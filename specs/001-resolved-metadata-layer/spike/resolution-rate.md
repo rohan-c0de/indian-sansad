@@ -446,3 +446,191 @@ file count — a 46-asker question is written into 46 per-member files in each o
    contract, versioning or deprecation notice. This measurement covers **identity corrections
    only** — it says nothing about the cost of the upstream changing shape, which is the larger
    half of Principle II's budget and remains unquantified.
+
+---
+
+# ADDENDUM — the 17th Lok Sabha, and what it overturns
+
+**Date**: 2026-10-09, after the sections above
+**Slice**: 17th Lok Sabha, **sessions 1–10 only — 45,467 of the term's 60,549 questions (75.1%)**
+**Matcher**: byte-identical configuration to the sections above. No threshold changed.
+
+> ## The headline above is wrong for the window. SC-002 is NOT met.
+>
+> T012 above concluded "VERIFIED WORKING, SC-002's 95% is met, with room". That conclusion was
+> drawn from the 18th Lok Sabha alone and carried its own refutation as the first of five things
+> it did not establish: *"The 17th Lok Sabha is unmeasured. It is 60,549 questions, 1.75× this
+> slice, and 64% of the covered window."* The 17th has now been measured and the verdict flips.
+
+## The numbers
+
+| Slice | Questions | Resolved | Rate | Ambiguous | Unresolved |
+|---|---|---|---|---|---|
+| 18th LS, complete term (term pool, 544 members) | 34,720 | 34,610 | **99.68%** | 0 | 106 |
+| **17th LS, sessions 1–10 (term pool, 559 members)** | **45,467** | **38,837** | **85.42%** | **0** | **6,630** |
+| **WINDOW, measured so far** | **80,187** | **73,447** | **91.59%** | 0 | 6,736 |
+
+Pessimistic full-roster bound for the 17th: **83.76%** by question (835 ambiguous, 6,549
+unresolved). Per name instance: 89.44% (term pool) / 88.35% (full pool). Per distinct form:
+91.35% / 89.94%.
+
+**The window figure is the sum of per-term numerators and denominators**, because each question
+is matched against its own term's members. That is arithmetically identical to per-question
+pooling and required no change to the prototype.
+
+### Why the slice is 10 sessions and not 15
+
+The fetch was **killed partway through session 11**, after sessions 1–10 had completed. Every one
+of those ten sessions matches its declared `totalRecordSize` exactly. **Session 11's 973 partial
+rows were discarded**, not counted — a partial session is a biased sub-sample of that session, and
+including it would corrupt the denominator in an unknowable direction.
+
+So this is a **real measurement over a real denominator**, not an extrapolation — but it is 75.1%
+of the term and the window figure covers **84.2% of the window**. The five missing sessions
+(11–15) could move 91.59% either way.
+
+## The pool correction that had to happen first
+
+The pool was previously selected by `lastLoksabha == N`. That is **wrong for any term but the
+latest**: a member who served in the 17th and continued into the 18th carries
+`lastLoksabha == 18`. The roster's `lsExpr` field enumerates every term served
+(`"11,12,14,16,17"`), so the pool is now `lsExpr contains N`.
+
+| | `lsExpr` contains N | `lastLoksabha == N` | |
+|---|---|---|---|
+| **18th LS** | 544 | 544 | **identical sets** |
+| **17th LS** | **559** | 343 | **216 members missing** |
+
+**The control that makes this safe**: re-running the 18th under the new definition reproduces
+99.68% / 34,610 of 34,720 / 467 forms / tiers 460-6-1 **exactly**, so nothing above is affected.
+Measuring the 17th with the old test would have withheld 216 of its own sitting members and
+manufactured unresolved forms the real pipeline never sees.
+
+## The fuzzy matcher is load-bearing after all
+
+T012 above recorded that the approximate tier "resolved nothing whatsoever — zero forms, zero
+instances", and explicitly declined to conclude fuzzy matching was unnecessary, giving as its
+first reason that the 17th was unmeasured and "an older term is exactly where upstream name
+hygiene is likelier to be worse." **That is what happened.**
+
+| Tier | 18th forms | 18th instances | **17th forms** | **17th instances** |
+|---|---|---|---|---|
+| exact | 460 | 56,241 | 383 | 55,771 |
+| normalised | 6 | 777 | **42** | **7,240** |
+| normalised-reordered | **0** | **0** | **11** | **1,443** |
+| **approximate (fuzzy)** | **0** | **0** | **18** | **3,465** |
+| reached approximate and failed | 1 | 106 | **43** | **8,020** |
+
+On the 17th, 114 forms (19,168 instances) need *something beyond exact matching* — against 7
+forms (883 instances) on the 18th. FR-002's fuzzy requirement is justified by the 17th, and the
+0.90 threshold is now exercised in the direction that matters: **it accepted 18 forms**.
+
+## Why the 17th fails — three causes, diagnosed rather than guessed
+
+The 43 unresolved forms classify cleanly by token-set relationship against the candidate pool:
+
+| Cause | Forms | Instances | Example |
+|---|---|---|---|
+| Question form's tokens are a strict **subset** of a roster name | 10 | 2,167 | `Shrirang Appa Barne` vs `shrirang appa chandu barne` |
+| Roster name is a strict **subset** of the question form | 8 | 1,709 | `Supriya Sadanand Sule` vs `supriya sule` |
+| **No containment relationship** | 25 | 4,144 | `D.K. Suresh`; `Poonam (Mahajan) Vajendla Rao`; `Balubhau (Alias Suresh Narayan) Dhanorkar` |
+
+The first two classes share one mechanism — a differing count of name components, almost always
+a middle name present on one side and absent on the other. The third is initials, parenthetical
+aliases, and genuinely divergent orderings.
+
+**A bidirectional token-containment tier** — resolve if the form's token set is a strict subset or
+superset of exactly one pool member's — was **simulated against the recorded failures**:
+
+| | Window rate | vs 95% | Hand corrections remaining |
+|---|---|---|---|
+| as measured | 91.59% | NOT MET | 44 forms (2.2 h) |
+| + containment tier | **95.33%** | **MET** | **25 forms (1.2 h)** |
+
+**It has not been implemented and no matcher change has been made.** Adding a tier after seeing
+the rate fall short is the move T012 forbids, and whether this counts as a structural rule for an
+evidenced pattern or as tuning is the owner's judgement, not the measurement's. The option, its
+gain and its three objections are set out in `spike-report.md` T014.
+
+## T013 revised — the correction cost has grown by 7×
+
+| | 18th LS only (as recorded above) | **Window (measured so far)** |
+|---|---|---|
+| Distinct forms needing correction | 6 (full pool) / 1 (term pool) | **44** |
+| **First-pass total** at the measured 3-min median | 18 min (0.30 h) | **132 min (2.2 h)** |
+| First-pass worst case at the 7-min maximum | 42 min (0.70 h) | **308 min (5.1 h)** |
+
+**The first-pass figure now exceeds Principle II's ~2 hours per week** for the week it is
+performed. It remains a **one-time** cost, and the steady-state arrival rate is what the
+principle's "routine" language actually targets — but the earlier claim that the burden sits at
+"0.14% of the budget, three orders of magnitude inside the ceiling" described the 18th Lok Sabha
+and does not describe the window.
+
+The correction timings themselves (median 3 min, maximum 7 min, n=6) are unchanged and were
+measured on 18th-LS forms. **Whether the 17th's harder cases — initials, aliases, parentheticals
+— cost the same 3 minutes is UNVERIFIED.** They are plausibly slower, which would make 2.2 h an
+underestimate.
+
+## Asker multiplicity, now across two terms
+
+| Slice | Questions | Instances | Mean | Median | **Max** |
+|---|---|---|---|---|---|
+| 18th LS, complete term | 34,720 | 57,124 | 1.6453 | 1 | 46 |
+| 17th LS, sessions 1–10 | 45,467 | 75,939 | **1.6702** | 1 | **49** |
+
+The two terms agree closely on the mean (1.645 vs 1.670), which is the first evidence that the
+multiplier is **stable across terms** rather than still drifting with sample size. The maximum
+rose 46 → 49.
+
+## The session-1 hypothesis is contradicted
+
+T012 above recorded that the 18th Lok Sabha's session 1 has **zero** questions against 7 sitting
+days, and offered as a plausible mechanical cause that a constitutive session — members sworn in,
+Speaker elected — holds no Question Hour, while explicitly labelling it a hypothesis rather than a
+finding.
+
+**The 17th Lok Sabha's session 1 carries 6,198 questions.** It was equally constitutive. So the
+hypothesis is **refuted**, and the 18th's session-1 gap is a genuine anomaly to declare under
+FR-013 rather than an explicable artefact. Cause remains **UNVERIFIED**.
+
+## Upstream cost: the 17th is ~3× more expensive per page, and it is not pagination
+
+| Fetch mode | Median s/page | Page depth | Result set |
+|---|---|---|---|
+| 18th LS, whole term (35 pages) | **~22** | to 35 | 34,720 |
+| 17th LS, whole term (11 pages, control) | **66.5** | to 61 | 60,549 |
+| 17th LS, per session | **~54** | to 7 | ~6,198 |
+
+Per-session fetching caps page depth at 7 and each result set at ~6,198 rows, and bought only
+**~19%**. So neither offset depth nor result-set size is the dominant cost.
+
+**Time of day is ruled out by direct control**: the identical 18th-LS request re-timed during the
+17th's fetch returned in 19.0 s and 32.8 s, matching its original 17.8–22 s. The service was not
+generally slower. **The cost is specific to the 17th Lok Sabha's records**, cause **UNVERIFIED**.
+
+**This revises the ingest-duration projection upward.** `free-tiers.md` T008 estimated a full
+window ingest at 20–50 minutes from measured per-record cost. Measured: the 18th took **797 s
+(13.3 min)** for 34,720 questions, and the 17th's 10 sessions took roughly **45 min** for 45,467.
+A full-window ingest is therefore on the order of **75–80 minutes**, not 20–50. Still comfortably
+inside the 6-hour job ceiling — about 22% of it — but the earlier figure was low by roughly 2×.
+
+**A correction to something asserted during this work**: a linear trend fitted to five 17th-LS
+page times (59 → 68 → 72 → 75 s) was used to project 171 minutes on a "deeper offsets are slower"
+reading. Page 7 then returned in 50.2 s and page 11 in 62.2 s. **The fit was fitting noise across
+five points and the next observation contradicted it.** Both the projection and the hypothesis
+are withdrawn.
+
+## What this addendum does not establish
+
+1. **Sessions 11–15 of the 17th Lok Sabha are unfetched** — 15,082 questions, 15.8% of the
+   window. 91.59% could move either way.
+2. **The containment tier is simulated, not implemented.** 95.33% comes from applying a stated
+   rule to recorded failures, not from a matcher re-run.
+3. **The 25 non-containment failures have no proposed remedy** — 4,144 instances needing
+   individual judgement or further rules.
+4. **Correction timings were measured on 18th-LS forms only.** The 17th's harder cases may cost
+   more than 3 minutes each.
+5. **Published bytes and file counts were not re-measured for the window** — the whole-window
+   publish and index need the complete 17th. Those figures remain 18th-LS projections.
+6. **Precision is still unverified.** No join, in either term, was hand-checked against the real
+   person. Every rate here measures the coverage of matching, not its correctness.

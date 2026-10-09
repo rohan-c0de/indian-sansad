@@ -311,3 +311,69 @@ files to republish records the member set already addresses.
    materially lower. The budget is deliberately stated uncompressed because the compression ratio
    has not been measured, and a budget resting on an assumed ratio is the kind of unverified
    figure this spike exists to eliminate.
+
+---
+
+# ADDENDUM — T016/T017 re-measured on a whole term
+
+**Date**: 2026-10-09, after the sections above
+
+T016 above measured **one session** (18th LS session 7, 6,975 questions) and T017 scaled it to the
+window. The whole 18th term has now been published in `--window` mode, which replaces the scaled
+estimate with a measurement for that term.
+
+| Basis | Questions | Total bytes (both formats) | **B/question** | Duplication | Files |
+|---|---|---|---|---|---|
+| One session (T016 above) | 6,975 | 25,033,292 | **3,589.0** | 4.135× | 994 |
+| **18th LS, whole term** | **34,720** | **113,425,115** | **3,266.9** | **3.872×** | **1,066** |
+
+**The single-session basis overstated bytes per question by 9.9%.** The cause is measurable: that
+session's own asker multiplicity was **1.7640** against the term's **1.6453**, and the by-member
+axis republishes once per asker. Choosing the *largest* session made the estimate conservative,
+which is what it was for.
+
+### T017's window projection, revised
+
+```
+whole-term basis : 3,266.9 B/question x 95,269 = 311,222,000 B = 296.8 MiB
+single-session   : 3,589.0 B/question x 95,269 = 341,920,673 B = 326.1 MiB  (what T017 published)
+```
+
+**~297 MiB, not 326 MiB — 27.6% of the 1 GiB GitHub Pages ceiling** rather than 31.8%. Every
+conclusion T017 drew is unchanged: the dataset fits, no axis needs dropping, and **repository
+growth through git history remains the binding constraint** rather than site size.
+
+### T015's file count: measured for one term
+
+T015 recorded the published file count as **UNVERIFIED against an unpublished GitHub limit**, and
+estimated ~1,800–2,200 window-wide from ~900 member identities. Measured for the 18th alone:
+
+| Axis | Files |
+|---|---|
+| by-member | **932** (466 members with ≥1 resolved question × 2 formats) |
+| by-ministry | 112 |
+| by-session | 14 |
+| reference | 6 |
+| coverage | 2 |
+| **Total, one term** | **1,066** |
+
+**Largest single published file: 3,697,700 B (3.53 MiB)** against the 100 MiB hard per-file limit
+— 28× headroom, better than T016's single-session figure suggested.
+
+The window total will be lower than 2 × 1,066, because the by-member and by-ministry axes span the
+whole window rather than being per-term: the 887-member window union (`lsExpr` contains 17 or 18)
+gives ~1,774 by-member files, plus ~120 by-ministry, 46 by-session, and ~8 reference and coverage
+— on the order of **1,950 files**. That is within T015's estimated range, still against a limit
+GitHub does not publish.
+
+## What this addendum does NOT establish
+
+**The window publish and the window-wide index were not run.** Both need the complete 17th Lok
+Sabha, and sessions 11–15 were never fetched. So:
+
+- **T017's ~297 MiB is still a projection**, now from a whole-term measurement rather than a
+  single session — better grounded, but not the window measured.
+- **T018's 3.13 MiB index figure is still a linear projection.** The sub-linearity asserted there
+  — that the term dictionary grows far slower than the postings — remains **unmeasured**.
+- **T019's page-load budget still rests on window-scaled per-file sizes**, not on real
+  window-partitioned files.

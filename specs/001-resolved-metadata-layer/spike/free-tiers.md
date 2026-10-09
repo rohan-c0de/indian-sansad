@@ -304,3 +304,52 @@ non-compliance is named, and the remedy is cheap and available.
    and an assumed ~900 member identities in the window. The per-member file count has not been
    produced, because nothing has been published yet. T016–T019 measure real bytes; the file
    *count* is first observable at T061.
+
+---
+
+# ADDENDUM — T008's ingest-duration figure, corrected by measurement
+
+**Date**: 2026-10-09, after the sections above
+
+T008 above sized a full ingest at **~46 minutes** from the laptop's measured ≈29 ms/record, and
+`ci-reachability.md` then revised it to an "honest range" of **20–50 minutes** on the strength of
+the runner being 11.3× faster on bulk transfer. **Both figures were low.** Measured:
+
+| Slice | Questions | Pages @1000 | Median s/page | **Measured wall time** |
+|---|---|---|---|---|
+| 18th LS, whole term | 34,720 | 35 | ~22 | **797 s = 13.3 min** |
+| 17th LS, sessions 1–10 | 45,467 | ~52 | ~54 | **~45 min** |
+| 17th LS, whole term (projected from its own median) | 60,549 | 61 | 66.5 | ~60 min |
+| **Full window** | **95,269** | **~96** | — | **~75–80 min** |
+
+**About 22% of the 6-hour per-job ceiling.** The conclusion T008 drew — tens of minutes, not
+hours, comfortably inside the ceiling — survives. The *number* was wrong by roughly 2×.
+
+### Why both earlier figures were low
+
+They assumed a uniform per-record cost measured on the 18th Lok Sabha. The 17th costs **~3×
+more per page**, and three candidate explanations were tested:
+
+- **Offset-pagination depth** — tested by fetching per session, which caps `pageNo` at 7 instead
+  of 61. Bought only ~19%. Not the cause.
+- **Result-set size** — the same test caps each result set at ~6,198 rows instead of 60,549.
+  Same ~19%. Not the cause.
+- **Time of day / general service load** — ruled out by direct control: the identical 18th-LS
+  request re-timed during the 17th's fetch returned in **19.0 s and 32.8 s**, against its
+  original 17.8–22 s.
+
+**The cost is specific to the 17th Lok Sabha's records. Cause UNVERIFIED.**
+
+### What this means for FR-009 rather than for the ceiling
+
+A *full* re-ingest is a rare operation; the incremental refresh FR-009 depends on is far smaller.
+But two things follow that the earlier figures hid:
+
+1. **Per-term cost is not predictable from another term.** A 3× spread between adjacent terms
+   means any future scope extension — the Rajya Sabha, or earlier Lok Sabhas — cannot have its
+   runtime estimated from the 18th. The 16th Lok Sabha alone carries 79,153 questions
+   (`route-capture.md`), more than either covered term.
+2. **One page took 271.6 s** during the 17th's whole-term fetch, against a 66.5 s median for that
+   run. A single request taking four minutes means per-request timeouts must be generous, and a
+   refresh that retries aggressively on slow responses will make the problem worse rather than
+   better.

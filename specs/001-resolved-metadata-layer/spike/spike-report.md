@@ -20,15 +20,21 @@ property.
 | **1** | Capture the question-metadata route | **VERIFIED WORKING** | `GET /api_ls/question/qetFilteredQuestionsAns` → HTTP 200, retrieved first-hand from the browser *and* programmatically. No credential, and with `User-Agent` and `Accept` stripped, **no required header at all**. [`route-capture.md`](./route-capture.md) |
 | **4a** | Name the free CI tier | **VERIFIED WORKING** | GitHub Actions, public repository: *"GitHub Actions usage is free ... for public repositories that use standard GitHub-hosted runners."* **Unmetered — no overage is possible.** [`free-tiers.md`](./free-tiers.md) |
 | **2** | Can a free CI runner reach the route | **VERIFIED WORKING** | HTTP 200 on both routes from an Azure `westus3` runner, run `37973110849`. No 403, no 429, no geo-block. **FR-009 is not blocked.** [`ci-reachability.md`](./ci-reachability.md) |
-| **3** | Measure the resolution rate and correction cost | **VERIFIED WORKING** | **99.68%** of 34,720 questions resolve to exactly one member (98.06% on the pessimistic pool) against SC-002's 95%. Correction cost **0.168 min/week** against a 120 min/week ceiling. [`resolution-rate.md`](./resolution-rate.md) |
+| **3** | Measure the resolution rate and correction cost | **VERIFIED BROKEN against SC-002** | **91.59%** over 80,187 questions across both terms — **below the 95% target**. The 18th Lok Sabha alone gives 99.68%; the 17th gives **85.42%**. First-pass correction cost **2.2 h** for 44 forms. **Stopped for the owner's decision — see T014.** [`resolution-rate.md`](./resolution-rate.md) |
 | **4b** | Name the free static hosting tier | **VERIFIED, one part by construction** | GitHub Pages: 1 GiB site, soft 100 GB/month, soft 10 builds/hour, 100 MiB hard per-file. One-origin service of `web/` + `data/published/` holds **by construction, not by execution** — no page exists yet. [`free-tiers.md`](./free-tiers.md) |
 | **5** | Measure bytes per partition and per first page load | **VERIFIED WORKING** | **25,033,292 bytes** for one real session → **326 MiB** projected for the window (31.8% of the 1 GiB ceiling). First page load **883 KiB** (ministry) / **479 KiB** (constituency). [`size-budget.md`](./size-budget.md) |
 
-**All five items pass. No capability is being reduced or dropped.**
+**Four of five items pass. Spike item 3 fails against SC-002 and is stopped for the owner.**
 
-T020 requires that where an item failed, the capability being reduced or dropped is named. **No
-item failed**, so nothing is dropped. Two reductions are nonetheless *pre-authorised* under
-Principle I, so the decision is already made if a limit is ever reached:
+T020 requires that where an item failed, the capability being reduced or dropped is named.
+**Spike item 3 failed**, and the capability at stake is **the resolution quality SC-002
+promises** — but *which* reduction applies is precisely the decision T014 hands to the owner
+(amend the criterion, buy the gap with 2.2 h of hand corrections, or add the match tier that
+simulation puts at 95.33%). **Nothing is reduced or dropped unilaterally**, because all three
+remedies are live and they differ in what they cost.
+
+No *other* capability is reduced. Two reductions are pre-authorised under Principle I, so the
+decision is already made if a limit is ever reached:
 
 - **If the published file count proves a problem** against GitHub's unpublished ceiling → drop
   the **per-member axis** (49.4% of published bytes), not buy hosting.
@@ -134,54 +140,125 @@ magnitude.**
 
 # T014 — the SC-002 decision
 
-## Decision: **SC-002 is MET. No amendment to `spec.md` is required and none is requested.**
+> ## ⛔ STOPPED FOR THE OWNER'S DECISION. SC-002 is **NOT MET**.
+>
+> **This section previously recorded SC-002 as MET. That record was wrong, and it was wrong for
+> the reason it itself declared:** it rested on the 18th Lok Sabha alone, and listed "the 17th
+> Lok Sabha is unmeasured — 64% of the covered window" as the first of eight things the spike had
+> not established. The 17th has now been partly measured and **the verdict flips.**
 
-| Configuration | Measured (per question) | Target | Outcome |
+## The measurement
+
+| Slice | Questions | Resolved | Rate | vs 95% |
+|---|---|---|---|---|
+| 18th Lok Sabha, complete term | 34,720 | 34,610 | **99.68%** | met |
+| **17th Lok Sabha, sessions 1–10** | **45,467** | **38,837** | **85.42%** | **FAILS by 9.58 points** |
+| **WINDOW (measured so far)** | **80,187** | **73,447** | **91.59%** | **FAILS by 3.41 points** |
+
+Each term is matched against its own members (`lsExpr` contains the term), so the window figure
+is the sum of per-term numerators and denominators — arithmetically identical to per-question
+pooling. Pessimistic full-roster bound for the 17th: **83.76%**.
+
+**Closing the gap by resolution would require 2,730 additional questions to resolve.**
+
+### Coverage of this measurement, stated precisely
+
+The 17th Lok Sabha slice is **sessions 1–10 only — 45,467 of the term's 60,549 questions
+(75.1%)**. Sessions 11–15 are **not fetched**: the fetch was killed partway through session 11,
+and the 973 partial rows from it were **discarded** rather than included, because a partial
+session is a biased sub-sample. Every session counted is complete and matches its declared
+`totalRecordSize` exactly.
+
+The window figure therefore covers **80,187 of 95,269 questions (84.2%)**. It is a real
+measurement over a real denominator, not an extrapolation — but it is not the whole window, and
+the five missing sessions could move it either way.
+
+## The second finding, which is as important as the first
+
+**The fuzzy matcher does real work on the 17th Lok Sabha.** On the 18th it resolved nothing at
+all, and this report recorded that as "its necessity is unevidenced on this route, for this
+term" rather than as evidence against it. That caution was warranted:
+
+| Tier | 18th LS forms | 18th LS instances | **17th LS forms** | **17th LS instances** |
+|---|---|---|---|---|
+| exact | 460 | 56,241 | 383 | 55,771 |
+| normalised | 6 | 777 | 42 | 7,240 |
+| normalised-reordered | 0 | 0 | 11 | 1,443 |
+| **approximate (fuzzy)** | **0** | **0** | **18** | **3,465** |
+| reached approximate and failed | 1 | 106 | 43 | 8,020 |
+
+FR-002's fuzzy matching is **load-bearing after all** — just not on the term that was measured
+first. Older upstream data has materially worse name hygiene, exactly as suspected.
+
+## Why the 17th fails: three distinct causes, diagnosed
+
+The 43 unresolved forms (8,020 instances) classify cleanly:
+
+| Cause | Forms | Instances | Example (name forms are FR-008-permitted) |
 |---|---|---|---|
-| **18th-LS candidate pool** — operative | **99.68%** | 95% | **MET, +4.68 points** |
-| **Full-roster pool** — pessimistic bound | **98.06%** | 95% | **MET, +3.06 points** |
+| **Question form's tokens are a strict SUBSET of a roster name** | 10 | 2,167 | `Shrirang Appa Barne` vs roster `shrirang appa chandu barne` — a middle name the question omits |
+| **Roster name is a strict subset of the question form** | 8 | 1,709 | `Supriya Sadanand Sule` vs roster `supriya sule` — a middle name the question adds |
+| **No containment relationship** | 25 | 4,144 | `D.K. Suresh`, `Poonam (Mahajan) Vajendla Rao`, `Balubhau (Alias Suresh Narayan) Dhanorkar` — initials, parentheticals and aliases |
 
-Met under both configurations, including the one that deliberately withholds a disambiguator the
-real pipeline will have. T014 requires a stop for the owner's decision only if the rate is
-*below* 95%; it is above under all three readings of the metric, so no decision is owed and
-T014's two remedies — amend SC-002 downward, or close a gap with assertions — are moot.
+The first two classes share one mechanism — a differing number of name components — and are
+**mechanically fixable**. The third needs individual judgement or further rules.
 
-Denominator **34,720 questions**, the complete 18th Lok Sabha, not a sample. Matcher thresholds
-were fixed before the first run; the prototype emits `tuned_after_seeing_results: false`.
+## The decision, with all three options costed
 
-| Reading of SC-002 | Denominator | `ls18` | `full` |
+T014 names two options. **A third exists and is better than either**, so withholding it would be
+the dishonest version of following the task.
+
+### Option A — amend SC-002 to the measured rate
+
+Change the 95% target to ~91.6%, citing this measurement. **Cost:** the published target becomes
+a description of current performance rather than a standard, and the spec's own Assumptions note
+("it should be revisited once real resolution rates are known") is satisfied in the weakest
+direction. 6,736 questions stay unresolved but visibly marked, which FR-004 permits.
+
+### Option B — close the gap with maintainer assertions
+
+**Cost, at the measured median of 3 minutes per correction:** 44 distinct forms window-wide ×
+3 min = **132 minutes (2.2 hours) first pass**. That **exceeds Principle II's ~2 hours per week**
+for the week it is done, though it is a one-time cost. It also scales with the 5 unfetched
+sessions and with the Rajya Sabha if it is ever obtained.
+
+### Option C — add a bidirectional token-containment match tier *(recommended)*
+
+A form resolves if its canonical token set is a strict subset **or** strict superset of exactly
+one pool member's token set. Simulated over the existing failures:
+
+| | Window rate | vs 95% | Hand corrections left |
 |---|---|---|---|
-| per **question**, every asker must resolve (strictest, quoted above) | 34,720 | **99.68%** | **98.06%** |
-| per name instance | 57,124 | 99.81% | 98.83% |
-| per distinct name form | 467 | 99.79% | 98.72% |
+| as measured | 91.59% | **NOT MET** | 44 forms (2.2 h) |
+| **+ containment tier** | **95.33%** | **MET** | **25 forms (1.2 h)** |
 
-### The decision this spike actually surfaces, for the owner
+It resolves 19 forms / 3,982 instances, gains **+3.74 points**, and nearly halves the correction
+burden. Options A and B are not needed if it is adopted — and it is what FR-002 asks for.
 
-`spec.md` Assumptions says SC-002's 95% *"should be revisited once real resolution rates are
-known."* They are now known, and they are **4.7 points above** it — so the target may be too
-**lenient**, not too strict. A 95% floor permits 1,736 of these 34,720 questions to go
-unresolved; the measurement leaves **106**. A target 16× looser than measured performance would
-let an order-of-magnitude regression pass unnoticed.
+**Three honest objections to Option C, which is why this is the owner's call and not mine:**
 
-**Not actioned here**, for two reasons: T014's mandate is to record or stop, not to raise a
-criterion; and the 17th Lok Sabha — 64% of the window — is unmeasured, so a floor raised on 36%
-of the data would be an invented default again. **Recorded as an owner decision for after the
-17th Lok Sabha is measured.**
+1. **It is a matcher change made after seeing the rate fall short — exactly the move T012
+   forbids.** The defence is that this is a *structural rule for an evidenced name-variant
+   pattern* (18 forms with a clear signature), not a threshold tuned to hit a number; and that
+   the rule was stated before being applied. But the defence is arguable, and the owner should
+   weigh it rather than have me decide it.
+2. **95.33% clears 95% by 0.33 points.** That is not a comfortable pass. The five unfetched
+   sessions, or the 17th's full term, could put it back under.
+3. **It is simulated, not implemented.** The figure comes from applying the rule to the recorded
+   failures, not from a re-run of the matcher. An implementation could differ at the margins.
 
-### SC-002's second clause is not measured and is not claimed
+**No option has been adopted. No matcher change has been made. Nothing has been amended.**
+
+## SC-002's second clause is still not measured
 
 *"...and 100% of the remainder are visibly marked unresolved rather than absent."* **NOT
-MEASURED** — nothing is published, so nothing is marked. It is a property of published output,
-tested by `quickstart.md` scenario 2 in Phase 4.
+MEASURED** — nothing is published, so nothing is marked. Phase 4, `quickstart.md` scenario 2.
 
-### And one limit on the rate itself
+## And the same limit on the rate itself
 
-**It measures the coverage of matching, not its correctness.** A form that matched exactly to one
-member is counted resolved; **no join was hand-checked against the real person.** The *precision*
-of 99.68% is **UNVERIFIED**. `quickstart.md` scenario 4 (`make verify-joins`) is the check that
-addresses it, in Phase 4.
-
----
+**It measures the coverage of matching, not its correctness.** No join was hand-checked against
+the real person, so the precision of any figure here is **UNVERIFIED** — only its coverage is
+measured.
 
 ## What Phase 3 inherits — findings that change the build
 
@@ -227,9 +304,13 @@ Each of these came out of the spike and is not in `plan.md`, `research.md` or `d
 
 Stated so Phase 3 does not inherit these as settled.
 
-1. **The 17th Lok Sabha has never been fetched.** 60,549 questions — **64% of the covered
-   window**. Every window figure in this report is a projection from the 18th alone, and the
-   resolution rate, the correction cost and the asker multiplicity are all 18th-LS-only.
+1. **The 17th Lok Sabha is 75% fetched, not whole.** Sessions 1–10 are complete (45,467 of
+   60,549 questions); **sessions 11–15 were never fetched** — the fetch was killed partway
+   through session 11 and those 973 partial rows were discarded. So the window measurement
+   covers **80,187 of 95,269 questions (84.2%)**, and the five missing sessions could move the
+   91.59% either way. The **published byte and file figures remain 18th-LS-only projections**:
+   the whole-window publish (T016/T017) and the window-wide index (T018) were not re-run,
+   because both need the complete 17th.
 2. **Rajya Sabha remains unobtainable.** `plan.md` Risk 1 stands. **But it is narrowed from three
    candidate causes to one**, on evidence: `HEAD`→403 on a public unauthenticated URL rules out
    *authorisation*, and 200 from an Azure datacentre IP undercuts the *datacentre-IP* candidate.
@@ -269,10 +350,18 @@ with GitHub redirecting the old Pages URL. No amendment is requested. Detail in
 
 | Gate | Principle | Status |
 |---|---|---|
-| Cost | I | **Evidenced.** Three components, all free tiers named, every limit behaviour quoted, no overage anywhere. Two non-size exposures recorded. |
-| Upkeep | II | **Partly evidenced.** This feature's component measured at 0.14% of budget; the project total is not establishable before a scheduled run. |
+| Cost | I | **Evidenced.** Three components, all free tiers named, every limit behaviour quoted, no overage anywhere. Two non-size exposures recorded. Ingest duration revised upward — see below. |
+| Upkeep | II | **Partly evidenced, and the figure has grown.** The steady-state identity-correction cost stays far inside budget, but the **first-pass** cost rose from 18 min (18th LS alone) to **132 min (2.2 h) window-wide**, which exceeds Principle II's weekly ceiling for the week it is done. The project total remains not establishable before a scheduled run. |
 | Sources | III | **Evidenced.** Every input is an already-structured route. The four document-path fields are refused, and the text behind them is a declared gap. |
 | Language | IV | **Evidenced.** `locale=en`; the two Hindi fields are refused; no translation path exists. |
 | Member fields | V | **Evidenced for the spike.** Positive FR-008 allowlist at fetch time; `make guard` passes on every commit; no upstream body was ever written inside the tree. Re-run against real published output before publishing, per the constitution. |
 
-**Phase 3 may begin.**
+## ⛔ Phase 3 is BLOCKED pending the T014 decision.
+
+The gate file exists, which is T020's condition — but the condition T014 attaches is not
+satisfied: *"stop for the owner's decision. Do not choose, and do not proceed into Phase 3 on an
+assumed answer."* SC-002 is not met on the measured window, so that stop is in force.
+
+**What unblocks it:** the owner picks Option A, B or C in T014. Optionally, fetching the 17th
+Lok Sabha's remaining five sessions first would make the decision on 100% of the window instead
+of 84.2% — at roughly 20 minutes of fetching.
