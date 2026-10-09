@@ -765,3 +765,106 @@ converged — unlike the early samples (1.32 at n=50, 1.504 at n=250). **T017 ma
    person. Every rate measures the coverage of matching, not its correctness.
 6. **The steady-state arrival rate was never computed for the 17th Lok Sabha**, so no
    window-wide Principle II steady-state figure exists.
+
+---
+
+# Containment-tier matches and the residual forms
+
+**Date**: 2026-10-09. Derived from the `--containment` runs over both complete terms.
+Member **name forms only** are shown; no other member field appears, per FR-008.
+
+## (1) Every name form the containment tier resolves, both terms
+
+| Questions | Form as written (question route) | Roster name matched | Term |
+|---:|---|---|---:|
+| 634 | `Shrirang Appa Barne` | `Shrirang Appa Chandu Barne` | 17th |
+| 629 | `Supriya Sadanand Sule` | `Supriya Sule` | 17th |
+| 484 | `Ravi Kishan Shukla` | `Ravindra Shukla Alias Ravi Kishan` | 17th |
+| 472 | `Prataprao  Jadhav` | `Prataprao Ganpatrao Jadhav` | 17th |
+| 395 | `Manoj Kumar Tiwari` | `Manoj Tiwari` | 17th |
+| 379 | `L.S. Tejasvi Surya` | `Tejasvi Surya` | 17th |
+| 342 | `Midhun Reddy` | `P V Midhun Reddy` | 17th |
+| 310 | `Jugal Kishore Sharma` | `Jugal Kishore` | 17th |
+| 284 | `Margani Bharat` | `Bharat Ram Margani` | 17th |
+| 280 | `Hemant Patil` | `Hemant Shriram Patil` | 17th |
+| 238 | `Rajiv Ranjan (Lalan) Singh` | `Rajiv Ranjan Singh` | 17th |
+| 181 | `Kanimozhi Karunanidhi` | `Kanimozhi Rajathi Karunanidhi` | 17th |
+| 152 | `Prataprao Govindrao  Patil Chikhalikar` | `Prataprao  Patil Chikhalikar` | 17th |
+| 106 | `Smt. Kanimozhi Karunanidhi` | `Kanimozhi Rajathi Karunanidhi` | 18th |
+| 103 | `Vinod Chavda` | `Chavda Vinod Lakhamshi` | 17th |
+| 88 | `Devusinh Jesingbhai Chauhan` | `Devusinh Chauhan` | 17th |
+| 75 | `Shiromani Ram` | `Ram Shiromani Verma` | 17th |
+| 31 | `Suresh Pujari` | `Suresh Kumar Pujari` | 17th |
+| 1 | `Satabdi Roy (Banerjee)` | `Satabdi Roy` | 17th |
+
+**19 forms, 5,184 questions.** Eighteen are in the 17th Lok Sabha and one in the 18th.
+
+Every row is the same mechanism — a differing count of name components. The question route and
+the roster disagree about whether a middle name, a patronymic, an initial or an alias belongs in
+the name, and the tier resolves the disagreement in whichever direction it runs. `Supriya
+Sadanand Sule` adds a middle name the roster omits; `Shrirang Appa Barne` omits one the roster
+carries. Three rows (`Ravi Kishan Shukla`, `Rajiv Ranjan (Lalan) Singh`, `Satabdi Roy
+(Banerjee)`) are alias forms that happen to satisfy containment; the tier was not designed for
+aliases and catches these incidentally, which is why the 25 residual forms still include
+parenthetical aliases it misses.
+
+## (2) The 25 residual forms, ranked by questions blocked
+
+A question is blocked if **any** of its askers is unresolved, so the counts below overlap: a
+co-asked question with two residual askers appears in both rows.
+
+| Rank | Questions blocked | Form as written | Term |
+|---:|---:|---|---:|
+| 1 | 513 | `Sunil Dattatray Tatkare` | 17th |
+| 2 | 414 | `Ganesan Selvam` | 17th |
+| 3 | 372 | `D.K. Suresh` | 17th |
+| 4 | 292 | `Poonam (Mahajan) Vajendla Rao` | 17th |
+| 5 | 273 | `V. Kalanidhi` | 17th |
+| 6 | 270 | `S. Jagathrakshakan` | 17th |
+| 7 | 270 | `Vellalath Kochukrishnan Nair. Sreekandan` | 17th |
+| 8 | 263 | `Kumbakudi Sudhakaran` | 17th |
+| 9 | 258 | `Balubhau (Alias Suresh Narayan) Dhanorkar` | 17th |
+| 10 | 255 | `Kani K. Navas` | 17th |
+| 11 | 246 | `Andimuthu Raja` | 17th |
+| 12 | 225 | `Abdul Majeed Ariff` | 17th |
+| 13 | 222 | `M. Selvaraj` | 17th |
+| 14 | 208 | `Mitesh Rameshbhai (Bakabhai) Patel` | 17th |
+| 15 | 202 | `Shardaben Anilbhai Patel` | 17th |
+| 16 | 195 | `Thalikkottai Rajuthevar Baalu` | 17th |
+| 17 | 143 | `Thirumaa Valavan Thol` | 17th |
+| 18 | 140 | `Nusrat Jahan Ruhi` | 17th |
+| 19 | 138 | `S. Ramalingam` | 17th |
+| 20 | 122 | `C. R. Patil` | 17th |
+| 21 | 47 | `Durga Das Uikey` | 17th |
+| 22 | 32 | `Rampreet Mandal` | 17th |
+| 23 | 24 | `Mohanbhai Sanjibhai Delkar` | 17th |
+| 24 | 23 | `Sakshi Ji Swami Maharaj` | 17th |
+| 25 | 2 | `V. Srinivas Prasad` | 17th |
+
+**All 25 are in the 17th Lok Sabha. The 18th has none after the tier.**
+
+## How many of the top forms reach 95% of the full window
+
+With the tier enabled the window stands at **90,299 / 95,269 = 94.78%**. Reaching 95.00%
+requires **90,506** resolved — **207 more questions**.
+
+| Top N forms corrected | Questions recovered | Window resolved | Rate |
+|---:|---:|---:|---:|
+| 1 | +422 | 90,721 | 95.23% **← 95% reached** |
+| 2 | +831 | 91,130 | 95.66% **← 95% reached** |
+| 3 | +1,174 | 91,473 | 96.02% **← 95% reached** |
+| 4 | +1,456 | 91,755 | 96.31% **← 95% reached** |
+| 5 | +1,692 | 91,991 | 96.56% **← 95% reached** |
+| 6 | +1,954 | 92,253 | 96.83% **← 95% reached** |
+
+**One correction is enough.** The top-ranked form, `Sunil Dattatray Tatkare`, blocks
+513 questions, of which **422** have no other residual asker and
+therefore resolve the moment it is corrected — taking the window to **95.23%**, clear of
+the 95% threshold.
+
+Correcting all 25 reaches **100.00%**. At the measured 3-minute median the full set is **75
+minutes**; the single correction that clears SC-002 is **3 minutes**.
+
+**The recovered count is lower than the blocked count for every form**, because a co-asked
+question needs *all* its residual askers fixed before it resolves. That is FR-003 working as
+specified, and it is why the ranking cannot simply be summed.

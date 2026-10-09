@@ -22,7 +22,7 @@ property.
 | **2** | Can a free CI runner reach the route | **VERIFIED WORKING** | HTTP 200 on both routes from an Azure `westus3` runner, run `37973110849`. No 403, no 429, no geo-block. **FR-009 is not blocked.** [`ci-reachability.md`](./ci-reachability.md) |
 | **3** | Measure the resolution rate and correction cost | **VERIFIED BROKEN against SC-002** | **90.64%** over the **complete window of 95,269 questions** — below the 95% target by 4.36 points. 18th LS 99.68%; 17th LS **85.45%**. Option C's tier, holdout-validated, reaches only **94.78%** — still short by 207 questions. First-pass correction cost **2.2 h** for 44 forms. **Stopped for the owner's decision — see T014.** [`resolution-rate.md`](./resolution-rate.md) |
 | **4b** | Name the free static hosting tier | **VERIFIED, one part by construction** | GitHub Pages: 1 GiB site, soft 100 GB/month, soft 10 builds/hour, 100 MiB hard per-file. One-origin service of `web/` + `data/published/` holds **by construction, not by execution** — no page exists yet. [`free-tiers.md`](./free-tiers.md) |
-| **5** | Measure bytes per partition and per first page load | **VERIFIED WORKING** | **113,425,115 bytes** measured for the 18th Lok Sabha's complete term → **~297 MiB** projected for the window (**27.6%** of the 1 GiB ceiling). **1,066 files** for one term; largest file 3.53 MiB against a 100 MiB limit. First page load **883 KiB** (ministry) / **479 KiB** (constituency). [`size-budget.md`](./size-budget.md) |
+| **5** | Measure bytes per partition and per first page load | **VERIFIED WORKING** | **227,007,149 bytes (216.5 MiB) MEASURED across the full window** — **21.1%** of the 1 GiB ceiling, **1,750 files**, largest file 3.53 MiB against a 100 MiB limit. Subject index **2.86 MiB measured**. First page load **587 KiB** median ministry / **401 KiB** median constituency / **2.50 MiB** largest ministry. [`size-budget.md`](./size-budget.md) |
 
 **Four of five items pass. Spike item 3 fails against SC-002 and is stopped for the owner.**
 
@@ -39,7 +39,7 @@ decision is already made if a limit is ever reached:
 - **If the published file count proves a problem** against GitHub's unpublished ceiling → drop
   the **per-member axis** (49.4% of published bytes), not buy hosting.
 - **If the subject index proves too costly** → it is fetched **lazily, only on an actual search**,
-  so no visitor who never searches pays its 3.13 MiB.
+  so no visitor who never searches pays its **2.86 MiB** (measured).
 
 ---
 
@@ -61,7 +61,7 @@ at that tier's limit. No paid service, trial, or promotional credit anywhere."*
 | | | Bandwidth **100 GB/month** (soft) | *"we may not be able to serve your site, or you may receive a polite email from GitHub Support"* | **No** |
 | | | Builds **10/hour** (soft) | as above | **No** |
 | | | Per file **100 MiB** (hard) | *"GitHub blocks files larger than 100 MiB."* | **No** |
-| | | **File count** | **NOT PUBLISHED by GitHub** | unknown |
+| | | **File count** | **NOT PUBLISHED by GitHub** | unknown — **1,750 files measured**, an ordinary number for a static site, but against an unpublished ceiling |
 | **Reader front end** | GitHub Pages — **the same site**, adding no component and no second tier | as above | as above | **No** |
 
 Every figure is quoted from GitHub's own current published pages with the URL and the retrieval
@@ -71,17 +71,21 @@ date (**2026-10-09**) in [`free-tiers.md`](./free-tiers.md).
 
 | Limit | Ceiling | Measured / projected | Headroom |
 |---|---|---|---|
-| Pages site size | 1 GiB | **~297 MiB** (from the 18th's whole-term 3,266.9 B/question) | 3.6× |
-| Pages per-file | 100 MiB | ~2.1 MiB largest | 48× |
+| Pages site size | 1 GiB | **216.5 MiB measured** (227,007,149 B, both formats, full window) | **4.7×** |
+| Pages per-file | 100 MiB | **3.53 MiB largest, measured** | 28× |
 | Job duration | 6 h | full ingest **~75–80 min**, from measured wall times (18th: 797 s; 17th: ~60 min) | ~4.5× |
-| Bandwidth | 100 GB/mo | 883 KiB/visitor → ~110,000 visitors | — |
+| Bandwidth | 100 GB/mo | **587 KiB median visitor → ~166,000 visitors**; 441 whole-dataset downloads | — |
 
 ### Two Principle I exposures that are not size, and were invisible before this spike
 
 **1. Repository growth, not dataset size, is the binding constraint.** `data/published/` is
-version-controlled, so every refresh writes a new **~297 MiB** copy into git history. The working
-tree stays at ~297 MiB; the repository passes GitHub's *"ideally less than 1 GB"* in about **four
-refreshes** and its *"less than 5 GB is strongly recommended"* within **eighteen**.
+version-controlled, so every refresh writes a new **216.5 MiB** copy into git history — a measured
+figure, not a projection. The working tree stays at 216.5 MiB; the repository passes GitHub's
+*"ideally less than 1 GB"* in about **five refreshes** and its *"less than 5 GB is strongly
+recommended"* within **twenty-four**.
+
+**This remains the constraint that binds first.** The Pages site ceiling has 4.7× headroom and
+the per-file limit 28×, while the repository guidance is breached on the fifth refresh.
 
 This **compounds** with the 60-day rule rather than sitting beside it: T008 concluded the refresh
 must **commit on every run** to keep the schedule alive, so commits are simultaneously mandatory
@@ -325,11 +329,19 @@ Each of these came out of the spike and is not in `plan.md`, `research.md` or `d
     Karunanidhi` — similarity ~0.84 against a 0.90 threshold. **Deliberately not added**, because
     changing the matcher after seeing the result is what T012 forbids. Recorded as a Phase 3
     design recommendation with its evidence.
-11. **Fetch the subject index lazily.** Eagerly loading 3.13 MiB cuts sustainable reach from
-    ~110,000 to ~24,000 visitors/month to serve one feature.
+11. **Fetch the subject index lazily.** Measured at **2.86 MiB** — 83% of its view's total.
+    Loading it eagerly cuts sustainable reach from ~166,000 to ~27,750 visitors/month to serve
+    one feature.
 12. **Every published figure is uncompressed.** Pages serves gzip/brotli, which on this shape
     would plausibly cut transfer 70–85%. The budget is deliberately stated uncompressed because
     the ratio has not been measured.
+13. **Page weight must be budgeted against the largest partition, not the median.** Measured
+    ministry files span **350 B to 2,564,507 B** — the median first load is 587 KiB but the
+    largest is **2.50 MiB**, a 4.4× spread.
+14. **Projections overstate at every level of aggregation.** One session scaled to a term was
+    9.9% high; one term scaled to the window was **37%** high; the index projection was 9.2%
+    high. Each larger aggregate is cheaper per question than the level below predicts, so any
+    future scope estimate built by scaling should be read as an upper bound.
 
 ---
 
@@ -337,13 +349,14 @@ Each of these came out of the spike and is not in `plan.md`, `research.md` or `d
 
 Stated so Phase 3 does not inherit these as settled.
 
-1. **Resolution is measured on 100% of the window; SIZE is not.** Both terms are now fetched
-   whole (34,720 + 60,549 = 95,269, matching the sum of their `totalRecordSize`), so the
-   resolution rate carries no projection. But the **published byte, file-count and index figures
-   are still 18th-Lok-Sabha measurements scaled to the window** — the whole-window publish
-   (T016/T017) and the window-wide index (T018) were **not re-run** on the completed data. So
-   ~297 MiB, ~1,950 files and the 3.13 MiB index remain projections, and T019's page-load budget
-   rests on window-scaled per-file sizes rather than real window-partitioned files.
+1. **Resolution AND size are both measured on 100% of the window.** Both terms are fetched whole
+   (34,720 + 60,549 = 95,269, matching the sum of their `totalRecordSize`), the window publish
+   and the window index have been run over them, and the publish's own resolved count (86,352)
+   matches `resolve_rate.py`'s independently computed figure exactly. **No projection remains in
+   any rate, byte count, file count or index size.** What is still *unobserved* rather than
+   unmeasured: the page shell's 60 KiB is an estimate because `web/` does not exist, no page has
+   been served, and every byte figure is uncompressed because the gzip/brotli ratio has not been
+   measured.
 2. **Rajya Sabha remains unobtainable.** `plan.md` Risk 1 stands. **But it is narrowed from three
    candidate causes to one**, on evidence: `HEAD`→403 on a public unauthenticated URL rules out
    *authorisation*, and 200 from an Azure datacentre IP undercuts the *datacentre-IP* candidate.

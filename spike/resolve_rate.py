@@ -326,8 +326,15 @@ def main() -> int:
     roster_p = scratch / "roster_ls.jsonl"
     # --questions lets a sub-slice be measured against its own term's pool --
     # needed to score sessions 11-15 as a holdout while the pool stays LS17.
+    slice_tag = ""
     if "--questions" in sys.argv:
         questions_p = scratch / sys.argv[sys.argv.index("--questions") + 1]
+        # The slice tag MUST enter the artefact filename. Without it, two runs
+        # over different sub-slices of the same term silently overwrite each
+        # other's detail file -- which happened, and fed a holdout-only forms
+        # dict into publish_sample.py.
+        stem = questions_p.stem.replace(f"questions_ls{loksabha}", "").strip("_")
+        slice_tag = f"_{stem}" if stem else ""
     else:
         questions_p = scratch / f"questions_ls{loksabha}.jsonl"
     for p in (roster_p, questions_p):
@@ -484,7 +491,8 @@ def main() -> int:
     print(json.dumps(out, indent=1, ensure_ascii=False))
 
     # --- per-form detail written to SCRATCH, not the repo ---
-    detail_p = scratch / f"resolution_detail_ls{loksabha}_{pool}{'_containment' if use_containment else ''}.json"
+    cflag = "_containment" if use_containment else ""
+    detail_p = scratch / f"resolution_detail_ls{loksabha}_{pool}{slice_tag}{cflag}.json"
     detail_p.write_text(json.dumps(
         {"aggregate": out,
          "forms": {f: r for f, r in sorted(results.items())}},
@@ -495,7 +503,7 @@ def main() -> int:
         ((f, r) for f, r in results.items() if r["status"] != "resolved"),
         key=lambda kv: (-kv[1]["instances"], kv[0]),
     )
-    wl = scratch / f"correction_worklist_ls{loksabha}_{pool}{'_containment' if use_containment else ''}.md"
+    wl = scratch / f"correction_worklist_ls{loksabha}_{pool}{slice_tag}{cflag}.md"
     with wl.open("w", encoding="utf-8") as fh:
         fh.write(f"# T013 correction worklist (Lok Sabha {loksabha}, pool: {pool})\n\n")
         fh.write(f"{len(needing)} distinct name forms came out ambiguous or unresolved.\n")

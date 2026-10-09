@@ -405,3 +405,119 @@ superseded.
 **What would turn the projections into measurements**: `spike/publish_sample.py --window
 --loksabha 17,18` and `spike/index_sample.py --loksabha 17,18`. Both are implemented and both
 need only the data already on disk. Neither was run in this pass.
+
+---
+
+# MEASURED — the full window, published and indexed
+
+**Date**: 2026-10-09. `spike/publish_sample.py --window --loksabha 17,18 --pool term` and
+`spike/index_sample.py --loksabha 17,18`, over both complete terms already on disk.
+**Every projection in this file is now superseded by a measurement.**
+
+**Correctness cross-check**: the publish reports **86,352 resolved / 8,917 unresolved**, matching
+`resolve_rate.py`'s independently computed window figure of 86,352 resolved + 8,913 unresolved +
+4 no-asker exactly. The two code paths agree.
+
+## T016/T017 — measured window publish
+
+| | Projected (18th-LS basis) | **MEASURED (both terms)** | Error in the projection |
+|---|---|---|---|
+| Total bytes, both formats | ~311,222,000 (~297 MiB) | **227,007,149 (216.5 MiB)** | projection **37% high** |
+| Bytes per question | 3,266.9 | **2,382.8** | projection 37% high |
+| File count | ~1,950 | **1,750** | projection 11% high |
+| Duplication multiple | 3.872× | **3.725×** | |
+| Largest single file | — | **3,697,700 (3.53 MiB)** | |
+| vs 1 GiB Pages ceiling | 27.6% | **21.1%** (4.7× headroom) | |
+
+**Why the projection was 37% high**: it scaled the 18th Lok Sabha's bytes-per-question to the
+window. The 17th is cheaper per question — its records carry shorter subject lines and the
+per-member duplication lands differently — so the combined figure is well below the 18th's rate.
+**Scaling one term to a window overstated it**, exactly as scaling one *session* to a term
+overstated that (9.9%). The lesson is consistent: each level of aggregation is cheaper per
+question than the level below it suggests.
+
+### Measured bytes and files per axis
+
+| Axis | Files | Records | ndjson bytes | CSV bytes |
+|---|---|---|---|---|
+| **by-member** | **1,576** | 148,158 | **66,954,627** | 37,720,338 |
+| by-ministry | 124 | 95,269 | 39,603,343 | 21,349,962 |
+| by-session | 42 | 95,269 | 39,603,343 | 21,344,919 |
+| reference | 6 | 871 | 292,851 | 136,831 |
+| coverage | 2 | 1 | 520 | 415 |
+| **Total** | **1,750** | — | **146,454,684** | **80,552,465** |
+
+21 sessions, 62 ministries, **788 members with at least one published file**.
+
+### Measured per-file size distributions (ndjson)
+
+| Axis | n | Min | Median | Mean | Max |
+|---|---|---|---|---|---|
+| by-session | 21 | 541,931 | 1,836,170 | 1,885,873 | **3,697,700** |
+| by-ministry | 62 | 350 | **539,249** | 638,763 | **2,564,507** |
+| by-member | 788 | 333 | **66,914** | 84,967 | **519,859** |
+| reference | 3 | 2,929 | 7,879 | 97,617 | 282,043 |
+
+**Largest published file is 3.53 MiB against the 100 MiB hard limit — 28× headroom.**
+
+### T015's file-count risk, now quantified
+
+T015 recorded the file count as **UNVERIFIED against a limit GitHub does not publish**. Measured:
+**1,750 files**. The limit remains unpublished, so the risk is unchanged in kind — but the
+quantity is no longer an estimate, and 1,750 is a wholly ordinary number for a static site.
+
+### Repository growth — the binding constraint, re-measured
+
+At **216.5 MiB per published snapshot**, a version-controlled `data/published/` passes GitHub's
+*"ideally less than 1 GB"* in **4.7 refreshes** and its *"less than 5 GB is strongly
+recommended"* in **23.6**. Less acute than the ~297 MiB projection implied (4.0 and 18.0), and
+still the constraint that binds first — the Pages site ceiling has 4.7× headroom while the
+repository guidance is breached on the fifth refresh.
+
+## T018 — measured window index
+
+| Variant | Distinct terms | Postings | **Bytes** | B/question |
+|---|---|---|---|---|
+| **`subjects_only` — chosen** | 16,979 | 352,738 | **3,002,356 (2.86 MiB)** | **31.51** |
+| `subjects_plus_ministry_and_member` | 18,152 | 972,521 | 4,860,719 (4.64 MiB) | 51.02 |
+
+**Projected 3,279,748 B; measured 3,002,356 B — the projection was 9.2% high**, and the
+**asserted sub-linearity is confirmed**: question count grew 2.74× (34,720 → 95,269) while the
+term dictionary grew only **1.52×** (11,145 → 16,979). Postings scaled nearly linearly
+(143,020 → 352,738 = 2.47×). The dictionary is the sub-linear part, as claimed.
+
+## T019 — first page load, from measured window files
+
+The page shell remains the **only estimated input** at 60 KiB; `web/` does not exist.
+
+| View | Total | Visitors/month inside 100 GB |
+|---|---|---|
+| Constituency entry, median member | **401 KiB** | 243,358 |
+| Ministry profile, median ministry | **587 KiB** | 166,332 |
+| Constituency entry, **largest** member | 844 KiB | 115,759 |
+| Ministry profile, **largest** ministry | **2.50 MiB** | 38,074 |
+| Ministry profile + subject search | **3.44 MiB** | 27,750 |
+
+**The spread matters more than the median.** T019 previously quoted 883 KiB for a ministry
+profile from a window-scaled average. Measured, the median ministry is **587 KiB** but the
+largest is **2.50 MiB** — a 4.4× spread, so a visitor's first load depends on *which* ministry
+they open. Any page-weight budget must be set against the largest, not the median.
+
+Subject search remains the dominant single cost at **2.86 MiB — 83% of its view's total**, and
+loading it eagerly cuts sustainable reach from ~166,000 to ~27,750 visitors/month. **Fetch it
+lazily, only on an actual search.** That conclusion is unchanged and now rests on measurement.
+
+**A whole-dataset download is 216.5 MiB**, so the 100 GB soft bandwidth allows **441 full-dataset
+downloads per month** — up from the 305 the projection implied.
+
+## What remains unmeasured
+
+1. **The page shell (60 KiB) is still an estimate.** `web/` does not exist.
+2. **No page has been served**, so no first page load has been *observed*. T083 and T090 remain
+   the executed checks.
+3. **Every figure is uncompressed.** Pages serves gzip/brotli, which on this shape would
+   plausibly cut transfer 70–85%. The compression ratio has not been measured, so the budget is
+   deliberately stated uncompressed.
+4. **These bytes reflect the unadopted current matcher.** With 8,917 questions unresolved, their
+   `asking_members` arrays are empty, so adopting Option C or correcting forms would **add**
+   per-member records and grow the published total somewhat.
