@@ -1,0 +1,53 @@
+# Decision: New uses for India's published parliamentary record (Sansad Issues)
+
+- **Slug**: indian-sansad
+- **Decided**: 2026-10-09 (supersedes the two 2026-10-08 verdicts, both `needs-clarification`)
+- **Verdict**: **go** — on **Option A only**, not on the twenty-one-candidate shortlist
+- **Artifacts reviewed**: intake.md ✓ | research.md ✓ (306 lines, two passes) | problem.md ✓ | concept.md ✓
+
+## Scorecard
+
+| Criterion | Rating | Justification |
+|-----------|--------|---------------|
+| Problem validity | adequate | The structural facts hold: answers are PDF-only in both Houses for the great majority of questions, record-listing pages render nothing outside a browser, bulk access was refused when officially requested, and nobody joins questions to resolved member identities. Not better than `adequate` — the premise has been narrowed three times by the owner's own tests (search works, a text layer exists, oral answers are present as text), and `problem.md` labels the document-not-data framing a proposed reading rather than a finding. |
+| Evidence strength | **adequate** (upgraded from `weak`) | Two things changed, and neither is a loosening of standards. **First**, the second research pass produced first-hand demand evidence for the prioritised audience: a developer who attempted this exact task documented "a staggering amount of data to scrape", name-spelling inconsistencies and difficulty "Mapping the Asking Member to an actual Member of Parliament", and covered only 29 Nov – 23 Dec 2021 before stopping. That is revealed preference, not a stated want. **Second — and this is the larger reason** — the owner's "audience follows the evidence" decision realigned the stated problem with the evidence that exists. Evidence strength was `weak` against a problem claiming three audiences; it is `adequate` against one that claims civic developers and researchers first. The decision did not manufacture evidence; it stopped claiming audiences the evidence never supported. Behind that sit eight independent projects, two researcher-built datasets with 549 and 35 downloads, and an academic corpus in published use. |
+| Value vs. inaction | adequate (restored from `weak`) | The documented practitioner who absorbed the extraction cost and stopped after under a month is the clearest statement of the cost of inaction in the file. `concept.md` also qualifies the "already addressed" counter-argument: the existing mirrors did **not** solve member identity, which is the specific obstacle the recommended option targets. Still only `adequate` — demand signals remain small in absolute terms. |
+| Feasibility / appetite | adequate | Option A is `small` (days), opens no document, needs no OCR, and its principal input was verified in one unauthenticated response returning `"totalElements":5426`. The ~1M-page volume estimate does not touch it. Held at `adequate` rather than `strong` by one real gap: `api_rs/member` returns 404 and the correct route was never identified, so the owner's Rajya Sabha scope decision cannot currently be honoured. |
+| Strategic fit | adequate | Scope and criteria are now explicit owner decisions, and Option A serves the audience the owner prioritised. The recorded tension remains: on the owner's criteria (novelty, personal interest, reach) `concept.md` ranks Option D first and Option D is not buildable, so the recommended option is not the criteria-topping one — though the reframing of A around a *documented, named, unsolved* obstacle raises its novelty above the earlier reading. `.specify/memory/constitution.md` is still an unfilled template. |
+| Risk posture | **weak** | Unchanged, and the one criterion that does not support this verdict. The owner declined the personal-data guardrail, so an unauthenticated payload of phone numbers, personal emails, home addresses, `dob`, `maritalStatus` and family composition for 5,426 named people sits **inside the recommended option's scope** via A8.5 and A8.6, with nothing barring re-publication and the DPDP framing an untested ASSUMPTION. Licensing stays scoped out — deferred, not cleared. Obsolescence is UNVERIFIED after two passes. These are accepted risks, not mitigated ones. |
+
+## Verdict & Rationale
+
+**go, on Option A.** The gate's two hard requirements are met: problem validity `adequate`, evidence strength `adequate`, and a shaped concept with a named recommendation exists.
+
+The decisive movement was not a new discovery but an alignment. For two verdicts this assessment held at `needs-clarification` because the stated problem claimed three audiences while the evidence supported one. The owner's decision to follow the evidence closed that gap from the problem side, and the second research pass then supplied first-hand evidence on the side that remained — a practitioner who hit precisely the obstacles Option A targets and abandoned the attempt.
+
+**The cheapness of Option A is itself part of the rationale, and should be read as such.** It is `small`, opens no document, and depends on no UNVERIFIED capability. At that size, building it is a better test of the remaining uncertainty than another research pass would be: the open question "would other builders use this?" is answerable by shipping it in days, and is not answerable by more searching. The previous verdict's escalation note said a third `needs-clarification` would not be honest. It would not be.
+
+**Two things this `go` is not.**
+
+It is **not** a go on the shortlist. Twenty-one uses are recorded; this authorises one option, comprising A8.1, A8.2, A8.5, A8.6 and A8.8. Options B, C, D and E are not approved, and Option C in particular remains live for later: `concept.md` records that if a page-counting pass shows volumes far below the ~1M estimate, C returns to contention.
+
+It is **not** a judgement that the recommendation is settled. `concept.md` records that the recommendation has changed four times (A → C → C reshaped → A) and that the options are within noise of each other on everything except demand evidence and cost. This verdict rests on those two axes, where A is clearly ahead on both — not on a claim that A is obviously right. **If the owner's "personal interest" criterion points elsewhere, that outranks this recommendation**, since it is the one criterion no assessment can score.
+
+**Risk posture `weak` does not block the gate but must travel with the handoff.** The personal-data position is an accepted risk inside the recommended option's scope; specification should treat it as a deliberate decision to be implemented consciously, not as an oversight to be discovered later.
+
+## If needs-clarification
+
+Not applicable. For the record, of the five blockers raised at the first verdict: the Hindi question closed by scope decision; the guardrail closed by owner decision; demand moved from "none" to first-hand practitioner evidence for the prioritised audience; **volume returned an unfavourable estimate that demotes Option C but does not touch Option A**; and the Digital Sansad question remains UNVERIFIED after two passes and is carried forward rather than blocking, because it bears far less on metadata joining than on searchable transcripts.
+
+## If go — Handoff to `/speckit-specify`
+
+- **Problem**: for the 17th–18th Lok Sabha period, the published parliamentary record is available as documents rather than as data — and specifically, nobody publishes question metadata joined to resolved member identities, which is a documented obstacle that has stopped at least one prior attempt.
+- **Chosen approach**: **Option A — resolved metadata layer, builders first, readers second.** Resolve consistent member identity across spelling variants and join questions to the MP who asked them; publish extracts others can consume without re-deriving. Reader-facing uses on top: ministry question-load and mix (A8.1), prior occurrences of a subject (A8.2), what a state's or constituency's MPs raised (A8.5), change in the House's composition (A8.6), subjects rising and falling over sessions (A8.8). **No document is opened.**
+- **In scope**: 17th and 18th Lok Sabha; Rajya Sabha bounded by the same calendar window (subject to the route gap below); **English only**; structured sources only — question metadata, the member roster, Rajya Sabha question text.
+- **Out of scope**: all PDF handling, text extraction, page-level work and OCR; all debate text and all answer text, including the oral answers found in debates PDFs; speaker attribution (A9.1, A9.3); Options B, C, D, E; the eight dropped candidates; Hindi and all other languages; anything before the 17th Lok Sabha; `eparlib.sansad.in` and `eparlib.nic.in`; licensing analysis; revenue; a team. Excluding PDFs keeps the ~1M-page estimate off the critical path — it does **not** claim that problem is solved.
+- **Success metrics**: owner-stated ceilings — ~2h/week upkeep, ₹0/month, no revenue, occasional manual steps tolerated, quiet degradation for visitors with breakage flagged to the owner. Agent-originated metrics accepted by the owner: share of new in-scope material picked up without manual intervention; lag from upstream publication to availability; breakage flagged rather than served silently wrong (qualitative); use by someone other than the owner — **threshold still unstated, and that gap is the demand question in another form.**
+- **Carried-forward open questions**:
+  - **Blocking for the Rajya Sabha half of scope**: the Rajya Sabha member route. `api_rs/member` → 404 and the correct route was never found; without it Option A is Lok Sabha-only and an owner scope decision goes unmet.
+  - The `api_ls/*` / `api_rs/*` inventory, and the question-metadata route, which is cited from a third party as found "in the Next.js client bundle" and was never fetched directly in either pass.
+  - Whether member identity is resolvable at ~2h/week without ground truth — the cited practitioner needed fuzzy matching and still called it "a difficult task". This is the recommendation's least defensible assumption.
+  - The personal-data position: which roster fields are published, given no guardrail was adopted and the DPDP framing is untested.
+  - Whether other builders would use this rather than build their own again — eight projects have each built their own, which is evidence of need *and* of a preference for self-building.
+  - Digital Sansad / Sansad Bhashini scope — UNVERIFIED after two passes; needs the app on a device.
+  - data.gov.in holdings (403 to automated fetches); the unstated use threshold; whether to approve `isignal.in` to verify the one newsroom analysis of parliamentary answers.

@@ -1,0 +1,52 @@
+# ---------------------------------------------------------------------------
+# Raw upstream payloads MUST NEVER enter this tree.
+# Constitution Principle V: "'Published' covers everything a third party can
+# reach: ... and any fixture, sample, or test file in the repository."
+# This list is the passive half of that guard; tools/guard_no_raw_payloads.py
+# is the active half. Neither is sufficient alone.
+# ---------------------------------------------------------------------------
+spike/out/
+data/raw/
+*.payload.json
+*.raw.json
+*.raw.csv
+
+# Scratch space for fetched bodies lives OUTSIDE the repo ($SANSAD_SCRATCH).
+# This entry exists only to catch a scratch dir created inside the tree by
+# mistake; `make scratch` asserts against that case.
+sansad-scratch/
+
+# ---------------------------------------------------------------------------
+# Secrets and environment
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# Python (plan.md: Python 3.13)
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage/
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Universal
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+*.log
+.vscode/
+.idea/
