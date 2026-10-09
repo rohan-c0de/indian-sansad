@@ -189,3 +189,118 @@ not just a publishing preference.
 - **The ingest duration above is arithmetic from measured per-record cost**, not a timed full
   run. 46 minutes is a projection from 29 ms/record × 95,269 records. No full ingest has been
   executed. Verdict: **UNVERIFIED projection**, and T010 measures only reachability, not duration.
+
+---
+
+# T015 — the free static hosting tier: GitHub Pages
+
+**Host**: GitHub Pages, on the same public repository as the CI (`rohan-c0de/indian-sansad`).
+**Date retrieved for every figure**: **2026-10-09**
+
+**Verdict on Principle I: compliant. No overage charge exists.** Every documented limit is a
+hard stop, a throttle, or an email — never a bill.
+
+## Figures, each quoted from GitHub's own published page
+
+| What T015 asks for | Published figure | Source page |
+|---|---|---|
+| **Total storage** (published site) | *"Published GitHub Pages sites may be no larger than 1 GB."* | `docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits` |
+| **Bandwidth per month** | *"GitHub Pages sites have a *soft* bandwidth limit of 100 GB per month."* | same |
+| **Builds per hour** | *"GitHub Pages sites have a *soft* limit of 10 builds per hour."* | same |
+| **Maximum single file size** | *"GitHub blocks files larger than 100 MiB."* Warning from Git above 50 MiB. | `docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github` |
+| **File-count ceiling** | **Not published.** GitHub publishes no limit on the number of files in a Pages site. | — |
+| **Requests per month** | **Not published.** GitHub publishes a bandwidth limit, not a request-count limit. | — |
+| **Behaviour at each limit** | *"If your site exceeds these usage quotas, we may not be able to serve your site, or you may receive a polite email from GitHub Support suggesting strategies for reducing your site's impact on our servers."* | `.../github-pages-limits` |
+| Repository size guidance (not a Pages limit, but it binds this project) | *"We recommend repositories remain small, ideally less than 1 GB, and less than 5 GB is strongly recommended."* | `.../about-large-files-on-github` |
+
+**Two figures are recorded as NOT PUBLISHED rather than guessed.** T015 asks for a file-count
+ceiling and a monthly request count; GitHub publishes neither. That is a real gap in the
+Principle I evidence and it is stated as one. The file-count gap matters specifically for this
+project, because the published design is **one file per ministry and one file per member** —
+see the arithmetic below.
+
+## The limit that actually binds: neither storage nor bandwidth, but **file count**
+
+`contracts/published-dataset.md` publishes one question file per `member_id` and one per
+ministry, in **both** newline-delimited JSON and CSV. For the covered window that is roughly:
+
+| Published set | Files (both formats) |
+|---|---|
+| By session — 23 sessions (17th: 15, 18th: 8) | ~46 |
+| By ministry — ~17 observed in one session, plausibly ~60 across the window | ~120 |
+| **By member — the 17th and 18th Lok Sabhas together** | **~2,200** |
+| Reference sets, aggregates, search index, coverage statements | ~30 |
+
+The member partition dominates, and the figure comes from measurement rather than estimate:
+the roster carries **544 members with `lastLoksabha == 18`**, and the 17th adds **343 more**
+whose service ended there (`lastLoksabha == 17`) — so on the order of **~900 member identities**
+in the window, × 2 formats ≈ **1,800–2,200 files**.
+
+**Against a file-count ceiling GitHub does not publish, that is an unquantifiable risk rather
+than a safe one.** It is almost certainly fine — Pages serves far larger static sites — but
+"almost certainly fine" is not the evidence Principle I's gate asks for, and this file does not
+pretend otherwise. Recorded as **UNVERIFIED against an unpublished limit**, with the remedy
+named in advance per Principle I: if the file count proves a problem the answer is to **drop the
+per-member axis** and let consumers filter the session partitions, not to buy hosting.
+
+## Both `data/published/` and `web/` from one origin — confirmed by construction
+
+T015 requires this separately, and `route-capture.md` T005 shows why it is load-bearing rather
+than convenient: **the upstream sends no `Access-Control-Allow-Origin`**, verified first-hand. A
+browser is refused cross-origin reads of the upstream — which is the whole reason the page reads
+this feature's own published files instead. If those files were on a *different* origin from the
+page, the page would hit the identical wall against its own data.
+
+GitHub Pages serves **one site per repository from a single origin**, covering every path in the
+published branch or folder:
+
+```
+https://rohan-c0de.github.io/indian-sansad/            -> web/index.html
+https://rohan-c0de.github.io/indian-sansad/data/...    -> data/published/...
+```
+
+Same scheme, same host, same port — **same origin by definition**, so no CORS preflight arises
+and no `Access-Control-Allow-Origin` header is needed on the dataset at all. The requirement is
+satisfied structurally rather than by configuration, which is the strongest form it could take.
+
+**Verdict: VERIFIED by construction, not by execution.** No page has been served and no fetch
+has been made from one. The claim rests on how GitHub Pages maps a repository to an origin, not
+on an observation. `quickstart.md` scenario 12 (`make serve-local`, `make test-page`) is what
+turns this into an executed check, and it belongs to Phase 6.
+
+## Attribution: a deviation the owner decided, recorded not buried
+
+The constitution's Scope of Authority says: *"The work is published under a project name, not the
+maintainer's name (owner decision 2026-10-08)."*
+
+The repository was created under the maintainer's personal account after the alternative — a free
+GitHub organisation named for the project — was put to the owner with this consequence stated.
+The owner chose the personal account. The effect is that **the published URL embeds a handle
+derived from the maintainer's name**: `rohan-c0de.github.io/indian-sansad`.
+
+Recorded here because it is a live deviation rather than a closed question:
+
+- The repository *content* complies — `README.md` names the project, and every commit's author
+  and committer are `Indian Sansad Maintainer <maintainer@indian-sansad.invalid>`, carrying no
+  personal identity in the history.
+- The *address* does not comply, and the constitution's Attribution clause is about how the work
+  is published.
+- It is **reversible at any time** by transferring the repository to an organisation; GitHub
+  redirects the old Pages URL, so the cost of deferring is low and does not compound.
+- A custom domain would also resolve it, but costs money annually and is therefore barred by
+  Principle I.
+
+**No amendment is requested and none is implied.** The owner's decision is recorded, the
+non-compliance is named, and the remedy is cheap and available.
+
+## What T015 does not establish
+
+1. **No figure here was observed.** All five published figures are quotations from GitHub's
+   documentation — which is the evidence T015 asks for — but no limit has been approached, let
+   alone hit.
+2. **Two required figures are not published at all** (file count, requests per month).
+3. **The one-origin property is structural, not executed** — no page exists yet.
+4. **The ~1,800–2,200 file estimate is arithmetic**, from measured roster counts (544 + 343)
+   and an assumed ~900 member identities in the window. The per-member file count has not been
+   produced, because nothing has been published yet. T016–T019 measure real bytes; the file
+   *count* is first observable at T061.

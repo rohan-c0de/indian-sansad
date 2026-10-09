@@ -81,7 +81,7 @@ Four orderings here depart from the template's default. Each is recorded so a re
 
 ### Spike item 4b — name the free static hosting tier (Constitution Principle I)
 
-- [ ] T015 For the chosen static host, record in `spike/free-tiers.md` — each figure quoted from the host's own current published limits page with URL and date retrieved: bandwidth per month, total storage, file-count ceiling, maximum single file size, requests per month, and **the documented behaviour at each limit** (hard stop, throttle, or overage charge — an overage charge disqualifies it). Separately confirm the host can serve **both** `data/published/` and `web/` from one origin, since the plan's same-origin argument — which is the whole reason the page is viable given the upstream's cross-origin block — depends on it
+- [X] T015 For the chosen static host, record in `spike/free-tiers.md` — each figure quoted from the host's own current published limits page with URL and date retrieved: bandwidth per month, total storage, file-count ceiling, maximum single file size, requests per month, and **the documented behaviour at each limit** (hard stop, throttle, or overage charge — an overage charge disqualifies it). Separately confirm the host can serve **both** `data/published/` and `web/` from one origin, since the plan's same-origin argument — which is the whole reason the page is viable given the upstream's cross-origin block — depends on it
 
 ### Spike item 5 — measure bytes per partition and per first page load
 
