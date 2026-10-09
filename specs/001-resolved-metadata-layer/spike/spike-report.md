@@ -345,8 +345,8 @@ askers do (FR-003), so the figures cannot be summed and the earlier five-pair cu
 has been replaced by this computation rather than adjusted.
 
 **The previously recorded figure was 96.56% (91,991) for five pairs. With row 4 dropped the real
-figure is 96.26% (91,708)** — 283 questions fewer, which is more than row 4's own 292 blocked
-count would suggest in isolation and less than it after overlap, for the same reason.
+figure is 96.26% (91,708)** — 283 questions fewer. Row 4 would have recovered 283 of its 292
+blocked questions.
 
 ### Residual forms after seeding: **21**
 
