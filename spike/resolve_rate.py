@@ -40,7 +40,22 @@ rather than guess at it:
       part of a given name rather than a title, and stripping them would
       corrupt real names to flatter the rate.
 
-  CANDIDATE POOL -- measured BOTH ways, `--pool full` and `--pool ls18`
+  CANDIDATE POOL -- measured BOTH ways, `--pool full` and `--pool term`
+
+      `--pool term` selects members whose `lsExpr` CONTAINS the term being
+      measured. `lsExpr` is a comma-separated enumeration of every Lok Sabha a
+      member served in ("11,12,14,16,17"), which is exact membership rather
+      than the approximation `lastLoksabha` gives.
+
+      This replaced an earlier `lastLoksabha == N` test, and the replacement is
+      a CORRECTNESS fix, not a tuning change. The control that establishes it:
+      for the 18th Lok Sabha the two definitions select the IDENTICAL 544-member
+      set, so the previously published 99.68% is unaffected. For the 17th they
+      differ sharply -- `lsExpr` contains 17 for 559 members against
+      `lastLoksabha == 17` for only 343, because the 216 members who continued
+      into the 18th carry lastLoksabha == 18. Measuring the 17th with the old
+      test would have withheld 216 of its own sitting members from the pool and
+      manufactured unresolved forms that the real pipeline would never see.
       The roster is every Lok Sabha member since the 1st: 5,426 people, of whom
       only 544 have `lastLoksabha == 18`. Matching an 18th-Lok-Sabha question
       against all 5,426 puts 4,882 people in the pool who could not possibly
@@ -53,6 +68,12 @@ rather than guess at it:
       full` is the honest pessimistic bound and the gap between the two is
       itself a finding. Both numbers appear in resolution-rate.md. Neither was
       selected after the fact for being the nicer one.
+
+      A window-level rate is NOT computed by pooling both terms together. Each
+      question belongs to exactly one term and is matched against that term's
+      members, so the window figure is the sum of the per-term numerators and
+      denominators. That is arithmetically identical to per-question pooling
+      and needs no change to this script.
 
 Tiers run exact -> normalised -> approximate, in that order, and stop at the
 first tier that produces any candidate. A later tier never overrides an
@@ -106,14 +127,20 @@ def canon_sorted(text: str) -> str:
     return " ".join(sorted(canon(text).split()))
 
 
-def load_roster(path: Path, pool: str) -> tuple[list[dict], dict]:
+def terms_served(member: dict) -> set[int]:
+    """Parse `lsExpr` -- the comma-separated list of Lok Sabhas served in."""
+    return {int(x) for x in str(member.get("lsExpr") or "").split(",")
+            if x.strip().isdigit()}
+
+
+def load_roster(path: Path, pool: str, loksabha: int) -> tuple[list[dict], dict]:
     members: list[dict] = []
     with path.open(encoding="utf-8") as fh:
         for line in fh:
             if line.strip():
                 members.append(json.loads(line))
-    if pool == "ls18":
-        members = [m for m in members if m.get("lastLoksabha") == 18]
+    if pool == "term":
+        members = [m for m in members if loksabha in terms_served(m)]
     # member_id is minted here as the upstream record id. data-model.md requires
     # it never be derived from a name; mpsno satisfies that.
     for m in members:
@@ -226,8 +253,12 @@ def main() -> int:
     if scratch == repo or repo in scratch.parents:
         sys.exit("REFUSED: SANSAD_SCRATCH is inside the repository.")
 
+    loksabha = 18
+    if "--loksabha" in sys.argv:
+        loksabha = int(sys.argv[sys.argv.index("--loksabha") + 1])
+
     roster_p = scratch / "roster_ls.jsonl"
-    questions_p = scratch / "questions_ls18.jsonl"
+    questions_p = scratch / f"questions_ls{loksabha}.jsonl"
     for p in (roster_p, questions_p):
         if not p.exists():
             sys.exit(f"missing input: {p}  (run spike/fetch_slice.py first)")
@@ -235,10 +266,12 @@ def main() -> int:
     pool = "full"
     if "--pool" in sys.argv:
         pool = sys.argv[sys.argv.index("--pool") + 1]
-    if pool not in ("full", "ls18"):
-        sys.exit("--pool must be 'full' or 'ls18'")
+    if pool not in ("full", "term"):
+        sys.exit("--pool must be 'full' or 'term'")
 
-    members, _ = load_roster(roster_p, pool)
+    members, _ = load_roster(roster_p, pool, loksabha)
+    if not members:
+        sys.exit(f"pool '{pool}' selected 0 members for Lok Sabha {loksabha}")
     exact, norm, sortd = build_indexes(members)
     norm_keys = list(norm.keys())
 
@@ -307,7 +340,7 @@ def main() -> int:
     out = {
         "slice": {
             "house": "Lok Sabha",
-            "loksabha": 18,
+            "loksabha": loksabha,
             "sessions_present": sorted(sessions, key=lambda s: int(s) if s.isdigit() else 99),
             "questions_per_session": dict(sorted(
                 sessions.items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 99)),
@@ -329,7 +362,8 @@ def main() -> int:
             "honorifics_deliberately_not_stripped": ["md", "mohd"],
             "candidate_pool": ("FULL roster, no term restriction (5,426 members)"
                                if pool == "full" else
-                               "18th Lok Sabha only (lastLoksabha == 18)"),
+                               f"Lok Sabha {loksabha} only (lsExpr contains "
+                               f"{loksabha}): {len(members)} members"),
             "tuned_after_seeing_results": False,
         },
         "asker_multiplicity": {
@@ -374,7 +408,7 @@ def main() -> int:
     print(json.dumps(out, indent=1, ensure_ascii=False))
 
     # --- per-form detail written to SCRATCH, not the repo ---
-    detail_p = scratch / f"resolution_detail_{pool}.json"
+    detail_p = scratch / f"resolution_detail_ls{loksabha}_{pool}.json"
     detail_p.write_text(json.dumps(
         {"aggregate": out,
          "forms": {f: r for f, r in sorted(results.items())}},
@@ -385,9 +419,9 @@ def main() -> int:
         ((f, r) for f, r in results.items() if r["status"] != "resolved"),
         key=lambda kv: (-kv[1]["instances"], kv[0]),
     )
-    wl = scratch / f"correction_worklist_{pool}.md"
+    wl = scratch / f"correction_worklist_ls{loksabha}_{pool}.md"
     with wl.open("w", encoding="utf-8") as fh:
-        fh.write(f"# T013 correction worklist (pool: {pool})\n\n")
+        fh.write(f"# T013 correction worklist (Lok Sabha {loksabha}, pool: {pool})\n\n")
         fh.write(f"{len(needing)} distinct name forms came out ambiguous or unresolved.\n")
         fh.write("Ordered by how many question instances each one blocks, "
                  "so the first corrections are the highest-value ones.\n\n")

@@ -102,10 +102,14 @@ def main() -> int:
     if scratch == repo or repo in scratch.parents:
         sys.exit("REFUSED: SANSAD_SCRATCH is inside the repository.")
 
-    qp = scratch / "questions_ls18.jsonl"
-    if not qp.exists():
-        sys.exit(f"missing input: {qp}")
-    questions = [json.loads(l) for l in qp.open(encoding="utf-8") if l.strip()]
+    terms = [int(x) for x in (sys.argv[sys.argv.index("--loksabha") + 1].split(",")
+             if "--loksabha" in sys.argv else ["18"])]
+    questions = []
+    for t in terms:
+        qp = scratch / f"questions_ls{t}.jsonl"
+        if not qp.exists():
+            sys.exit(f"missing input: {qp}")
+        questions += [json.loads(l) for l in qp.open(encoding="utf-8") if l.strip()]
 
     session = sys.argv[sys.argv.index("--session") + 1] if "--session" in sys.argv else None
     if session is not None:
@@ -135,7 +139,7 @@ def main() -> int:
         }
 
     print(json.dumps({
-        "slice": {"house": "lok-sabha", "loksabha": 18,
+        "slice": {"house": "lok-sabha", "loksabha": terms,
                   "session": session or "ALL SESSIONS IN SLICE",
                   "questions_indexed": len(questions)},
         "tokeniser": {

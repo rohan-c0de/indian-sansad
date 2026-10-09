@@ -76,7 +76,7 @@ QUESTION_ALLOWED = (
 )
 
 PAGE_SIZE = 1000
-LOKSABHA = 18
+LOKSABHA = 18   # default; override with --loksabha N
 
 
 def scratch_dir() -> Path:
@@ -141,14 +141,14 @@ def fetch_roster(out: Path) -> int:
     return len(rows)
 
 
-def fetch_questions(out: Path) -> tuple[int, int]:
+def fetch_questions(out: Path, loksabha: int) -> tuple[int, int]:
     first, status = get_json(
-        f"{BASE}{QUESTION_PATH}?loksabhaNo={LOKSABHA}&pageNo=1"
+        f"{BASE}{QUESTION_PATH}?loksabhaNo={loksabha}&pageNo=1"
         f"&locale=en&pageSize={PAGE_SIZE}"
     )
     total = first[0]["totalRecordSize"]
     pages = -(-total // PAGE_SIZE)
-    print(f"questions: loksabhaNo={LOKSABHA}, totalRecordSize={total}, "
+    print(f"questions: loksabhaNo={loksabha}, totalRecordSize={total}, "
           f"pageSize={PAGE_SIZE} -> {pages} pages", flush=True)
 
     written = 0
@@ -159,7 +159,7 @@ def fetch_questions(out: Path) -> tuple[int, int]:
                 payload = first
             else:
                 payload, status = get_json(
-                    f"{BASE}{QUESTION_PATH}?loksabhaNo={LOKSABHA}&pageNo={page}"
+                    f"{BASE}{QUESTION_PATH}?loksabhaNo={loksabha}&pageNo={page}"
                     f"&locale=en&pageSize={PAGE_SIZE}"
                 )
             rows = payload[0]["listOfQuestions"] or []
@@ -177,17 +177,29 @@ def fetch_questions(out: Path) -> tuple[int, int]:
 
 
 def main() -> int:
+    loksabha = LOKSABHA
+    if "--loksabha" in sys.argv:
+        loksabha = int(sys.argv[sys.argv.index("--loksabha") + 1])
+    skip_roster = "--skip-roster" in sys.argv
+
     scratch = scratch_dir()
-    print(f"SANSAD_SCRATCH = {scratch}  (verified outside the repo)\n", flush=True)
+    print(f"SANSAD_SCRATCH = {scratch}  (verified outside the repo)", flush=True)
+    print(f"loksabhaNo = {loksabha}\n", flush=True)
 
     roster_out = scratch / "roster_ls.jsonl"
-    questions_out = scratch / f"questions_ls{LOKSABHA}.jsonl"
+    questions_out = scratch / f"questions_ls{loksabha}.jsonl"
 
     t0 = time.monotonic()
-    n_members = fetch_roster(roster_out)
-    print(f"  -> {roster_out} ({roster_out.stat().st_size} bytes)\n", flush=True)
+    if skip_roster and roster_out.exists():
+        n_members = sum(1 for l in roster_out.open(encoding="utf-8") if l.strip())
+        print(f"roster: reusing {roster_out} ({n_members} rows) -- the roster is "
+              f"term-independent, so re-fetching 5.0 MiB would change nothing\n",
+              flush=True)
+    else:
+        n_members = fetch_roster(roster_out)
+        print(f"  -> {roster_out} ({roster_out.stat().st_size} bytes)\n", flush=True)
 
-    n_questions, total = fetch_questions(questions_out)
+    n_questions, total = fetch_questions(questions_out, loksabha)
     print(f"\n  -> {questions_out} ({questions_out.stat().st_size} bytes)")
     print(f"\nSUMMARY  members={n_members}  questions_written={n_questions}  "
           f"totalRecordSize={total}  "
