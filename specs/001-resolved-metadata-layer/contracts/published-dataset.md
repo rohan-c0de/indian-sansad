@@ -15,7 +15,7 @@ This feature's external interface is **a published dataset**, not a service. Its
 | Resolution records | One record per name form encountered, with its outcome (FR-005). |
 | Ministries, Sessions, Constituencies | Reference sets, whole. |
 | Precomputed aggregates | Counts and trends, including User Story 4's composition and subject-trend files, with the counting basis stated (FR-012). |
-| Subject-search index | Published so in-browser subject search needs no server. Its size is **UNVERIFIED** until measured; see [research.md](../research.md). |
+| Subject-search index | Published so in-browser subject search needs no server. **Measured at 3,002,356 bytes (2.86 MiB)** over the full 95,269-question window, subjects only; see [spike/size-budget.md](../spike/size-budget.md). Consumers should expect the page to fetch it lazily, only on an actual search. |
 | Coverage statement | One per House, always present (FR-013). |
 
 There is **no per-state or per-constituency question partition**. Those subsets are reached by filtering the member reference set and then taking the matching members' files — a deliberate choice, since both are member attributes and a separate partition would republish the per-member files under a key the member set already supplies.

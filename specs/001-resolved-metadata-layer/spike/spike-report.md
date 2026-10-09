@@ -111,22 +111,27 @@ move the project onto a metered tier whose overage behaviour depends on account 
 The Upkeep gate requires: *"The recurring manual work this change adds, in hours per week, and
 the project total after it."*
 
-### First-pass cost, measured across the full window
+### First-pass cost, with Option C adopted
 
-| | Forms needing correction | At the measured 3-min median | At the 7-min maximum |
+**Option C is adopted** (owner decision 2026-10-09), so the containment tier resolves 19 forms
+automatically and the hand work is what remains after it:
+
+| | Forms | At the measured 3-min median | At the 7-min maximum |
 |---|---|---|---|
-| Matcher unchanged | **44** | **132 min = 2.2 h** | 308 min = 5.1 h |
-| With the T014 Option C tier | 25 | 75 min = 1.2 h | 175 min = 2.9 h |
+| **REQUIRED — the four owner-confirmed assertions** | **4** | **≈12 min** | 28 min |
+| Optional — the remaining 21 residual forms | 21 | ≈63 min | 147 min |
+| *Not chosen* — matcher unchanged, all 44 forms by hand | *44* | *132 min = 2.2 h* | *308 min = 5.1 h* |
 
-**The first-pass cost of 2.2 hours EXCEEDS Principle II's ~2 hours per week** for the week in
-which it is performed. With Option C's tier it falls to 1.2 h and fits — but Option C is not
-adopted, so **the figure that currently stands is the one that breaches the ceiling.**
+**The required hand work is about 12 minutes** — the four assertions that carry SC-002 to 96.26%.
+That is **well inside Principle II's ~2 hours per week**, and it is a one-time cost rather than
+recurring work.
 
-It is a **one-time** cost rather than recurring work, and Principle II's operative language is
-about *routine* manual work ("Occasional manual intervention is tolerated. Routine manual work is
-NOT"). So this is a breach of the weekly ceiling by a non-routine task, which is the mildest form
-the breach could take — but it is recorded as a breach rather than argued away, because the gate
-asks for hours per week and 2.2 > 2.
+The remaining 21 residual forms are **optional**: correcting them would take roughly 63 minutes
+more and reach 100%, but SC-002 is already met without them.
+
+**The 132-minute (2.2 h) figure was the matcher-unchanged alternative, and it was not chosen.**
+It is kept in the table above, italicised, because it is what the decision was weighed against —
+it exceeded the weekly ceiling, which is part of why Option C was adopted.
 
 ### Steady-state arrival rate — **18th Lok Sabha only, and n=6**
 
@@ -141,15 +146,16 @@ Two limits, both load-bearing:
 
 1. **n=6.** The timings come from six corrections — median 3 min, maximum 7 min — because six
    were all that existed in the 18th term. T013 specifies at least 20.
-2. **The arrival rate was never measured for the 17th Lok Sabha.** Its 44-form burden is counted
-   in the first-pass figure above, but the *rate at which its forms first appeared* was not
-   computed, so no window-wide steady-state figure exists. The 0.168 min/week above is a
-   single-term observation.
+2. **The arrival rate was never measured for the 17th Lok Sabha.** Its forms are counted in the
+   first-pass figures above, but the *rate at which they first appeared* was not computed, so no
+   window-wide steady-state figure exists. The 0.168 min/week above is a **single-term
+   observation**.
 
-A further caveat the 17th introduces: the timings were measured on **18th-LS forms**, which were
-all token-containment cases. The 17th's residual failures are initials, parenthetical aliases and
-divergent orderings — plausibly slower per correction. **Whether 3 minutes holds for them is
-UNVERIFIED**, which would make 2.2 h an underestimate.
+A further caveat the 17th introduces: the timings were measured on **six 18th-term forms, all of
+them token-containment cases — the easy class**. The 17th's residual forms are initials,
+parenthetical aliases and divergent orderings, and all four confirmed assertions are of that
+harder kind. **Whether 3 minutes holds for them is UNVERIFIED**, so both the 12-minute and
+63-minute figures may be underestimates.
 
 ### The project total is not established
 
@@ -159,8 +165,13 @@ expected to go mostly on breakage", and the upstream carries no contract, versio
 deprecation notice. **Breakage upkeep is unquantified and cannot be quantified before the
 pipeline has run on a schedule.**
 
-**Verdict: the Upkeep gate is NOT passed.** The first-pass figure breaches the weekly ceiling,
-the steady-state figure covers one of two terms at n=6, and the project total is unavailable.
+**Verdict: the Upkeep gate is PARTLY EVIDENCED, not passed.** The required hand work — about 12
+minutes, one time — now sits comfortably inside the weekly ceiling, so the breach the
+matcher-unchanged path would have caused does not arise. What keeps the gate from being passed is
+unchanged by the decision: the steady-state figure covers **one of two terms at n=6**, the
+3-minute median comes from the **easy** class of forms while every required assertion is of the
+harder kind, and **the project total is unestablished** — breakage upkeep cannot be quantified
+before the pipeline has run on a schedule.
 
 ---
 
@@ -368,9 +379,10 @@ unresolved-but-marked, which FR-004 permits.
 **44 distinct forms × 3 min median = 132 min (2.2 h) first pass**, which **exceeds Principle II's
 weekly ceiling**. Reaches 100%, since correcting every failing form leaves nothing unresolved.
 
-### Option C — adopt the containment tier
+### Option C — adopt the containment tier — **ADOPTED**
 
-**94.78%. Does not reach 95%.** Reduces the correction burden from 44 forms to **25**.
+**94.78%. Does not reach 95% on its own.** Reduces the correction burden from 44 forms to **25**,
+of which four were confirmed as assertions and 21 remain optional.
 
 ### Option C + B — the only combination that both meets SC-002 and fits the upkeep ceiling
 
@@ -502,7 +514,7 @@ with GitHub redirecting the old Pages URL. No amendment is requested. Detail in
 | Gate | Principle | Status |
 |---|---|---|
 | Cost | I | **Evidenced.** Three components, all free tiers named, every limit behaviour quoted, no overage anywhere. Two non-size exposures recorded. Ingest duration revised upward — see below. |
-| Upkeep | II | **Partly evidenced, and the figure has grown.** The steady-state identity-correction cost stays far inside budget, but the **first-pass** cost rose from 18 min (18th LS alone) to **132 min (2.2 h) window-wide**, which exceeds Principle II's weekly ceiling for the week it is done. The project total remains not establishable before a scheduled run. |
+| Upkeep | II | **Partly evidenced.** With Option C adopted the **required** hand work is the four confirmed assertions — about **12 minutes**, one time, well inside the weekly ceiling. The 21 remaining residual forms are optional (≈63 min). The 132 min (2.2 h) figure was the matcher-unchanged alternative and was not chosen. Still unevidenced: the steady-state rate covers one of two terms at n=6, the 3-minute median comes from the easy class of forms, and the project total is not establishable before a scheduled run. |
 | Sources | III | **Evidenced.** Every input is an already-structured route. The four document-path fields are refused, and the text behind them is a declared gap. |
 | Language | IV | **Evidenced.** `locale=en`; the two Hindi fields are refused; no translation path exists. |
 | Member fields | V | **Evidenced for the spike.** Positive FR-008 allowlist at fetch time; `make guard` passes on every commit; no upstream body was ever written inside the tree. Re-run against real published output before publishing, per the constitution. |

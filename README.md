@@ -28,8 +28,15 @@ five principles that gate the work.
 specification artefacts, the Phase 1 guard rails, and the Phase 2 spike with its measurements.
 `src/sansad/`, `web/` and `data/published/` do not exist yet.
 
-**Phase 3 is blocked on one owner decision** — see
-[`spike/spike-report.md`](specs/001-resolved-metadata-layer/spike/spike-report.md).
+**Phase 3 is unblocked and has not started.** Both owner decisions it waited on were recorded
+on 2026-10-09 — see
+[`spike/spike-report.md`](specs/001-resolved-metadata-layer/spike/spike-report.md) and
+[`spike/size-budget.md`](specs/001-resolved-metadata-layer/spike/size-budget.md):
+
+- **Identity resolution**: the bidirectional token-containment tier is **adopted**, and
+  **SC-002 stays at 95%** — met by improving resolution, not by lowering the target.
+- **Repository growth**: the dataset is published to a **rolling `published` branch** as a single
+  force-pushed commit; `data/published/` is git-ignored on `main`.
 
 ### What the spike established
 
@@ -39,9 +46,12 @@ specification artefacts, the Phase 1 guard rails, and the Phase 2 spike with its
   a free CI runner alike.
 - **The full covered window is fetched and measured**: 95,269 questions across the 17th Lok
   Sabha (60,549) and the 18th (34,720), plus the 5,426-member roster.
-- **Identity resolution works, unevenly.** 99.68% of the 18th Lok Sabha's questions resolve to
-  exactly one member — but only **85.45%** of the 17th's, for **90.64% across the window**
-  against a 95% target. That shortfall is the decision Phase 3 waits on.
+- **Identity resolution works, unevenly — and SC-002 is met.** 99.68% of the 18th Lok Sabha's
+  questions resolve to exactly one member, but only **85.45%** of the 17th's, for **90.64%**
+  across the window with the original matcher. The adopted containment tier lifts that to
+  **94.78% automatic**, and **four owner-confirmed maintainer assertions** carry it to
+  **96.26%** — a 1.26-point margin over the 95% target, which was kept unchanged. The automatic
+  rate remains **below** 95%, so the coverage statement publishes both figures separately.
 - **Zero running cost is evidenced**, not asserted: every component sits on a named free tier
   with its behaviour at the limit quoted from the provider's own published pages.
 
