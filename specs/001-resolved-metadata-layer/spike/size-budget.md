@@ -521,3 +521,54 @@ downloads per month** — up from the 305 the projection implied.
 4. **These bytes reflect the unadopted current matcher.** With 8,917 questions unresolved, their
    `asking_members` arrays are empty, so adopting Option C or correcting forms would **add**
    per-member records and grow the published total somewhat.
+
+---
+
+## Two window-publish runs disagreed. The cause, and what the figures here reflect.
+
+An **earlier** window-publish run reported figures that differ from the ones recorded above:
+
+| | Earlier run | **The run recorded above** |
+|---|---|---|
+| Resolved | 83,122 | **86,352** |
+| Files written | 1,630 | **1,750** |
+| Total bytes, both formats | 224,767,279 | **227,007,149** |
+| by-member files / records | 1,456 / 144,392 | **1,576 / 148,158** |
+| Members with a published file | 728 | **788** |
+
+**The run recorded above matches `resolve_rate.py` exactly** — its 86,352 resolved equals that
+tool's independently computed window figure of 86,352 resolved + 8,913 unresolved + 4 no-asker,
+reached by a different code path over the same inputs. The earlier run matched nothing.
+
+### The cause, shown rather than asserted
+
+The per-form detail filename did not vary with the `--questions` argument. Measuring sessions
+11–15 as a holdout therefore **overwrote** the full-term detail file for the 17th Lok Sabha, and
+the earlier publish consumed that holdout-only file. Inspecting the artefact confirms it:
+
+```
+resolution_detail_ls17_term.json -> forms: 432 | slice questions: 15082 | file: questions_ls17_s11-15.jsonl
+```
+
+432 forms over 15,082 questions is the holdout, not the 505 forms over 60,549 the full term
+carries. Every asker name absent from that truncated dictionary scored as unresolved, which
+explains the direction and the shape of all five differences: fewer resolved questions → fewer
+members with any resolved question (728 vs 788) → fewer by-member files (1,456 vs 1,576) and
+fewer by-member records (144,392 vs 148,158) → fewer total files and bytes.
+
+The filename now carries a slice tag, the full-term details were regenerated (505 and 467 forms),
+and the re-run is what is recorded above. **The published rates were never affected** — those
+come from each run's own stdout, not from this file.
+
+### What configuration the size figures reflect
+
+**The containment tier was OFF and no maintainer assertion was applied** when these bytes were
+measured. The publish used the current unadopted matcher, so 8,917 of 95,269 questions carry an
+empty `asking_members` array.
+
+**So these are a floor, not the final size.** Adopting the containment tier and seeding the four
+confirmed assertions resolves 9,133 further questions (90,299 − 86,352 = 3,947 from the tier,
+plus 1,409 from the assertions, less overlap), and each newly resolved asker adds that question
+to a per-member file in both formats. The published total will **grow** — by roughly the share
+those questions represent of the by-member axis, which is 46% of all published bytes. The size
+figures above should be re-measured once Phase 3's matcher is in place.

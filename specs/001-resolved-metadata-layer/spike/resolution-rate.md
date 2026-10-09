@@ -843,28 +843,47 @@ co-asked question with two residual askers appears in both rows.
 
 **All 25 are in the 17th Lok Sabha. The 18th has none after the tier.**
 
-## How many of the top forms reach 95% of the full window
+## Owner decision 2026-10-09 — four assertions confirmed, one dropped
 
-With the tier enabled the window stands at **90,299 / 95,269 = 94.78%**. Reaching 95.00%
-requires **90,506** resolved — **207 more questions**.
+| # | Status | Questions blocked | Form as written |
+|---:|---|---:|---|
+| 1 | **CONFIRMED BY OWNER** | 513 | `Sunil Dattatray Tatkare` |
+| 2 | **CONFIRMED BY OWNER** | 414 | `Ganesan Selvam` |
+| 3 | **CONFIRMED BY OWNER** | 372 | `D.K. Suresh` |
+| 4 | **DROPPED BY OWNER** | 292 | `Poonam (Mahajan) Vajendla Rao` |
+| 5 | **CONFIRMED BY OWNER** | 273 | `V. Kalanidhi` |
 
-| Top N forms corrected | Questions recovered | Window resolved | Rate |
-|---:|---:|---:|---:|
-| 1 | +422 | 90,721 | 95.23% **← 95% reached** |
-| 2 | +831 | 91,130 | 95.66% **← 95% reached** |
-| 3 | +1,174 | 91,473 | 96.02% **← 95% reached** |
-| 4 | +1,456 | 91,755 | 96.31% **← 95% reached** |
-| 5 | +1,692 | 91,991 | 96.56% **← 95% reached** |
-| 6 | +1,954 | 92,253 | 96.83% **← 95% reached** |
+**No reason was recorded for dropping row 4, and none is inferred here.** That form **stays among
+the residual forms**, which now number **21** (25 after the tier, minus the four seeded).
 
-**One correction is enough.** The top-ranked form, `Sunil Dattatray Tatkare`, blocks
-513 questions, of which **422** have no other residual asker and
-therefore resolve the moment it is corrected — taking the window to **95.23%**, clear of
-the 95% threshold.
+### The window rate with the four confirmed pairs — computed over the question records
 
-Correcting all 25 reaches **100.00%**. At the measured 3-minute median the full set is **75
-minutes**; the single correction that clears SC-002 is **3 minutes**.
+With the tier enabled the window stands at **90,299 / 95,269 = 94.78%** — the **automatic** rate.
+Seeding the four confirmed assertions:
 
-**The recovered count is lower than the blocked count for every form**, because a co-asked
-question needs *all* its residual askers fixed before it resolves. That is FR-003 working as
-specified, and it is why the ranking cannot simply be summed.
+| | Resolved | Rate | vs 95% |
+|---|---:|---:|---:|
+| Automatic (tier only, no assertions) | 90,299 / 95,269 | **94.78%** | fails by 0.22 |
+| **+ four confirmed assertions** | **91,708 / 95,269** | **96.26%** | **met, +1.26 points** |
+
+**1,409 questions recovered.** Computed by re-walking all 95,269 question records and counting
+those whose *every* residual asker is one of the four confirmed forms. **Not** obtained by adding
+the per-form blocked counts, which would be wrong:
+
+```
+naive sum of questions the four forms appear in : 1,572
+actually recovered                              : 1,409
+difference                                      :   163
+```
+
+Those **163 questions remain unresolved** because each is co-asked by someone whose form is still
+residual. A question resolves only when **all** its askers resolve (FR-003), so blocked counts
+overlap and cannot be summed — which is exactly why this figure was recomputed rather than
+derived from the earlier five-pair table.
+
+**The earlier record said 96.56% (91,991 resolved) for five pairs. With row 4 dropped the real
+figure is 96.26% (91,708)** — 283 questions fewer.
+
+**Cost**: 4 × the measured 3-minute median = **12 minutes**. The remaining 21 residual forms are
+optional; correcting all of them would reach 100.00%.
+

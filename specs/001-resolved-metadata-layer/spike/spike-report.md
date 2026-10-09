@@ -20,7 +20,7 @@ property.
 | **1** | Capture the question-metadata route | **VERIFIED WORKING** | `GET /api_ls/question/qetFilteredQuestionsAns` → HTTP 200, retrieved first-hand from the browser *and* programmatically. No credential, and with `User-Agent` and `Accept` stripped, **no required header at all**. [`route-capture.md`](./route-capture.md) |
 | **4a** | Name the free CI tier | **VERIFIED WORKING** | GitHub Actions, public repository: *"GitHub Actions usage is free ... for public repositories that use standard GitHub-hosted runners."* **Unmetered — no overage is possible.** [`free-tiers.md`](./free-tiers.md) |
 | **2** | Can a free CI runner reach the route | **VERIFIED WORKING** | HTTP 200 on both routes from an Azure `westus3` runner, run `37973110849`. No 403, no 429, no geo-block. **FR-009 is not blocked.** [`ci-reachability.md`](./ci-reachability.md) |
-| **3** | Measure the resolution rate and correction cost | **VERIFIED WORKING, by owner decision** | Matcher alone: **90.64%** over the complete 95,269-question window (18th LS 99.68%; 17th LS 85.45%) — **below** the 95% target. With the adopted containment tier: **94.78%** — still below. With five seeded assertions: **96.56% — SC-002 met**, target unchanged at 95%. Correction cost **15 min** for the five. **The automatic rate remains below 95%**, which T053 requires be published separately. [`resolution-rate.md`](./resolution-rate.md) |
+| **3** | Measure the resolution rate and correction cost | **VERIFIED WORKING, by owner decision** | Matcher alone: **90.64%** over the complete 95,269-question window (18th LS 99.68%; 17th LS 85.45%) — **below** the 95% target. With the adopted containment tier: **94.78%** — still below. With four seeded assertions: **96.26% — SC-002 met** with a 1.26-point margin, target unchanged at 95%. Correction cost **12 min** for the four. **The automatic rate remains below 95%**, which T053 requires be published separately. [`resolution-rate.md`](./resolution-rate.md) |
 | **4b** | Name the free static hosting tier | **VERIFIED, one part by construction** | GitHub Pages: 1 GiB site, soft 100 GB/month, soft 10 builds/hour, 100 MiB hard per-file. One-origin service of `web/` + `data/published/` holds **by construction, not by execution** — no page exists yet. [`free-tiers.md`](./free-tiers.md) |
 | **5** | Measure bytes per partition and per first page load | **VERIFIED WORKING** | **227,007,149 bytes (216.5 MiB) MEASURED across the full window** — **21.1%** of the 1 GiB ceiling, **1,750 files**, largest file 3.53 MiB against a 100 MiB limit. Subject index **2.86 MiB measured**. First page load **587 KiB** median ministry / **401 KiB** median constituency / **2.50 MiB** largest ministry. [`size-budget.md`](./size-budget.md) |
 
@@ -32,7 +32,7 @@ item 3 did fail against SC-002 as measured, and the owner's decision of 2026-10-
 resolution — a holdout-validated matcher tier plus five hand assertions — rather than by lowering
 the target or dropping a published axis.
 
-**What is conceded rather than reduced**: the pipeline does not reach 95% unaided. Five
+**What is conceded rather than reduced**: the pipeline does not reach 95% unaided. Four
 maintainer assertions are load-bearing for SC-002, and T053 requires the automatic rate be
 published alongside the assisted one so that dependence is visible to consumers instead of
 blended away.
@@ -172,8 +172,8 @@ the steady-state figure covers one of two terms at n=6, and the project total is
 >
 > **Option C is adopted**: the bidirectional token-containment tier becomes part of the Phase 3
 > matcher. **SC-002 is NOT amended** — the 95% threshold stands unchanged. The remaining gap is
-> closed by **seeding maintainer assertions for the top five residual forms**, not by lowering
-> the target.
+> closed by **seeding maintainer assertions for four owner-confirmed residual forms**, not by
+> lowering the target. A fifth was proposed and **dropped by the owner**.
 >
 > ### The evidence it rests on
 >
@@ -182,7 +182,7 @@ the steady-state figure covers one of two terms at n=6, and the project total is
 > | Tier's gain on the **blind holdout** (sessions 11–15, 15,082 unseen questions) | **+6.31 points** (85.57% → 91.88%) |
 > | Gain on the data the rule was derived from | +6.35 points — a 0.04-point difference, so **no measurable overfitting** |
 > | Full window **with the tier** | **94.78%** (90,299 / 95,269) — still 207 questions short |
-> | Full window **after the five assertions** | **96.56%** (91,991 / 95,269) — **SC-002 met with 1.56 points of margin** |
+> | Full window **after the four confirmed assertions** | **96.26%** (91,708 / 95,269) — **SC-002 met with 1.26 points of margin** |
 >
 > ### Why adopting it after seeing the shortfall is acceptable
 >
@@ -303,43 +303,57 @@ Two of the three objections to Option C are now resolved in its favour, and the 
 - **It is still a matcher change made after seeing the rate fall short**, which is the move T012
   forbids. That objection is unaffected by the holdout and remains the owner's to weigh.
 
-## Proposed assertions — the five residual forms, **PROPOSED, awaiting owner confirmation**
+## Assertions — four **CONFIRMED BY OWNER**, one **DROPPED BY OWNER** (2026-10-09)
 
-These are the pairs T048 will seed. **Every row is a proposal, not a decision.** None has been
-written to `data/assertions/`, and an unconfirmed row is not an assertion.
+These are the pairs T048 will seed. **None has been written to `data/assertions/` yet** — Phase 3
+has not started.
 
 Member fields shown are `member_id`, name form, constituency and state — all inside the FR-008
 set — included because confirming an identity needs more than a name.
 
-| # | Questions blocked | Form as written (question route) | **PROPOSED** member | Roster name form | Constituency, State | Why, and how confident |
-|---:|---:|---|---|---|---|---|
-| 1 | 513 | `Sunil Dattatray Tatkare` | `ls-5199` | `Tatkare Sunil Dattatrey` | Raigad, Maharashtra | Token reorder plus one spelling variant (`Dattatray` / `Dattatrey`). **High confidence** — every token corresponds. |
-| 2 | 414 | `Ganesan Selvam` | `ls-4963` | `Selvam G` | Kancheepuram, Tamil Nadu | The roster's `G` initial expands to `Ganesan`, reordered. **Moderate–high** — rests on the initial's expansion, which the roster does not spell out. |
-| 3 | 372 | `D.K. Suresh` | `ls-4585` | `Doddalahalli Kempegowda Suresh` | Bangalore Rural, Karnataka | `D.K.` = **D**(oddalahalli) **K**(empegowda). **High confidence** — both initials match and he is the only `Suresh` in a Bangalore constituency in this term. |
-| 4 | 292 | `Poonam (Mahajan) Vajendla Rao` | `ls-4660` | `Poonam  Pramod Mahajan` | Mumbai North Central, Maharashtra | Shares `Poonam` and `Mahajan`; the question form's `Vajendla Rao` appears **nowhere** in the roster record, and the roster's `Pramod` appears nowhere in the question form. **LOWEST confidence of the five — please check this one first.** |
-| 5 | 273 | `V. Kalanidhi` | `ls-4959` | `Kalanidhi Veeraswamy` | Chennai North, Tamil Nadu | `V.` = **V**(eeraswamy), reordered. **High confidence** — the only `Kalanidhi` in the term. |
+| # | Status | Questions blocked | Form as written (question route) | Member | Roster name form | Constituency, State | Basis |
+|---:|---|---:|---|---|---|---|
+| 1 | **CONFIRMED BY OWNER** | 513 | `Sunil Dattatray Tatkare` | `ls-5199` | `Tatkare Sunil Dattatrey` | Raigad, Maharashtra | Token reorder plus one spelling variant (`Dattatray` / `Dattatrey`); every token corresponds. |
+| 2 | **CONFIRMED BY OWNER** | 414 | `Ganesan Selvam` | `ls-4963` | `Selvam G` | Kancheepuram, Tamil Nadu | The roster's `G` initial expands to `Ganesan`, reordered. Rested on that expansion, which the roster does not spell out. |
+| 3 | **CONFIRMED BY OWNER** | 372 | `D.K. Suresh` | `ls-4585` | `Doddalahalli Kempegowda Suresh` | Bangalore Rural, Karnataka | `D.K.` = **D**(oddalahalli) **K**(empegowda); both initials match and the only `Suresh` in a Bangalore constituency this term. |
+| 4 | **DROPPED BY OWNER** | 292 | `Poonam (Mahajan) Vajendla Rao` | ~~`ls-4660`~~ | ~~`Poonam  Pramod Mahajan`~~ | ~~Mumbai North Central, Maharashtra~~ | Proposal shared only `Poonam` and `Mahajan`; the question form's `Vajendla Rao` appears nowhere in the roster record and the roster's `Pramod` nowhere in the question form. **No reason for the drop was recorded by the owner, and none is inferred here.** The form **stays among the residual forms.** |
+| 5 | **CONFIRMED BY OWNER** | 273 | `V. Kalanidhi` | `ls-4959` | `Kalanidhi Veeraswamy` | Chennai North, Tamil Nadu | `V.` = **V**(eeraswamy), reordered; the only `Kalanidhi` in the term. |
 
-**Why these five and not others**: ranked by questions blocked, they are the largest-value
-corrections available. The cumulative effect, computed over the real question records:
+**Why these and not others**: the five were ranked by questions blocked, the largest-value
+corrections available. Four were confirmed and one dropped.
 
-| Confirmed assertions | Questions recovered | Window resolved | Rate |
-|---:|---:|---:|---:|
-| 0 (tier only) | — | 90,299 | 94.78% — fails |
-| 1 | +422 | 90,721 | **95.23% — SC-002 met** |
-| 2 | +831 | 91,130 | 95.66% |
-| 3 | +1,174 | 91,473 | 96.02% |
-| 4 | +1,456 | 91,755 | 96.31% |
-| **5** | **+1,692** | **91,991** | **96.56%** |
+### The window rate with the four confirmed pairs — computed, not summed
 
-**The first assertion alone meets SC-002.** Five are seeded for margin: at 95.23% a single
-upstream name change could drop the published rate back under, whereas 96.56% leaves 1.56 points.
+| | Resolved | Rate | vs 95% |
+|---|---:|---:|---:|
+| Tier only, no assertions (the **automatic** rate) | 90,299 / 95,269 | **94.78%** | fails by 0.22 |
+| **+ the four confirmed assertions** | **91,708 / 95,269** | **96.26%** | **met, +1.26 points** |
 
-Recovered counts are below blocked counts because a co-asked question resolves only when **all**
-its residual askers are fixed — FR-003 working as specified, which is why the ranking cannot be
-summed.
+**Recovered: 1,409 questions.** This was computed by re-walking all 95,269 question records and
+counting those whose every residual asker is one of the four confirmed forms — **not** by adding
+the per-form figures, because co-asked questions make them non-additive:
 
-**Cost**: 5 × 3-minute measured median = **15 minutes**. The remaining 20 residual forms are
-optional; correcting all 25 would reach 100.00% for 75 minutes.
+```
+naive sum of questions the four forms appear in : 1,572
+actually recovered                              : 1,409
+difference                                      :   163
+```
+
+Those **163 questions stay unresolved** because each is co-asked by someone whose form is still
+residual — including, for some, the dropped row 4. A question resolves only when *all* its
+askers do (FR-003), so the figures cannot be summed and the earlier five-pair cumulative table
+has been replaced by this computation rather than adjusted.
+
+**The previously recorded figure was 96.56% (91,991) for five pairs. With row 4 dropped the real
+figure is 96.26% (91,708)** — 283 questions fewer, which is more than row 4's own 292 blocked
+count would suggest in isolation and less than it after overlap, for the same reason.
+
+### Residual forms after seeding: **21**
+
+25 residual forms remained after the tier. Four are now assertions, leaving **21** — and
+`Poonam (Mahajan) Vajendla Rao` is one of them, carrying its 292 blocked questions.
+
+**Cost**: 4 × 3-minute measured median = **12 minutes**. Correcting the remaining 21 is optional.
 
 ## The decision, re-costed against the complete window
 
@@ -498,19 +512,19 @@ with GitHub redirecting the old Pages URL. No amendment is requested. Detail in
 Both of T020's conditions are satisfied. The gate file exists, and T014's attached condition —
 *"stop for the owner's decision. Do not choose, and do not proceed into Phase 3 on an assumed
 answer"* — is discharged: **the owner decided on 2026-10-09** (Option C adopted, SC-002 retained
-at 95%, five assertions seeded). The answer is recorded above, not assumed.
+at 95%, four assertions seeded, a fifth dropped). The answer is recorded above, not assumed.
 
 **Carried into Phase 3 by that decision:**
 
 - **T046** — the matcher includes the containment tier, implemented exactly as the spike
   prototype implements it, thresholds unchanged.
-- **T048** — the first assertions are the five owner-confirmed pairs, and **only** confirmed
-  pairs; the table above is marked PROPOSED.
+- **T048** — the first assertions are the **four** owner-confirmed pairs, and only those; the
+  dropped fifth stays among the 21 residual forms.
 - **T053** — the Coverage Statement publishes the **automatic** rate and the rate **including
   maintainer assertions** separately, so a matcher regression cannot hide behind accumulated hand
   corrections.
 
-**One thing Phase 3 must not inherit as settled**: SC-002 is met at 96.56% *with* five hand
+**One thing Phase 3 must not inherit as settled**: SC-002 is met at 96.26% *with* four hand
 assertions, and at **94.78% without them**. The automatic rate is **below** the threshold. That is
 why T053 publishes both figures, and why the published record will show the shortfall rather than
 conceal it.

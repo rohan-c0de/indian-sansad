@@ -65,7 +65,7 @@ The audit link between a written name form and the identity it resolved to. This
 | `name_as_written` | The exact form found in the source. |
 | `member_id` | Identity resolved to, or empty. |
 | `status` | `resolved`, `ambiguous`, `unresolved`. |
-| `method` | How it was resolved — exact match, normalised match, or manual assertion. |
+| `method` | How it was resolved. One of **six** values, matching the tiers T046 implements so any join shows which tier produced it (FR-005): `exact` | `normalised` | `normalised-reordered` | `approximate` | `token-containment` | `manual-assertion`. |
 | `candidates` | For `ambiguous`, the member identities that matched equally well. |
 | `source_record_ref` | Where the name form was encountered. |
 | `asserted_by` | `automatic` or `maintainer`, for manual corrections. |
