@@ -64,8 +64,8 @@ Four orderings here depart from the template's default. Each is recorded so a re
 
 ### Spike item 4a — name the free CI tier (Constitution Principle I; must precede item 2)
 
-- [ ] T007 Enumerate the candidate free CI providers that offer **scheduled** jobs, in `specs/001-resolved-metadata-layer/spike/free-tiers.md`, and choose one. No trial, no promotional credit, no free tier of a plan that becomes chargeable — Principle I and FR-014 count all three as paid
-- [ ] T008 For the chosen CI provider, record in `spike/free-tiers.md`, each figure quoted from that provider's own current published limits page with the URL and the date retrieved: scheduled-job support, minutes or runs per month, maximum single job duration, concurrency, whether schedules are disabled on repository inactivity, and **the documented behaviour at each limit** — hard stop, throttle, queue, or overage charge. An overage charge disqualifies the provider under Principle I; record the disqualification and return to T007 rather than accepting it
+- [X] T007 Enumerate the candidate free CI providers that offer **scheduled** jobs, in `specs/001-resolved-metadata-layer/spike/free-tiers.md`, and choose one. No trial, no promotional credit, no free tier of a plan that becomes chargeable — Principle I and FR-014 count all three as paid
+- [X] T008 For the chosen CI provider, record in `spike/free-tiers.md`, each figure quoted from that provider's own current published limits page with the URL and the date retrieved: scheduled-job support, minutes or runs per month, maximum single job duration, concurrency, whether schedules are disabled on repository inactivity, and **the documented behaviour at each limit** — hard stop, throttle, queue, or overage charge. An overage charge disqualifies the provider under Principle I; record the disqualification and return to T007 rather than accepting it
 
 ### Spike item 2 — confirm a free CI runner can reach the route
 
