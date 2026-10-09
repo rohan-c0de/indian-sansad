@@ -1,0 +1,26 @@
+{
+  "_policy": "HAND-WRITTEN. No upstream response. All identities fictional; see README.md.",
+  "members": [
+    {"memberId": "fx-0001", "memberName": "Sunil Kumar Singh", "party": "Party A",
+     "state": "State One", "constituency": "Constituency Alpha", "house": "Lok Sabha",
+     "term": 18, "sittingStatus": "sitting"},
+    {"memberId": "fx-0002", "memberName": "Asha Devi Verma", "party": "Party B",
+     "state": "State Two", "constituency": "Constituency Beta", "house": "Lok Sabha",
+     "term": 18, "sittingStatus": "sitting"},
+    {"memberId": "fx-0003", "memberName": "Ramesh Chandra Pillai", "party": "Party A",
+     "state": "State Three", "constituency": "Constituency Gamma", "house": "Lok Sabha",
+     "term": 18, "sittingStatus": "sitting"},
+    {"memberId": "fx-0010", "memberName": "Mohan Lal Gupta", "party": "Party C",
+     "state": "State Four", "constituency": "Constituency Delta", "house": "Lok Sabha",
+     "term": 18, "sittingStatus": "sitting"},
+    {"memberId": "fx-0011", "memberName": "Mohan Lal Gupta", "party": "Party D",
+     "state": "State Five", "constituency": "Constituency Epsilon", "house": "Lok Sabha",
+     "term": 18, "sittingStatus": "sitting"},
+    {"memberId": "fx-0020", "memberName": "Kavita Rao", "party": "Party B",
+     "state": "State Six", "constituency": "Constituency Zeta", "house": "Lok Sabha",
+     "term": 18, "sittingStatus": "sitting"},
+    {"memberId": "fx-0021", "memberName": "Kavita Rao", "party": "Party B",
+     "state": "State Six", "constituency": "Constituency Eta", "house": "Lok Sabha",
+     "term": 18, "sittingStatus": "sitting"}
+  ]
+}

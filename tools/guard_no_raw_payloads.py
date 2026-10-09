@@ -48,38 +48,86 @@ from pathlib import Path
 
 PROHIBITED_ATTRIBUTES: dict[str, tuple[str, ...]] = {
     "personal phone": (
-        "mobileno", "mobilenumber", "mobile", "phoneno", "phonenumber",
-        "telephoneno", "telephonenumber", "personalphone", "personalmobile",
-        "contactno", "contactnumber", "residencephone", "residencephoneno",
+        "mobileno",
+        "mobilenumber",
+        "mobile",
+        "phoneno",
+        "phonenumber",
+        "telephoneno",
+        "telephonenumber",
+        "personalphone",
+        "personalmobile",
+        "contactno",
+        "contactnumber",
+        "residencephone",
+        "residencephoneno",
     ),
     "Delhi phone": (
-        "delhiphone", "delhiphoneno", "delhiphonenumber", "delhimobile",
-        "delhitelephone", "delhitelephoneno", "delhicontact", "delhicontactno",
-        "delhiresidencephone", "delhiaddressphone",
+        "delhiphone",
+        "delhiphoneno",
+        "delhiphonenumber",
+        "delhimobile",
+        "delhitelephone",
+        "delhitelephoneno",
+        "delhicontact",
+        "delhicontactno",
+        "delhiresidencephone",
+        "delhiaddressphone",
     ),
     "email": (
-        "email", "emailid", "emailaddress", "mailid", "mailaddress",
-        "personalemail", "officialemail", "eid",
+        "email",
+        "emailid",
+        "emailaddress",
+        "mailid",
+        "mailaddress",
+        "personalemail",
+        "officialemail",
+        "eid",
     ),
     "present address": (
-        "presentaddress", "presentadd", "currentaddress", "residentialaddress",
-        "localaddress", "delhiaddress", "address",
+        "presentaddress",
+        "presentadd",
+        "currentaddress",
+        "residentialaddress",
+        "localaddress",
+        "delhiaddress",
+        "address",
     ),
     "permanent address": (
-        "permanentaddress", "permanentadd", "permaddress", "homeaddress",
+        "permanentaddress",
+        "permanentadd",
+        "permaddress",
+        "homeaddress",
         "nativeaddress",
     ),
     "date of birth": (
-        "dob", "dateofbirth", "birthdate", "birthday", "dateofbirthday",
+        "dob",
+        "dateofbirth",
+        "birthdate",
+        "birthday",
+        "dateofbirthday",
     ),
     "marital status": (
-        "maritalstatus", "marital", "maritalstate", "spousename",
-        "wifename", "husbandname",
+        "maritalstatus",
+        "marital",
+        "maritalstate",
+        "spousename",
+        "wifename",
+        "husbandname",
     ),
     "number of sons and daughters": (
-        "noofsons", "numberofsons", "sons", "nosons",
-        "noofdaughters", "numberofdaughters", "daughters", "nodaughters",
-        "noofsonsanddaughters", "noofchildren", "numberofchildren", "children",
+        "noofsons",
+        "numberofsons",
+        "sons",
+        "nosons",
+        "noofdaughters",
+        "numberofdaughters",
+        "daughters",
+        "nodaughters",
+        "noofsonsanddaughters",
+        "noofchildren",
+        "numberofchildren",
+        "children",
     ),
 }
 
@@ -90,47 +138,108 @@ PROHIBITED_ATTRIBUTES: dict[str, tuple[str, ...]] = {
 # when they appear in a STRUCTURED position: as a JSON/YAML key, a CSV header
 # cell, or an assignment target. The unambiguous spellings (dob, emailId,
 # maritalStatus, noOfSons...) are prohibited anywhere, in any file.
-AMBIGUOUS_IN_PROSE: frozenset[str] = frozenset({
-    "mobile", "address", "sons", "daughters", "children", "marital",
-    "eid", "email",
-})
+AMBIGUOUS_IN_PROSE: frozenset[str] = frozenset(
+    {
+        "mobile",
+        "address",
+        "sons",
+        "daughters",
+        "children",
+        "marital",
+        "eid",
+        "email",
+    }
+)
 
 # ---------------------------------------------------------------------------
 # Where to look
 # ---------------------------------------------------------------------------
 
-SKIP_DIRS: frozenset[str] = frozenset({
-    ".git", ".venv", "venv", "node_modules", "__pycache__",
-    ".pytest_cache", ".ruff_cache", ".mypy_cache", ".idea", ".vscode",
-    "htmlcov", "dist", "build",
-})
+SKIP_DIRS: frozenset[str] = frozenset(
+    {
+        ".git",
+        ".venv",
+        "venv",
+        "node_modules",
+        "__pycache__",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        ".idea",
+        ".vscode",
+        "htmlcov",
+        "dist",
+        "build",
+    }
+)
 
 # Extensions treated as payload-shaped for the size ceiling. A raw upstream
 # response arriving as a committed fixture is the case this exists for.
-PAYLOAD_SUFFIXES: frozenset[str] = frozenset({
-    ".json", ".jsonl", ".ndjson", ".csv", ".tsv", ".xml", ".yaml", ".yml",
-})
+PAYLOAD_SUFFIXES: frozenset[str] = frozenset(
+    {
+        ".json",
+        ".jsonl",
+        ".ndjson",
+        ".csv",
+        ".tsv",
+        ".xml",
+        ".yaml",
+        ".yml",
+    }
+)
 
 PAYLOAD_SIZE_CEILING_BYTES = 64 * 1024  # 64 KB, per T002
 
 # Binary and generated files are not scanned for text. They are still size-checked
 # when payload-shaped.
-UNSCANNABLE_SUFFIXES: frozenset[str] = frozenset({
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg", ".pdf",
-    ".woff", ".woff2", ".ttf", ".otf", ".eot",
-    ".zip", ".gz", ".tar", ".bz2", ".xz", ".7z",
-    ".so", ".dylib", ".dll", ".pyc", ".pyo", ".o", ".a",
-    ".mp3", ".mp4", ".wav", ".mov", ".webm",
-    ".sqlite", ".db", ".parquet",
-})
+UNSCANNABLE_SUFFIXES: frozenset[str] = frozenset(
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".ico",
+        ".svg",
+        ".pdf",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".zip",
+        ".gz",
+        ".tar",
+        ".bz2",
+        ".xz",
+        ".7z",
+        ".so",
+        ".dylib",
+        ".dll",
+        ".pyc",
+        ".pyo",
+        ".o",
+        ".a",
+        ".mp3",
+        ".mp4",
+        ".wav",
+        ".mov",
+        ".webm",
+        ".sqlite",
+        ".db",
+        ".parquet",
+    }
+)
 
 # This guard's own source names every prohibited spelling, by necessity. So does
 # any file whose job is to document or test the prohibition. Each exemption is
 # an explicit, individually-justified hole in the guard -- never a pattern.
-SELF_EXEMPT: frozenset[str] = frozenset({
-    "tools/guard_no_raw_payloads.py",   # this file: the list lives here
-    "tests/unit/test_guard_no_raw_payloads.py",  # tests the list
-})
+SELF_EXEMPT: frozenset[str] = frozenset(
+    {
+        "tools/guard_no_raw_payloads.py",  # this file: the list lives here
+        "tests/unit/test_guard_no_raw_payloads.py",  # tests the list
+    }
+)
 
 
 def _canonical(text: str) -> str:
@@ -149,9 +258,7 @@ for _attribute, _spellings in PROHIBITED_ATTRIBUTES.items():
     for _spelling in _spellings:
         _SPELLING_TO_ATTRIBUTE[_canonical(_spelling)] = _attribute
 
-_CANONICAL_AMBIGUOUS: frozenset[str] = frozenset(
-    _canonical(s) for s in AMBIGUOUS_IN_PROSE
-)
+_CANONICAL_AMBIGUOUS: frozenset[str] = frozenset(_canonical(s) for s in AMBIGUOUS_IN_PROSE)
 
 # A token in a structured position. Each alternative captures the identifier:
 #   "mobileNo":            JSON / YAML double-quoted key
@@ -200,7 +307,7 @@ def _fence_mask(lines: list[str]) -> list[bool]:
     mask: list[bool] = []
     for line in lines:
         if _FENCE.match(line):
-            mask.append(False)          # the fence delimiter is not content
+            mask.append(False)  # the fence delimiter is not content
             inside = not inside
             continue
         mask.append(inside)
@@ -262,7 +369,7 @@ def scan_text(relpath: str, text: str) -> list[tuple[int, str, str]]:
             for match in _ANY_TOKEN.finditer(line):
                 token = _canonical(match.group(0))
                 if token in _CANONICAL_AMBIGUOUS:
-                    continue            # prose-ambiguous: structured only
+                    continue  # prose-ambiguous: structured only
                 hits.add(token)
 
         for canon in sorted(hits):
@@ -288,6 +395,184 @@ def iter_files(root: Path) -> list[Path]:
     return out
 
 
+# ===========================================================================
+# T031 -- `make audit-fields`: the three scopes quickstart.md scenario 10 names
+# ===========================================================================
+# Scenario 10 requires that no member attribute outside the FR-008 list appears
+# anywhere in:
+#
+#   1. `data/published/` -- "every partition and both formats, including the
+#      precomputed aggregates and the subject-search index";
+#   2. `web/` and everything it renders -- "the page source, any vendored file
+#      under `web/lib/`, and any attribute that reaches a reader only through
+#      an aggregate or index the page fetches";
+#   3. "every fixture, sample and test file in the repository" -- `tests/`.
+#
+# WHY THIS IS WIDER THAN `make guard`. plan.md's own Constitution Check flags
+# it: "Principle V's gate names 'pages' and 'derived statistics' explicitly."
+# `make guard` scans the committed tree. That is not the same set as what gets
+# published -- `data/published/` is git-ignored on `main` and reaches third
+# parties via the `published` branch, so a tree-only scan would never look at
+# the actual published dataset. An audit of the specification rather than of
+# the artefact is not an audit.
+#
+# TWO DELIBERATE DIFFERENCES FROM `make guard`:
+#
+#   * The 64 KB payload ceiling is NOT applied inside `data/published/`.
+#     That ceiling exists to catch a committed raw upstream response masquerading
+#     as a fixture. Published dataset files are legitimately large -- the spike
+#     measured 3.53 MiB for the largest, against GitHub Pages' 100 MiB hard
+#     per-file limit. Applying the fixture ceiling there would fail on every
+#     refresh, and a check that always fails is a check that gets switched off.
+#     The ceiling still applies in `web/` and `tests/`, where a 64 KB JSON file
+#     IS the thing being guarded against.
+#
+#   * An ABSENT scope is reported as NOT PRESENT, never as a pass. SC-010 is a
+#     claim that nothing unlisted is published; that claim cannot be supported
+#     by a directory that was never built. `--require-present` turns absence
+#     into a non-zero exit, which is what `make validate` uses -- there, after a
+#     refresh, an empty `data/published/` is itself a failure.
+
+#: The three scopes, as (relative path, applies the payload size ceiling).
+AUDIT_SCOPES: tuple[tuple[str, bool], ...] = (
+    ("data/published", False),
+    ("web", True),
+    ("tests", True),
+)
+
+
+def audit_scope(
+    root: Path, relative: str, apply_size_ceiling: bool, max_payload_bytes: int
+) -> tuple[bool, int, list[str], list[str]]:
+    """Audit one scope.
+
+    Returns (present, files_scanned, attribute_violations, size_violations).
+    Violation strings carry paths and keys only -- never values.
+    """
+    scope_root = root / relative
+    if not scope_root.is_dir():
+        return (False, 0, [], [])
+
+    attribute_violations: list[str] = []
+    size_violations: list[str] = []
+    scanned = 0
+
+    for path in iter_files(scope_root):
+        relpath = path.relative_to(root).as_posix()
+        suffix = path.suffix.lower()
+
+        if apply_size_ceiling and suffix in PAYLOAD_SUFFIXES:
+            size = path.stat().st_size
+            if size > max_payload_bytes:
+                size_violations.append(
+                    f"{relpath}: {size} bytes exceeds the {max_payload_bytes}-byte payload ceiling"
+                )
+
+        if relpath in SELF_EXEMPT or suffix in UNSCANNABLE_SUFFIXES:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+
+        scanned += 1
+        for lineno, key, attribute in scan_text(relpath, text):
+            attribute_violations.append(
+                f"{relpath}:{lineno}: key '{key}' is a prohibited "
+                f"'{attribute}' field (Constitution Principle V)"
+            )
+
+    return (True, scanned, attribute_violations, size_violations)
+
+
+def audit_fields(root: Path, max_payload_bytes: int, require_present: bool) -> int:
+    """Run the three-scope audit. Returns the process exit code.
+
+    Exit code is the whole interface, as with `main`:
+        0  every present scope is clean (and, with --require-present, all three
+           scopes exist)
+        1  a prohibited attribute or oversized payload was found, or a required
+           scope is absent
+    """
+    print("audit-fields: the three scopes of quickstart.md scenario 10")
+    print(f"  repository root: {root}\n")
+
+    total_attribute: list[str] = []
+    total_size: list[str] = []
+    absent: list[str] = []
+    audited = 0
+
+    for relative, apply_ceiling in AUDIT_SCOPES:
+        present, scanned, attrs, sizes = audit_scope(
+            root, relative, apply_ceiling, max_payload_bytes
+        )
+        ceiling_note = (
+            f"size ceiling {max_payload_bytes} B"
+            if apply_ceiling
+            else "size ceiling NOT applied (published files are legitimately large)"
+        )
+
+        if not present:
+            absent.append(relative)
+            print(f"  [NOT PRESENT] {relative}/")
+            print("                nothing audited -- this is NOT a pass for this scope")
+            continue
+
+        if scanned == 0:
+            # Present but empty. An empty result is not a confirmed-empty
+            # result: this scope was looked at and contained nothing to read,
+            # which supports no claim about what the project publishes. It is
+            # counted with the absent scopes, not the clean ones -- a green
+            # "all 3 scopes audited" over 0 files is the most misleading line
+            # this tool could print.
+            absent.append(f"{relative} (present but empty)")
+            print(f"  [EMPTY] {relative}/ -- 0 file(s) to scan")
+            print("          nothing audited -- this is NOT a pass for this scope")
+            continue
+
+        audited += 1
+        status = "FAIL" if (attrs or sizes) else "PASS"
+        print(f"  [{status}] {relative}/ -- {scanned} file(s) scanned, {ceiling_note}")
+        for line in attrs:
+            print(f"      attribute: {line}")
+        for line in sizes:
+            print(f"      size:      {line}")
+        total_attribute.extend(attrs)
+        total_size.extend(sizes)
+
+    print()
+    if total_attribute or total_size:
+        print(
+            f"audit-fields: FAIL -- {len(total_attribute)} attribute violation(s), "
+            f"{len(total_size)} size violation(s) across {audited} audited scope(s)"
+        )
+        return 1
+
+    if absent:
+        print(
+            f"audit-fields: {audited} of {len(AUDIT_SCOPES)} scope(s) audited and clean. "
+            f"NOT AUDITED: {', '.join(absent)}."
+        )
+        if require_present:
+            print(
+                "audit-fields: FAIL -- --require-present was given and a scope is "
+                "missing or empty. SC-010 cannot be asserted about a dataset "
+                "that was never built."
+            )
+            return 1
+        print(
+            "audit-fields: PASS for what exists. This is NOT a clean bill of "
+            "health for the absent scope(s) above."
+        )
+        return 0
+
+    print(
+        f"audit-fields: PASS -- all {len(AUDIT_SCOPES)} scope(s) audited, "
+        f"no prohibited attribute, no oversized payload"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -297,12 +582,33 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     parser.add_argument(
-        "root", nargs="?", default=".",
+        "root",
+        nargs="?",
+        default=".",
         help="Directory to scan (default: current directory).",
     )
     parser.add_argument(
-        "--max-payload-bytes", type=int, default=PAYLOAD_SIZE_CEILING_BYTES,
+        "--max-payload-bytes",
+        type=int,
+        default=PAYLOAD_SIZE_CEILING_BYTES,
         help=f"Payload size ceiling in bytes (default: {PAYLOAD_SIZE_CEILING_BYTES}).",
+    )
+    parser.add_argument(
+        "--audit-fields",
+        action="store_true",
+        help=(
+            "Run the T031 three-scope audit (data/published/, web/, tests/) "
+            "instead of the whole-tree guard. quickstart.md scenario 10."
+        ),
+    )
+    parser.add_argument(
+        "--require-present",
+        action="store_true",
+        help=(
+            "With --audit-fields, fail if any of the three scopes is absent "
+            "from disk. Used by `make validate`, where an empty "
+            "data/published/ after a refresh is itself a failure."
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -310,6 +616,9 @@ def main(argv: list[str] | None = None) -> int:
     if not root.is_dir():
         print(f"guard: not a directory: {root}", file=sys.stderr)
         return 2
+
+    if args.audit_fields:
+        return audit_fields(root, args.max_payload_bytes, args.require_present)
 
     attribute_violations: list[str] = []
     size_violations: list[str] = []
@@ -371,8 +680,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"guard: note -- {len(skipped_unreadable)} file(s) not decodable "
             f"as UTF-8 and therefore not attribute-scanned: "
-            f"{', '.join(skipped_unreadable[:5])}"
-            + (" ..." if len(skipped_unreadable) > 5 else "")
+            f"{', '.join(skipped_unreadable[:5])}" + (" ..." if len(skipped_unreadable) > 5 else "")
         )
     return 0
 

@@ -1,0 +1,34 @@
+{
+  "_policy": "HAND-WRITTEN. No upstream response. All identities fictional; see README.md.",
+  "_exercises": "FR-003 / US1 scenario 2: a co-asked question MUST carry every asking member and MUST NOT be duplicated per asker.",
+  "_envelope_note": "Field names mirror the question route recorded in spike/route-capture.md so shape detection can be exercised. Values are invented.",
+  "listOfQuestions": [
+    {
+      "quesNo": 101, "lokNo": "18", "sessionNo": "1", "date": "2024-07-01",
+      "type": "STARRED", "subjects": "Placeholder subject for a co-asked question",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["Shri Sunil Kumar Singh", "Smt. Asha Devi Verma", "Ramesh Pillai"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    },
+    {
+      "quesNo": 102, "lokNo": "18", "sessionNo": "1", "date": "2024-07-02",
+      "type": "UNSTARRED", "subjects": "Placeholder subject for a single-asker question",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["Singh, Sunil K."],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    }
+  ],
+  "totalRecordSize": 2,
+  "_expected": {
+    "q101": "ONE record carrying three member_ids: fx-0001, fx-0002, fx-0003. Not three records.",
+    "q102": "resolves to fx-0001 via the required variant pair's second form."
+  }
+}

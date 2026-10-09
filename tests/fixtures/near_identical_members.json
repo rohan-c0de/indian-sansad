@@ -1,0 +1,23 @@
+{
+  "_policy": "HAND-WRITTEN. No upstream response. All identities fictional; see README.md.",
+  "_exercises": "FR-002 / Edge Cases: two members with identical or near-identical names MUST NOT be merged; distinctness is decided on attributes beyond the name.",
+  "pairs": [
+    {
+      "a": {"member_id": "fx-0010", "canonical_name": "Mohan Lal Gupta",
+            "party": "Party C", "state": "State Four", "constituency": "Constituency Delta"},
+      "b": {"member_id": "fx-0011", "canonical_name": "Mohan Lal Gupta",
+            "party": "Party D", "state": "State Five", "constituency": "Constituency Epsilon"},
+      "distinct_on": ["party", "state", "constituency"],
+      "expected": "TWO member identities. A matcher that merges on name equality fails here, and so does one that merges on a high similarity score."
+    },
+    {
+      "a": {"member_id": "fx-0020", "canonical_name": "Kavita Rao",
+            "party": "Party B", "state": "State Six", "constituency": "Constituency Zeta"},
+      "b": {"member_id": "fx-0021", "canonical_name": "Kavita Rao",
+            "party": "Party B", "state": "State Six", "constituency": "Constituency Eta"},
+      "distinct_on": ["constituency"],
+      "expected": "TWO member identities, distinguishable ONLY by constituency. This is the harder case: it is simultaneously the ambiguous-resolution fixture, because a question record carrying only the name cannot break the tie -- so the right outcome is two members AND an ambiguous question."
+    }
+  ],
+  "_not_this_case": "A member whose party or House changes mid-window is the OPPOSITE case and MUST keep ONE member_id with the change in `terms` (data-model.md -> Member). Distinctness is decided on attributes beyond the name; a changed attribute on one person is not a second person."
+}

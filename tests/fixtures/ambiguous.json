@@ -1,0 +1,22 @@
+{
+  "_policy": "HAND-WRITTEN. No upstream response. All identities fictional; see README.md.",
+  "_exercises": "Edge Cases: an ambiguous form MUST list its candidates; an ambiguous match MUST NOT be silently collapsed to the first candidate.",
+  "listOfQuestions": [
+    {
+      "quesNo": 301, "lokNo": "18", "sessionNo": "3", "date": "2024-09-01",
+      "type": "STARRED", "subjects": "Placeholder subject, ambiguous asker",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["Kavita Rao"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    }
+  ],
+  "totalRecordSize": 1,
+  "_expected": {
+    "q301": "resolution_status 'ambiguous'. The Resolution Record MUST carry candidates ['fx-0020','fx-0021'] and member_id MUST be null. Collapsing to fx-0020 because it sorts first is the exact failure Edge Cases names.",
+    "why_equal": "fx-0020 and fx-0021 share name, party AND state. They differ only by constituency, which the question route does not carry -- so nothing in the question record can break the tie."
+  }
+}

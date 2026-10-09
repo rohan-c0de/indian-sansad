@@ -11,6 +11,27 @@ data/raw/
 *.raw.json
 *.raw.csv
 
+# ---------------------------------------------------------------------------
+# Published dataset -- BUILD OUTPUT, not source (owner decision 2026-10-09).
+#
+# `make refresh` writes data/published/ locally. It is NOT committed on `main`:
+# the spike measured 216.5 MiB per refresh (227,007,149 bytes, both formats,
+# full window), and because T008 concluded the refresh must commit on every run
+# to keep GitHub's 60-day schedule rule from silently disabling it, committing
+# the dataset to `main` would breach GitHub's "ideally less than 1 GB"
+# repository guidance on about the FIFTH refresh.
+#
+# The dataset lives only on the rolling orphan branch `published`, which the
+# workflow force-pushes as a single commit. That bounds repository growth; its
+# cost is the per-refresh provenance that git history would otherwise give.
+#
+# Deliberately NO .gitkeep under data/published/ -- a committed .gitkeep is
+# exactly how a git-ignored build-output directory ends up tracked on `main`.
+# data/assertions/ DOES keep its .gitkeep: maintainer corrections are an input
+# that must survive a refresh rewriting the published branch wholesale.
+# ---------------------------------------------------------------------------
+data/published/
+
 # Scratch space for fetched bodies lives OUTSIDE the repo ($SANSAD_SCRATCH).
 # This entry exists only to catch a scratch dir created inside the tree by
 # mistake; `make scratch` asserts against that case.

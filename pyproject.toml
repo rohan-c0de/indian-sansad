@@ -1,0 +1,114 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sansad"
+version = "0.1.0"
+description = "A resolved metadata layer over the Indian parliamentary record"
+readme = "README.md"
+# Pinned, not a floor-with-headroom. plan.md names Python 3.13 and the spike's
+# measured figures were produced on 3.13.5; 3.14 is unverified here.
+requires-python = ">=3.13,<3.14"
+
+# --------------------------------------------------------------------------
+# Runtime dependencies -- TWO, not the three plan.md's categories imply.
+#
+# plan.md names three pipeline roles: an HTTP client, an approximate
+# string-matching library, and a tabular/serialisation library. Two are
+# third-party below. The third -- approximate string matching -- is
+# DELIBERATELY the standard library's `difflib`, and this is a recorded
+# departure from T021's wording rather than an omission.
+#
+# Why (owner decision, 2026-10-09):
+#   The spike's resolution measurement used `difflib.SequenceMatcher.ratio`
+#   on normalised forms at APPROX_THRESHOLD = 0.90 and APPROX_MARGIN = 0.02
+#   (spike/resolve_rate.py). Those constants were holdout-validated on
+#   sessions 11-15 of the 17th Lok Sabha -- 15,082 questions that did not
+#   exist on disk when the rule was committed -- and generalised to within
+#   0.04 points. Every figure carrying the owner's SC-002 decision rests on
+#   that metric: 94.78% automatic, 96.26% with the four confirmed assertions
+#   (specs/001-resolved-metadata-layer/spike/spike-report.md).
+#
+#   A third-party matcher such as rapidfuzz does not score the same way --
+#   its `ratio` is a normalised Indel similarity, not SequenceMatcher's
+#   longest-matching-block ratio -- so 0.90 would mean something different
+#   under it and the holdout validation would be void. Re-establishing it
+#   means re-running all 95,269 questions. Keeping `difflib` carries the
+#   measurement into src/ unchanged.
+#
+#   CONSTRAINT ON T046: the production `approximate` tier MUST use
+#   difflib.SequenceMatcher.ratio at 0.90/0.02 on normalised forms. Swapping
+#   the similarity metric re-opens SC-002 and requires a fresh holdout.
+#
+# Each dependency below is upkeep against Principle II's ~2h/week ceiling,
+# which is why there are two and not more.
+# --------------------------------------------------------------------------
+dependencies = [
+    # HTTP client for the ingest transport (src/sansad/ingest/transport.py).
+    # The spike proved the route reachable with urllib.request from both a
+    # laptop and a GitHub-hosted runner; httpx is taken for connection reuse
+    # across the ~95k-record window, explicit timeouts, and retry control on
+    # an upstream that carries no contract or deprecation notice.
+    "httpx>=0.28,<1.0",
+    # Tabular/serialisation library for the publish side. The published
+    # dataset is newline-delimited JSON and CSV on every axis
+    # (contracts/published-dataset.md); polars writes both natively, in one
+    # wheel, with no numpy dependency behind it.
+    "polars>=1.17,<2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9.0",
+    "ruff>=0.8,<1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sansad"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+# --------------------------------------------------------------------------
+# T022 -- linting and formatting.
+#
+# One tool (ruff) for both, because two tools with overlapping opinions is
+# upkeep against Principle II's ceiling for no gain. `spike/` is excluded:
+# it is throwaway measurement scaffolding by design (T011 keeps the resolver
+# prototype out of src/ deliberately) and holding it to src/'s standard
+# would invite tidying code whose only remaining job is to have produced a
+# figure already recorded.
+# --------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["spike", ".venv", "data"]
+# VERIFIED: without force-exclude, `ruff format --check spike/` scans the
+# excluded directory anyway -- an explicitly-passed path overrides exclude
+# by default ("4 files would be reformatted"). force-exclude makes the
+# exclusion hold however ruff is invoked.
+force-exclude = true
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # import sorting
+    "UP",   # pyupgrade -- keeps us on 3.13 idiom
+    "B",    # bugbear
+    "SIM",  # simplify
+    "RUF",  # ruff's own
+]
+# E501 is left to the formatter: ruff-format wraps code, but it will not
+# reflow a long string or a quoted MUST rule, and the model modules quote
+# data-model.md verbatim (T024-T028). A lint error on a verbatim quote would
+# pressure someone into paraphrasing a validation rule, which is the one
+# thing those docstrings exist to prevent.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests may shadow and redefine fixtures freely.
+"tests/**" = ["B011"]

@@ -1,0 +1,24 @@
+{
+  "_policy": "HAND-WRITTEN. No upstream response. All identities fictional; see README.md.",
+  "_note": "Name forms only (permitted by Principle V). The fx- member ids are invented.",
+  "variant_pairs": [
+    {
+      "member_id": "fx-0001",
+      "canonical_name": "Sunil Kumar Singh",
+      "name_variants": ["Shri Sunil Kumar Singh", "Singh, Sunil K."],
+      "exercises": "required pair: honorific prefix + comma-reordering + middle-name initial"
+    },
+    {
+      "member_id": "fx-0002",
+      "canonical_name": "Asha Devi Verma",
+      "name_variants": ["Smt. Asha Devi Verma", "Verma Asha Devi", "A. D. Verma"],
+      "exercises": "honorific, token reordering without comma, all-initials form"
+    },
+    {
+      "member_id": "fx-0003",
+      "canonical_name": "Ramesh Chandra Pillai",
+      "name_variants": ["Ramesh Chandra Pillai", "Ramesh Pillai"],
+      "exercises": "token containment: roster name is a strict subset of the question form"
+    }
+  ]
+}

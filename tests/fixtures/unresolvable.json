@@ -1,0 +1,33 @@
+{
+  "_policy": "HAND-WRITTEN. No upstream response. All identities fictional; see README.md.",
+  "_exercises": "FR-004 / US1 scenario 3: an unresolvable asker MUST be retained with resolution_status 'unresolved', and MUST NOT be dropped or assigned a guessed member.",
+  "listOfQuestions": [
+    {
+      "quesNo": 201, "lokNo": "18", "sessionNo": "2", "date": "2024-08-01",
+      "type": "UNSTARRED", "subjects": "Placeholder subject, unresolvable asker",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["Zzyzx Qwerty Nonexistentname"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    },
+    {
+      "quesNo": 202, "lokNo": "18", "sessionNo": "2", "date": "2024-08-02",
+      "type": "UNSTARRED", "subjects": "Placeholder subject, one resolvable and one not",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["Shri Sunil Kumar Singh", "Zzyzx Qwerty Nonexistentname"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    }
+  ],
+  "totalRecordSize": 2,
+  "_expected": {
+    "q201": "retained; resolution_status 'unresolved'; asking_members empty; NOT dropped.",
+    "q202": "retained; NOT counted as resolved even though one asker resolved -- a question resolves only when ALL its askers do (FR-003). This is the non-additivity the spike had to re-walk 95,269 records to measure."
+  }
+}
