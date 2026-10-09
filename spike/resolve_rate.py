@@ -185,8 +185,21 @@ def resolve_form(form: str, exact, norm, sortd, norm_keys: list[str]):
     if not c:
         return ("unresolved", "none", [], 0.0)
     scored: list[tuple[float, str]] = []
+    # SequenceMatcher caches an index of seq2, so seq2 is set ONCE per form and
+    # seq1 is swapped per candidate -- the cheap direction. real_quick_ratio and
+    # quick_ratio are documented UPPER BOUNDS on ratio, so skipping a candidate
+    # that fails them cannot change any result; it only avoids the full
+    # comparison. This is a speed change, not a semantic one: without it the
+    # full-pool run is ~30M comparisons.
+    sm = SequenceMatcher(None)
+    sm.set_seq2(c)
     for key in norm_keys:
-        r = SequenceMatcher(None, c, key).ratio()
+        sm.set_seq1(key)
+        if sm.real_quick_ratio() < APPROX_THRESHOLD:
+            continue
+        if sm.quick_ratio() < APPROX_THRESHOLD:
+            continue
+        r = sm.ratio()
         if r >= APPROX_THRESHOLD:
             scored.append((r, key))
     if not scored:
