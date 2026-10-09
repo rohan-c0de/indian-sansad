@@ -70,7 +70,7 @@ Four orderings here depart from the template's default. Each is recorded so a re
 ### Spike item 2 — confirm a free CI runner can reach the route
 
 - [X] T009 Add a throwaway reachability workflow at the path the T007 provider uses (e.g. `.github/workflows/spike-reachability.yml` for GitHub Actions) that issues one request to the T004 route and one to `GET /api_ls/member` from the runner, printing status code, elapsed and response headers, asserting HTTP 200, and **writing no response body anywhere**
-- [ ] T010 Run the T009 workflow and record the result in `specs/001-resolved-metadata-layer/spike/ci-reachability.md` with the runner's log pasted verbatim. This is not a formality: `research.md` records `GET /api_rs/members` returning **403 where every sibling path returns 404**, cause UNVERIFIED, and a datacentre IP is one of the candidate causes. A 403 or 429 from the runner where the laptop got 200 is a VERIFIED BROKEN gate on FR-009's unattended refresh. Delete or disable the workflow once recorded
+- [X] T010 Run the T009 workflow and record the result in `specs/001-resolved-metadata-layer/spike/ci-reachability.md` with the runner's log pasted verbatim. This is not a formality: `research.md` records `GET /api_rs/members` returning **403 where every sibling path returns 404**, cause UNVERIFIED, and a datacentre IP is one of the candidate causes. A 403 or 429 from the runner where the laptop got 200 is a VERIFIED BROKEN gate on FR-009's unattended refresh. Delete or disable the workflow once recorded
 
 ### Spike item 3 — measure the resolution rate and the hand-correction cost (`plan.md` Risk 3, spec Open Question 3)
 
