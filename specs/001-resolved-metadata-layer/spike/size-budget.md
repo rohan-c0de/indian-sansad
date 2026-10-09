@@ -377,3 +377,31 @@ Sabha, and sessions 11–15 were never fetched. So:
   — that the term dictionary grows far slower than the postings — remains **unmeasured**.
 - **T019's page-load budget still rests on window-scaled per-file sizes**, not on real
   window-partitioned files.
+
+---
+
+## Status after the 17th Lok Sabha was completed
+
+The complete 17th Lok Sabha is now fetched (60,549 questions), so the window is fully in hand at
+95,269 questions. **The window publish and the window-wide index were NOT re-run**, because the
+owner's instruction scoped this pass to resolution measurement and record updates.
+
+So every size figure in this file stands as recorded, with its basis restated plainly:
+
+| Figure | Status |
+|---|---|
+| 18th LS whole term: 113,425,115 B, 3,266.9 B/question, 1,066 files, largest file 3.53 MiB | **MEASURED** |
+| One session (18th LS session 7): 25,033,292 B | **MEASURED** |
+| Window total ~297 MiB | **PROJECTED** from the 18th's whole-term B/question |
+| Window file count ~1,950 | **PROJECTED** from 887 window member identities |
+| Subject index 3.13 MiB | **PROJECTED** linearly from the 18th's measured 1.14 MiB |
+| First page load 883 KiB / 479 KiB | **PROJECTED** from window-scaled per-file sizes |
+
+One input to those projections did improve: **asker multiplicity is now converged** at
+1.645 (18th), 1.670 and 1.711 (17th sub-slices) — so the ~1.67 the window projection assumes is
+measured across two terms rather than one, and the early drifting samples (1.32, 1.504) are
+superseded.
+
+**What would turn the projections into measurements**: `spike/publish_sample.py --window
+--loksabha 17,18` and `spike/index_sample.py --loksabha 17,18`. Both are implemented and both
+need only the data already on disk. Neither was run in this pass.

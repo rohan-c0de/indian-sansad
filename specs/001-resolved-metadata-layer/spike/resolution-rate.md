@@ -634,3 +634,134 @@ are withdrawn.
    publish and index need the complete 17th. Those figures remain 18th-LS projections.
 6. **Precision is still unverified.** No join, in either term, was hand-checked against the real
    person. Every rate here measures the coverage of matching, not its correctness.
+
+---
+
+# FINAL — the complete window, and the Option C holdout test
+
+**Date**: 2026-10-09, superseding the figures in the addendum above
+**Slices**: 18th Lok Sabha complete (34,720) + **17th Lok Sabha complete (60,549)** = **95,269**
+**Matcher**: configuration unchanged. The containment tier is a separate, flagged run.
+
+Sessions 11–15 of the 17th Lok Sabha were fetched (15,082 rows, `complete=YES`, matching
+`totalRecordSize` exactly) **without refetching sessions 1–10**. 34,720 + 60,549 = 95,269 equals
+the sum of the two terms' declared totals, so **no projection remains in any rate below.**
+
+## Step 2 — the window, with the matcher unchanged
+
+| Slice | Questions | Resolved | Rate | Unresolved | Ambiguous |
+|---|---|---|---|---|---|
+| 18th LS, complete term | 34,720 | 34,610 | **99.68%** | 106 | 0 |
+| **17th LS, complete term** | **60,549** | **51,742** | **85.45%** | 8,807 | 0 |
+| 17th LS, sessions 11–15 (holdout) alone | 15,082 | 12,905 | **85.57%** | 2,177 | 0 |
+| **FULL WINDOW** | **95,269** | **86,352** | **90.64%** | 8,913 | 0 |
+
+**SC-002: NOT MET.** Short by **4.36 points** = **4,153 questions**.
+
+The addendum above reported 91.59% over 80,187 questions (84.2% of the window). Completing the
+17th moved the window figure **down** to 90.64%, because the added sessions resolve at 85.57% —
+in line with the rest of that term and far below the 18th.
+
+**The 17th's failure rate is strikingly stable across its own sessions**: 85.42% (sessions 1–10),
+85.57% (sessions 11–15), 85.45% (whole term). Whatever causes it is uniform across the term, not
+concentrated in particular sessions.
+
+Tiers, 17th LS complete term: exact 391 · normalised 42 · normalised-reordered 11 ·
+**approximate 18** · reached approximate and failed 43.
+
+## Step 3 — the Option C tier, implemented and holdout-tested
+
+Implemented in **`spike/resolve_rate.py` only — never in `src/`** — behind `--containment`, off
+by default, exactly as described in `spike-report.md` T014 Option C: *a form resolves if its
+canonical token set is a strict subset or strict superset of exactly one pool member's token
+set*, reached only when every earlier tier has failed to produce a single member.
+
+**It was written, tested and committed while sessions 11–15 were still being fetched**, so those
+sessions could not have informed any rule or threshold. **No rule or threshold was altered after
+seeing the holdout result.**
+
+### Holdout: sessions 11–15, 15,082 questions, unseen
+
+| | Resolved | Rate | Unresolved |
+|---|---|---|---|
+| matcher unchanged | 12,905 | **85.57%** | 2,177 |
+| + containment tier | 13,857 | **91.88%** | 1,225 |
+| **gain on unseen data** | **+952** | **+6.31 points** | −952 |
+
+**The rule generalises essentially perfectly.** On the data it was derived from (sessions 1–10)
+the gain was **+6.35 points**; on unseen data **+6.31**. A 0.04-point difference across a
+15,082-question holdout is no measurable overfitting. 16 holdout forms resolved via the new tier.
+
+### Full window, both configurations
+
+| Configuration | Resolved | Rate | vs 95% |
+|---|---|---|---|
+| matcher unchanged | 86,352 / 95,269 | **90.64%** | NOT MET |
+| **+ containment tier** | **90,299 / 95,269** | **94.78%** | **STILL NOT MET** |
+| gain | +3,947 | +4.14 points | |
+
+**Short by 207 questions — 0.22 points.**
+
+**The simulation overstated it, and this report had flagged exactly that risk.** The addendum's
+estimate was 95.33% on 84.2% of the window, with the recorded objection that *"95.33% clears 95%
+by 0.33 points … the five unfetched sessions, or the 17th's full term, could put it back under."*
+They did. The implemented tier on the complete window gives 94.78%.
+
+### Residual burden after the tier
+
+| | Forms needing correction | × 3-min median |
+|---|---|---|
+| matcher unchanged | **44** | 132 min = **2.2 h** |
+| + containment tier | **25** | 75 min = **1.2 h** |
+
+**All 25 residual forms are in the 17th Lok Sabha; the 18th has zero after the tier.** They block
+5,472 name instances and 4,970 questions. Correcting all 25 reaches **100%**. Reaching merely 95%
+needs **207** questions, and the largest residual form alone blocks 528 name instances — so one or
+two corrections clear the threshold.
+
+The 25 are the non-containment class: initials (`D.K. Suresh`, `V. Kalanidhi`), parenthetical
+aliases (`Poonam (Mahajan) Vajendla Rao`, `Balubhau (Alias Suresh Narayan) Dhanorkar`), and
+divergent orderings (`Sunil Dattatray Tatkare`, `Ganesan Selvam`, `Kumbakudi Sudhakaran`).
+
+## A fourth coverage anomaly, found by completing the term
+
+**Session 13 of the 17th Lok Sabha returns `totalRecordSize: 0`** — zero questions — against the
+**4 sitting days** the session enumeration records for it. Unlike the 18th's session 1, this is a
+**mid-term** session, so no constitutive-sitting explanation is even available.
+
+The FR-013 tally is now four, all causes **UNVERIFIED**:
+
+| Term | Session | Sitting days | Questions |
+|---|---|---|---|
+| 18th | 1 | 7 | **0** |
+| 18th | 8 | **0** | 4,500 |
+| **17th** | **13** | **4** | **0** |
+| 17th | — | — | sessions 1–15 otherwise all populated |
+
+## Asker multiplicity across both complete terms
+
+| Slice | Questions | Instances | Mean | Max |
+|---|---|---|---|---|
+| 18th LS, complete term | 34,720 | 57,124 | 1.6453 | 46 |
+| 17th LS, sessions 1–10 | 45,467 | 75,939 | 1.6702 | 49 |
+| 17th LS, sessions 11–15 | 15,082 | 25,811 | **1.7114** | 20 |
+
+The mean is stable across terms and sub-slices (1.645–1.711), which is the evidence that it has
+converged — unlike the early samples (1.32 at n=50, 1.504 at n=250). **T017 may use ~1.67.**
+
+## What this FINAL section does not establish
+
+1. **Published size is still projected, not measured, for the window.** The whole-window publish
+   and index were not re-run on the completed 17th. ~297 MiB, ~1,950 files and the 3.13 MiB
+   index remain scaled 18th-LS measurements.
+2. **The 0.90 approximate threshold is uncalibrated.** It accepted 18 forms and rejected 43.
+   Whether a lower value would resolve more of the 25 residual forms without mis-joining anyone
+   is untested, deliberately — altering it now is the tuning T012 forbids.
+3. **The 25 residual forms have no automated remedy proposed**, and no rule for initials or
+   parenthetical aliases was attempted.
+4. **Correction timings remain n=6 and 18th-LS-only.** The 25 residual forms are the harder
+   class; whether they cost 3 minutes each is **UNVERIFIED**, so 1.2 h may be an underestimate.
+5. **Precision is still unverified.** No join in either term was hand-checked against the real
+   person. Every rate measures the coverage of matching, not its correctness.
+6. **The steady-state arrival rate was never computed for the 17th Lok Sabha**, so no
+   window-wide Principle II steady-state figure exists.

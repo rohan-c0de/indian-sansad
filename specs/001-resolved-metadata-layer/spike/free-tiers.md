@@ -353,3 +353,27 @@ But two things follow that the earlier figures hid:
    run. A single request taking four minutes means per-request timeouts must be generous, and a
    refresh that retries aggressively on slow responses will make the problem worse rather than
    better.
+
+---
+
+## Ingest duration — final measured figures
+
+Sessions 11–15 of the 17th Lok Sabha completed in **765 s for 15,082 questions** (18 requests,
+median 44.5 s/page). Combining every measured wall time:
+
+| Slice | Questions | Measured wall time |
+|---|---|---|
+| 18th LS, complete term | 34,720 | **797 s = 13.3 min** |
+| 17th LS, sessions 1–10 | 45,467 | ~45 min |
+| 17th LS, sessions 11–15 | 15,082 | **765 s = 12.8 min** |
+| **Full window** | **95,269** | **~71 min** |
+
+**~71 minutes, about 20% of the 6-hour per-job ceiling.** This supersedes T008's ~46 min and
+`ci-reachability.md`'s 20–50 min range; both were low by roughly 1.5–2×. The conclusion they
+drew — tens of minutes, not hours — survives.
+
+Per-session fetching also proved the more predictable mode: median 44.5 s/page for sessions
+11–15 against 66.5 s/page for the whole-term control, with a 74.1 s maximum rather than the
+271.6 s spike the whole-term run produced. **For FR-009's unattended refresh, per-session
+pagination is the safer shape** — not because it is much faster, but because its worst case is
+3.7× tighter, and a scheduled job is sized by its worst case.

@@ -24,25 +24,38 @@ five principles that gate the work.
 
 ## Current status
 
-**Nothing is built yet.** This repository currently contains the specification
-artefacts and the Phase 1 guard rails only. The pipeline, the published dataset
-and the reader page do not exist.
+**The blocking spike is complete; the pipeline is not built.** This repository contains the
+specification artefacts, the Phase 1 guard rails, and the Phase 2 spike with its measurements.
+`src/sansad/`, `web/` and `data/published/` do not exist yet.
 
-Two facts about the upstream source bound what can honestly be promised, and
-both are recorded rather than resolved:
+**Phase 3 is blocked on one owner decision** — see
+[`spike/spike-report.md`](specs/001-resolved-metadata-layer/spike/spike-report.md).
 
-- **The question-metadata route has never been retrieved first-hand.** Three
-  passes have failed to obtain it; the service base path returns a HAL index
-  exposing only `self`, `health`, `health-path` and `metrics`, and `GET /api_ls`
-  returns 404. User Story 1 depends on this route entirely. Phase 2 is a
-  blocking spike against exactly this question.
-- **Rajya Sabha member data is not yet obtainable.** `GET /api_rs/members`
-  returns HTTP 403 where every sibling path returns 404; the cause is
-  **UNVERIFIED**. First release is therefore **Lok Sabha only**, and the
-  coverage statement will say so rather than implying both Houses.
+### What the spike established
 
-The one data route verified end to end anywhere in this project is the Lok Sabha
-member roster, `GET /api_ls/member`.
+- **The question-metadata route is retrieved and documented.** Three earlier passes failed to
+  obtain it; it is `GET /api_ls/question/qetFilteredQuestionsAns` (the upstream's own spelling —
+  `qet`, not `get`), reachable with no credential and no required header, from a laptop and from
+  a free CI runner alike.
+- **The full covered window is fetched and measured**: 95,269 questions across the 17th Lok
+  Sabha (60,549) and the 18th (34,720), plus the 5,426-member roster.
+- **Identity resolution works, unevenly.** 99.68% of the 18th Lok Sabha's questions resolve to
+  exactly one member — but only **85.45%** of the 17th's, for **90.64% across the window**
+  against a 95% target. That shortfall is the decision Phase 3 waits on.
+- **Zero running cost is evidenced**, not asserted: every component sits on a named free tier
+  with its behaviour at the limit quoted from the provider's own published pages.
+
+### What is still unknown
+
+- **Rajya Sabha material is not obtainable yet.** `GET /api_rs/members` returns HTTP 403 where
+  every sibling path returns 404. The cause is narrowed — a request-shape or path filter rather
+  than authorisation or IP reputation — but **unverified**. First release is **Lok Sabha only**,
+  and the coverage statement will say so rather than implying both Houses.
+- **Question and answer text is out of scope by principle.** It is served only behind document
+  files, which this project never opens. It is a declared gap, not an omission.
+- **Three session-level coverage anomalies**, all causes unverified: the 18th Lok Sabha's session
+  1 has 7 sitting days and no questions; its session 8 has no sitting days and 4,500 questions;
+  the 17th's session 13 has 4 sitting days and no questions.
 
 ## Constraints that shape every decision here
 
@@ -87,5 +100,6 @@ spike/             throwaway spike code (Phase 2); not production
 specs/             specification artefacts
 ```
 
-Most of these directories do not exist yet. They are created by the phase that
-first needs them.
+`specs/`, `tools/`, `spike/` and the `Makefile` exist. `src/sansad/`, `web/`,
+`data/published/`, `data/assertions/` and `tests/` do not — they are created by
+the phase that first needs them.

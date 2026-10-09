@@ -324,7 +324,12 @@ def main() -> int:
         loksabha = int(sys.argv[sys.argv.index("--loksabha") + 1])
 
     roster_p = scratch / "roster_ls.jsonl"
-    questions_p = scratch / f"questions_ls{loksabha}.jsonl"
+    # --questions lets a sub-slice be measured against its own term's pool --
+    # needed to score sessions 11-15 as a holdout while the pool stays LS17.
+    if "--questions" in sys.argv:
+        questions_p = scratch / sys.argv[sys.argv.index("--questions") + 1]
+    else:
+        questions_p = scratch / f"questions_ls{loksabha}.jsonl"
     for p in (roster_p, questions_p):
         if not p.exists():
             sys.exit(f"missing input: {p}  (run spike/fetch_slice.py first)")
@@ -414,6 +419,7 @@ def main() -> int:
             "questions_per_session": dict(sorted(
                 sessions.items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 99)),
             "questions_in_slice": n_q,
+            "questions_file": questions_p.name,
             "date_min": min(dates) if dates else None,
             "date_max": max(dates) if dates else None,
         },
