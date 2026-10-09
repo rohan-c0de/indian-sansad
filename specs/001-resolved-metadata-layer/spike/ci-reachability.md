@@ -216,7 +216,32 @@ test made 2. It is not answered here and should not be assumed from here.
 
 ## Workflow deleted, per T010
 
-T010 requires the workflow to be deleted or disabled once the result is recorded. It has been
-**deleted** rather than disabled, because a disabled workflow in `.github/workflows/` is a file
-that can be re-enabled by accident and will be read as pipeline code by the next person. Its
-source remains in git history at the T009 commit if it is ever needed again.
+T010 requires the workflow to be deleted or disabled once the result is recorded. **Both were
+done**, because neither alone leaves an unambiguous state.
+
+**Deleted** from the tree, and verified absent on every ref:
+
+```
+main: absent
+001-resolved-metadata-layer: absent
+# GET repos/.../contents/.github/workflows?ref=001-resolved-metadata-layer
+{"message":"Not Found", ... "status":"404"}
+```
+
+Deletion was preferred over disabling because a disabled workflow file in `.github/workflows/`
+can be re-enabled by accident and will be read as pipeline code by the next person. Its source
+remains in git history at the T009 commit if it is ever needed again.
+
+**Also disabled**, because deleting the file did *not* clear GitHub's own workflow registry —
+it continued to list the workflow as `active` on account of its run history:
+
+```
+# before
+spike-reachability	active	379908706
+# after `gh workflow disable`
+spike-reachability	disabled_manually	379908706
+```
+
+A workflow whose file is absent cannot trigger, so `active` there was cosmetic rather than a
+live scheduler. It is still worth clearing: a registry entry reading `active` is exactly the
+kind of thing that gets misread later as "the spike workflow is still running".
