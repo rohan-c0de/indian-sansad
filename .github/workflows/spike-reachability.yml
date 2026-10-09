@@ -1,0 +1,95 @@
+# THROWAWAY. Spike item 2 (T009/T010) only.
+#
+# Purpose: find out whether a free GitHub-hosted runner can reach the two
+# upstream routes at all. This is not a formality. research.md records
+# `GET /api_rs/members` returning HTTP 403 where every sibling path returns
+# 404, cause UNVERIFIED, and names "a datacentre IP" as one candidate cause.
+# A 403 or 429 from the runner where the laptop got 200 is a VERIFIED BROKEN
+# gate on FR-009's unattended refresh.
+#
+# T010 requires this file to be deleted or disabled once the result is
+# recorded in spike/ci-reachability.md. It is not pipeline code and must
+# never become any.
+#
+# NO RESPONSE BODY IS WRITTEN ANYWHERE. Every request sends its body to
+# /dev/null (`-o /dev/null`); only the status line, the response headers and
+# curl's own timing counters reach the log. Constitution Principle V covers
+# "any fixture, sample, or test file in the repository", and a CI log is not
+# a safe place for a 5 MiB roster of 5,426 people's personal details either.
+
+name: spike-reachability
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['001-resolved-metadata-layer']
+    paths: ['.github/workflows/spike-reachability.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spike-reachability
+  cancel-in-progress: false
+
+jobs:
+  reach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Runner context
+        run: |
+          echo "runner_os=${RUNNER_OS}  arch=${RUNNER_ARCH}"
+          echo "curl version:"; curl --version | head -1
+          echo "date_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      # --- the route T004 captured ---
+      - name: Question metadata route (T004) -- assert HTTP 200
+        run: |
+          set -uo pipefail
+          URL='https://sansad.in/api_ls/question/qetFilteredQuestionsAns?loksabhaNo=18&sessionNumber=8&pageNo=1&locale=en&pageSize=10'
+          echo "GET /api_ls/question/qetFilteredQuestionsAns (query params omitted from this log line)"
+          out="$(curl -sS -o /dev/null -D - \
+                   -w 'CURL_HTTP_CODE=%{http_code}\nCURL_TIME_TOTAL=%{time_total}\nCURL_TIME_CONNECT=%{time_connect}\nCURL_TIME_STARTTRANSFER=%{time_starttransfer}\nCURL_SIZE_DOWNLOAD=%{size_download}\nCURL_HTTP_VERSION=%{http_version}\n' \
+                   --max-time 120 "$URL" 2>&1)" || true
+          printf '%s\n' "$out"
+          code="$(printf '%s' "$out" | sed -n 's/^CURL_HTTP_CODE=//p' | tail -1)"
+          echo "----"
+          if [ "$code" != "200" ]; then
+            echo "FAIL: question route returned '${code}' from this runner."
+            echo "The laptop got 200 for the identical request (see spike/route-capture.md T005)."
+            echo "A 403 or 429 here is a VERIFIED BROKEN gate on FR-009."
+            exit 1
+          fi
+          echo "PASS: question route returned 200 from the runner."
+
+      # --- the control group: the one route verified end-to-end before this spike ---
+      - name: Member roster control (GET /api_ls/member) -- assert HTTP 200
+        if: always()
+        run: |
+          set -uo pipefail
+          URL='https://sansad.in/api_ls/member'
+          echo "GET /api_ls/member  (control group; ~5.0 MiB, measured 46.5s from the laptop)"
+          out="$(curl -sS -o /dev/null -D - \
+                   -w 'CURL_HTTP_CODE=%{http_code}\nCURL_TIME_TOTAL=%{time_total}\nCURL_TIME_CONNECT=%{time_connect}\nCURL_TIME_STARTTRANSFER=%{time_starttransfer}\nCURL_SIZE_DOWNLOAD=%{size_download}\nCURL_HTTP_VERSION=%{http_version}\n' \
+                   --max-time 300 "$URL" 2>&1)" || true
+          printf '%s\n' "$out"
+          code="$(printf '%s' "$out" | sed -n 's/^CURL_HTTP_CODE=//p' | tail -1)"
+          echo "----"
+          if [ "$code" != "200" ]; then
+            echo "FAIL: member roster returned '${code}' from this runner."
+            echo "This is the route research.md records as the ONLY one verified"
+            echo "end-to-end anywhere in this project. A non-200 here means the"
+            echo "runner, not the route, is the problem."
+            exit 1
+          fi
+          echo "PASS: member roster returned 200 from the runner."
+
+      - name: Confirm no response body was written to disk
+        if: always()
+        run: |
+          set -uo pipefail
+          echo "Files in the workspace (expect only the checked-out tree, which is not checked out here):"
+          ls -la "${GITHUB_WORKSPACE}" || true
+          echo "No actions/checkout step runs in this workflow and every request used -o /dev/null,"
+          echo "so no upstream body exists on this runner to leak into an artefact."
