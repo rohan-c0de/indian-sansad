@@ -319,3 +319,130 @@ Note the `slice` block as the script emitted it, **with its defect**:
    person**, so the *precision* of the 99.68% is unverified — only its coverage. A systematic
    mis-join (for instance two members whose roster entries are themselves wrong) would be
    invisible here.
+
+---
+
+# T013 — the hand-correction cost
+
+## Verdict: VERIFIED WORKING. Neither figure breaches Principle II's ~2 hours per week.
+
+| Figure | Measured | Against Principle II's 120 min/week |
+|---|---|---|
+| **First-pass total** (one time) | **18 minutes** (0.30 h) | 15% of a single week's budget, once |
+| **Steady state**, flat average | **0.168 min/week** (0.0028 h) | **0.14%** of the budget |
+| **Steady state**, burst-period rate | 0.846 min/week (0.0141 h) | 0.71% of the budget |
+
+**Neither of the two numbers breaches the ceiling.** T013 asks which of them does if either does:
+**neither**, by three orders of magnitude.
+
+## Correction timings — measured by the maintainer, not estimated
+
+The maintainer performed the corrections and timed them end to end:
+
+| | |
+|---|---|
+| **Median per correction** | **3 minutes** |
+| **Maximum per correction** | **7 minutes** |
+| Corrections timed | **6** |
+
+### T013 asks for at least 20 timed corrections. Only 6 exist.
+
+This is not a shortfall in the measurement — it is the measurement's result. Across the
+**entire 34,720-question term**, the number of distinct name forms requiring a hand correction is:
+
+| Configuration | Distinct forms needing correction | Name instances they block |
+|---|---|---|
+| **Full-roster pool** (pessimistic) | **6** | 671 |
+| **18th-LS pool** (operative) | **1** | 106 |
+
+T013's "at least 20" presupposes a correction burden more than three times larger than the one
+that exists. **The sample is n=6, and every figure derived from it inherits that.** A median over
+six observations is a weak median; it is reported as the measured value because it is the only
+real one available, not because six is sufficient.
+
+**What was measured and what was not.** The maintainer reported the *time* each correction took,
+which is what T013 asks for. The *outcomes* — which `member_id` each form was assigned to — were
+not reported back and are **not recorded here**. They belong in `data/assertions/` and are
+Phase 3 work (the assertion store must survive unattended refreshes, per FR-009 + FR-011). No
+assertion value is invented in this file.
+
+## First-pass total
+
+```
+6 distinct forms x 3 min median = 18 min = 0.300 h
+6 distinct forms x 7 min max    = 42 min = 0.700 h   (worst case, if every one were a hard case)
+```
+
+Under the operative pool it is **one** correction: 3 minutes median, 7 minutes worst case.
+
+**This is a one-time cost, not a recurring one**, and it is well inside a single week's budget
+either way. Note it covers the 18th Lok Sabha only; the 17th is 60,549 questions and unmeasured,
+so the project-wide first pass is **not** established by this figure.
+
+## Steady state — the arrival rate of *new* correction-needing forms
+
+T013 asks for "the steady-state hours per week implied by the rate at which **new** unresolved
+forms arrive across the slice's span". Measured by taking each correction-needing form's
+**earliest appearance date** in the slice:
+
+```
+SLICE SPAN      2024-07-22 -> 2026-08-12  = 751 days = 107.3 weeks
+ARRIVAL DATES   2024-07-22, 2024-07-22, 2024-07-22, 2024-07-29, 2024-12-16, 2024-12-18
+ARRIVAL WINDOW  2024-07-22 -> 2024-12-18 = 149 days = 21.3 weeks
+SILENCE SINCE   2024-12-18 -> 2026-08-12 = 602 days = 86.0 weeks, ZERO new forms
+```
+
+| Rate | Forms/week | × 3 min median | vs 120 min/week |
+|---|---|---|---|
+| Flat average over the whole span | 0.0559 | **0.168 min/week** | 0.140% |
+| During the 21.3-week arrival window | 0.2819 | 0.846 min/week | 0.705% |
+| Over the 86.0 weeks since | **0.0000** | 0 min/week | 0% |
+
+### The distribution is front-loaded, and averaging it away would misreport it
+
+**All six forms first appeared within the first 21.3 weeks of a 107.3-week span. None has
+appeared in the 86 weeks since.** Four of the six appeared in the term's first eight days.
+
+The flat average of 0.0559 forms/week is a real figure over a real denominator, and it is
+reported as the headline because it is the one T013's wording asks for. But it describes a
+steady trickle that **the data does not show**:
+
+- it **overstates** the ongoing work, which has been zero for 86 consecutive weeks;
+- it **understates** the initial burst, which ran 5× higher.
+
+The shape has a plausible mechanical cause — a new Lok Sabha seats ~543 members at once, so the
+unfamiliar name forms arrive together at the start of a term and then stop. **That is a
+hypothesis, not a finding.** It predicts a fresh burst at the start of the 19th Lok Sabha and
+near-zero in between, which would make the right planning figure "about 20 minutes once per
+general election" rather than any per-week rate at all. **Testing it needs the 17th Lok Sabha
+slice**, which would show whether that term's corrections also cluster at its start. Unmeasured.
+
+## Asker multiplicity — the multiplier T017 needs
+
+T013 requires the mean and maximum asker count per question from this slice, which
+`research.md` records as never measured:
+
+| | |
+|---|---|
+| **Mean askers per question** | **1.6453** |
+| **Maximum askers per question** | **46** |
+
+Full distribution and the sample-size progression are in the T012 section above. T017 uses the
+**mean** for total published bytes and must use the **maximum** for the worst-case per-member
+file count — a 46-asker question is written into 46 per-member files in each of two formats.
+
+## What T013 does not establish
+
+1. **n=6.** Both the median and the maximum come from six corrections, not the 20 T013 specifies,
+   because only six exist. Every derived figure carries that.
+2. **The 17th Lok Sabha is unmeasured** — 64% of the covered window. Both the first-pass total
+   and the arrival rate are 18th-LS-only.
+3. **The clustering hypothesis is untested.** Whether corrections cluster at the start of every
+   term, or whether this term was unusual, is not known from one term.
+4. **No correction was verified as correct.** The maintainer's time was measured; the accuracy of
+   the resulting assignments was not checked against any independent source.
+5. **Breakage upkeep is not in these figures at all.** `plan.md` Risk 6 records the expectation
+   that the 2h/week budget "is expected to go mostly on breakage", and the upstream carries no
+   contract, versioning or deprecation notice. This measurement covers **identity corrections
+   only** — it says nothing about the cost of the upstream changing shape, which is the larger
+   half of Principle II's budget and remains unquantified.
