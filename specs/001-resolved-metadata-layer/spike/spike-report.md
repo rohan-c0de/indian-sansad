@@ -29,7 +29,7 @@ property.
 T020 requires that where an item failed, the capability being reduced or dropped is named. Spike
 item 3 did fail against SC-002 as measured, and the owner's decision of 2026-10-09 resolved it
 **without reducing anything**: SC-002 stays at 95%, and the gap was closed by improving
-resolution — a holdout-validated matcher tier plus five hand assertions — rather than by lowering
+resolution — a holdout-validated matcher tier plus four hand assertions — rather than by lowering
 the target or dropping a published axis.
 
 **What is conceded rather than reduced**: the pipeline does not reach 95% unaided. Four
