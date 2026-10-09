@@ -37,6 +37,7 @@ from pathlib import Path
 
 BASE = "https://sansad.in"
 ROSTER_PATH = "/api_ls/member"
+SESSION_PATH = "/api_ls/business/getAllLoksabhaAndSession"
 # The upstream's own spelling. "qet", not "get". Correcting it yields 404.
 QUESTION_PATH = "/api_ls/question/qetFilteredQuestionsAns"
 
@@ -141,6 +142,87 @@ def fetch_roster(out: Path) -> int:
     return len(rows)
 
 
+def session_numbers(loksabha: int) -> list[int]:
+    """Session numbers for a term, from the upstream's own enumeration."""
+    payload, _ = get_json(f"{BASE}{SESSION_PATH}?locale=en")
+    for row in payload:
+        if row.get("loksabha") == loksabha:
+            return sorted(s["sessionNo"] for s in row.get("sessions", []))
+    return []
+
+
+def fetch_questions_per_session(out: Path, loksabha: int) -> tuple[int, int]:
+    """Fetch session by session instead of paging through the whole term.
+
+    WHY: paging the whole term means `pageNo` reaches 61 for the 17th Lok
+    Sabha, and each request asks the service to position itself inside a
+    60,549-row result set. Asking per session makes every result set ~4,000
+    rows and caps page depth at ~5.
+
+    This is also the experiment that separates two explanations for the 17th
+    being ~3x slower per page than the 18th -- offset depth versus result-set
+    size. Both predict per-session is faster, so a speed-up does not
+    distinguish them; but no speed-up would rule BOTH out and point at
+    throttling instead. The whole-term page times are kept as the control at
+    $SANSAD_SCRATCH/ls17_wholeterm_page_times.txt.
+    """
+    sessions = session_numbers(loksabha)
+    if not sessions:
+        raise RuntimeError(f"no sessions enumerated for loksabha {loksabha}")
+    print(f"questions: loksabhaNo={loksabha}, PER-SESSION mode, "
+          f"sessions {sessions}", flush=True)
+
+    written = 0
+    grand_total = 0
+    page_times: list[tuple[int, int, float]] = []
+    with out.open("w", encoding="utf-8") as fh:
+        for sn in sessions:
+            t0 = time.monotonic()
+            first, _ = get_json(
+                f"{BASE}{QUESTION_PATH}?loksabhaNo={loksabha}&sessionNumber={sn}"
+                f"&pageNo=1&locale=en&pageSize={PAGE_SIZE}"
+            )
+            total = first[0]["totalRecordSize"]
+            grand_total += total
+            pages = -(-total // PAGE_SIZE)
+            el = time.monotonic() - t0
+            page_times.append((sn, 1, el))
+            rows = first[0]["listOfQuestions"] or []
+            for r in rows:
+                fh.write(json.dumps(project(r, QUESTION_ALLOWED),
+                                    ensure_ascii=False) + "\n")
+            written += len(rows)
+            print(f"  session {sn:>2}: total={total:>6}  pages={pages}  "
+                  f"page 1/{pages} {len(rows):>4} rows ({el:.1f}s)", flush=True)
+
+            for page in range(2, pages + 1):
+                t0 = time.monotonic()
+                payload, _ = get_json(
+                    f"{BASE}{QUESTION_PATH}?loksabhaNo={loksabha}"
+                    f"&sessionNumber={sn}&pageNo={page}&locale=en"
+                    f"&pageSize={PAGE_SIZE}"
+                )
+                rows = payload[0]["listOfQuestions"] or []
+                for r in rows:
+                    fh.write(json.dumps(project(r, QUESTION_ALLOWED),
+                                        ensure_ascii=False) + "\n")
+                written += len(rows)
+                el = time.monotonic() - t0
+                page_times.append((sn, page, el))
+                print(f"  session {sn:>2}: page {page}/{pages} "
+                      f"{len(rows):>4} rows ({el:.1f}s)  cumulative={written}",
+                      flush=True)
+
+    ts = [t for _, _, t in page_times]
+    if ts:
+        ts_sorted = sorted(ts)
+        med = ts_sorted[len(ts_sorted) // 2]
+        print(f"\n  PER-SESSION page timing: {len(ts)} requests  "
+              f"min={min(ts):.1f}s  median={med:.1f}s  "
+              f"mean={sum(ts)/len(ts):.1f}s  max={max(ts):.1f}s", flush=True)
+    return written, grand_total
+
+
 def fetch_questions(out: Path, loksabha: int) -> tuple[int, int]:
     first, status = get_json(
         f"{BASE}{QUESTION_PATH}?loksabhaNo={loksabha}&pageNo=1"
@@ -199,7 +281,10 @@ def main() -> int:
         n_members = fetch_roster(roster_out)
         print(f"  -> {roster_out} ({roster_out.stat().st_size} bytes)\n", flush=True)
 
-    n_questions, total = fetch_questions(questions_out, loksabha)
+    if "--per-session" in sys.argv:
+        n_questions, total = fetch_questions_per_session(questions_out, loksabha)
+    else:
+        n_questions, total = fetch_questions(questions_out, loksabha)
     print(f"\n  -> {questions_out} ({questions_out.stat().st_size} bytes)")
     print(f"\nSUMMARY  members={n_members}  questions_written={n_questions}  "
           f"totalRecordSize={total}  "
