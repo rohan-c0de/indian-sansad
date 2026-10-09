@@ -151,7 +151,8 @@ def session_numbers(loksabha: int) -> list[int]:
     return []
 
 
-def fetch_questions_per_session(out: Path, loksabha: int) -> tuple[int, int]:
+def fetch_questions_per_session(out: Path, loksabha: int,
+                                only: list[int] | None = None) -> tuple[int, int]:
     """Fetch session by session instead of paging through the whole term.
 
     WHY: paging the whole term means `pageNo` reaches 61 for the 17th Lok
@@ -169,8 +170,15 @@ def fetch_questions_per_session(out: Path, loksabha: int) -> tuple[int, int]:
     sessions = session_numbers(loksabha)
     if not sessions:
         raise RuntimeError(f"no sessions enumerated for loksabha {loksabha}")
-    print(f"questions: loksabhaNo={loksabha}, PER-SESSION mode, "
-          f"sessions {sessions}", flush=True)
+    if only:
+        skipped = [s for s in sessions if s not in only]
+        sessions = [s for s in sessions if s in only]
+        print(f"questions: loksabhaNo={loksabha}, PER-SESSION mode, "
+              f"RESUMING sessions {sessions}", flush=True)
+        print(f"  NOT refetching already-complete sessions {skipped}", flush=True)
+    else:
+        print(f"questions: loksabhaNo={loksabha}, PER-SESSION mode, "
+              f"sessions {sessions}", flush=True)
 
     written = 0
     grand_total = 0
@@ -281,8 +289,15 @@ def main() -> int:
         n_members = fetch_roster(roster_out)
         print(f"  -> {roster_out} ({roster_out.stat().st_size} bytes)\n", flush=True)
 
+    only = None
+    if "--sessions" in sys.argv:
+        only = [int(x) for x in sys.argv[sys.argv.index("--sessions") + 1].split(",")]
+        questions_out = scratch / (f"questions_ls{loksabha}_s"
+                                   f"{min(only)}-{max(only)}.jsonl")
+        print(f"resume mode: writing ONLY sessions {only} to {questions_out.name}",
+              flush=True)
     if "--per-session" in sys.argv:
-        n_questions, total = fetch_questions_per_session(questions_out, loksabha)
+        n_questions, total = fetch_questions_per_session(questions_out, loksabha, only)
     else:
         n_questions, total = fetch_questions(questions_out, loksabha)
     print(f"\n  -> {questions_out} ({questions_out.stat().st_size} bytes)")

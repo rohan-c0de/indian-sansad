@@ -78,6 +78,36 @@ rather than guess at it:
 Tiers run exact -> normalised -> approximate, in that order, and stop at the
 first tier that produces any candidate. A later tier never overrides an
 earlier one.
+
+====================================================================
+OPTIONAL FINAL TIER: --containment  (OFF by default)
+====================================================================
+Bidirectional token containment, implemented exactly as described in
+spike-report.md T014 Option C:
+
+    "A form resolves if its canonical token set is a strict subset OR strict
+     superset of exactly one pool member's token set."
+
+Reached only when every tier above has failed to produce a single member --
+i.e. on `unresolved` or `ambiguous` -- which is how the simulation recorded in
+spike-report.md was computed. If containment matches more than one distinct
+member the form stays unresolved/ambiguous; it never collapses a genuine
+ambiguity, per data-model.md.
+
+It exists because the 17th Lok Sabha's failures classified into 10 forms whose
+tokens are a strict subset of a roster name (a middle name the question omits)
+and 8 where the roster name is a subset of the form (a middle name the question
+adds) -- one mechanism, 3,876 instances.
+
+WHY IT IS OFF BY DEFAULT, and why that matters: adding a tier after seeing a
+rate fall short is the move T012 forbids. Keeping it behind a flag means the
+unchanged matcher remains runnable and directly comparable, so the before/after
+is a measurement rather than a replacement.
+
+THIS TIER WAS WRITTEN BEFORE SESSIONS 11-15 OF THE 17TH LOK SABHA WERE
+FETCHED. Those sessions are the holdout, and they did not exist on disk when
+this code was authored, so no rule or threshold here can have been fitted to
+them. Nothing below is adjusted after seeing the holdout result.
 """
 
 from __future__ import annotations
@@ -173,6 +203,7 @@ def build_indexes(members: list[dict]):
     exact: dict[str, set[str]] = defaultdict(set)
     norm: dict[str, set[str]] = defaultdict(set)
     sortd: dict[str, set[str]] = defaultdict(set)
+    tokensets: dict[frozenset[str], set[str]] = defaultdict(set)
     for m in members:
         mid = m["_member_id"]
         for v in m["_variants"]:
@@ -181,36 +212,71 @@ def build_indexes(members: list[dict]):
             if c:
                 norm[c].add(mid)
                 sortd[canon_sorted(v)].add(mid)
-    return exact, norm, sortd
+                tokensets[frozenset(c.split())].add(mid)
+    return exact, norm, sortd, tokensets
 
 
-def resolve_form(form: str, exact, norm, sortd, norm_keys: list[str]):
+def containment_match(form: str, tokensets) -> tuple[list[str], int]:
+    """Strict bidirectional token containment.
+
+    Returns (member_ids, n_pool_names_matched). Resolves only when exactly ONE
+    distinct member is implicated -- several matching names belonging to the
+    same person is still one identity and still resolves.
+    """
+    ft = frozenset(canon(form).split())
+    if not ft:
+        return ([], 0)
+    hits: set[str] = set()
+    n = 0
+    for pt, ids in tokensets.items():
+        if not pt:
+            continue
+        if ft < pt or pt < ft:
+            hits |= ids
+            n += 1
+    return (sorted(hits), n)
+
+
+def resolve_form(form: str, exact, norm, sortd, norm_keys: list[str],
+                 tokensets=None):
     """Return (status, tier, member_ids, best_score)."""
     raw = form.strip()
 
     # --- tier 1: exact, verbatim ---
     if raw in exact:
         ids = exact[raw]
-        return ("resolved" if len(ids) == 1 else "ambiguous", "exact",
-                sorted(ids), 1.0)
+        if len(ids) == 1:
+            return ("resolved", "exact", sorted(ids), 1.0)
+        return fallback("ambiguous", "exact", sorted(ids), 1.0)
 
     # --- tier 2: normalised (honorifics and punctuation removed) ---
     c = canon(raw)
     if c and c in norm:
         ids = norm[c]
-        return ("resolved" if len(ids) == 1 else "ambiguous", "normalised",
-                sorted(ids), 1.0)
+        if len(ids) == 1:
+            return ("resolved", "normalised", sorted(ids), 1.0)
+        return fallback("ambiguous", "normalised", sorted(ids), 1.0)
 
     # --- tier 2b: normalised, token order ignored ---
     cs = canon_sorted(raw)
     if cs and cs in sortd:
         ids = sortd[cs]
-        return ("resolved" if len(ids) == 1 else "ambiguous",
-                "normalised-reordered", sorted(ids), 1.0)
+        if len(ids) == 1:
+            return ("resolved", "normalised-reordered", sorted(ids), 1.0)
+        return fallback("ambiguous", "normalised-reordered", sorted(ids), 1.0)
+
+    def fallback(status, tier, ids, score):
+        """Last resort: the optional containment tier, if enabled."""
+        if tokensets is None or status == "resolved":
+            return (status, tier, ids, score)
+        cids, _ = containment_match(raw, tokensets)
+        if len(cids) == 1:
+            return ("resolved", "token-containment", cids, 1.0)
+        return (status, tier, ids, score)
 
     # --- tier 3: approximate ---
     if not c:
-        return ("unresolved", "none", [], 0.0)
+        return fallback("unresolved", "none", [], 0.0)
     scored: list[tuple[float, str]] = []
     # SequenceMatcher caches an index of seq2, so seq2 is set ONCE per form and
     # seq1 is swapped per candidate -- the cheap direction. real_quick_ratio and
@@ -230,17 +296,17 @@ def resolve_form(form: str, exact, norm, sortd, norm_keys: list[str]):
         if r >= APPROX_THRESHOLD:
             scored.append((r, key))
     if not scored:
-        return ("unresolved", "approximate-none", [], 0.0)
+        return fallback("unresolved", "approximate-none", [], 0.0)
     scored.sort(reverse=True)
     best_score, best_key = scored[0]
     ids = sorted(norm[best_key])
     if len(ids) > 1:
-        return ("ambiguous", "approximate", ids, best_score)
+        return fallback("ambiguous", "approximate", ids, best_score)
     runner = next((s for s, k in scored[1:] if norm[k] != norm[best_key]), None)
     if runner is not None and (best_score - runner) < APPROX_MARGIN:
         tied = sorted({i for s, k in scored if s >= best_score - APPROX_MARGIN
                        for i in norm[k]})
-        return ("ambiguous", "approximate", tied, best_score)
+        return fallback("ambiguous", "approximate", tied, best_score)
     return ("resolved", "approximate", ids, best_score)
 
 
@@ -272,7 +338,8 @@ def main() -> int:
     members, _ = load_roster(roster_p, pool, loksabha)
     if not members:
         sys.exit(f"pool '{pool}' selected 0 members for Lok Sabha {loksabha}")
-    exact, norm, sortd = build_indexes(members)
+    use_containment = "--containment" in sys.argv
+    exact, norm, sortd, tokensets = build_indexes(members)
     norm_keys = list(norm.keys())
 
     questions: list[dict] = []
@@ -299,7 +366,9 @@ def main() -> int:
     # --- resolve each DISTINCT form once ---
     results: dict[str, dict] = {}
     for form in form_counts:
-        status, tier, ids, score = resolve_form(form, exact, norm, sortd, norm_keys)
+        status, tier, ids, score = resolve_form(
+            form, exact, norm, sortd, norm_keys,
+            tokensets if use_containment else None)
         results[form] = {"status": status, "tier": tier,
                          "member_ids": ids, "score": round(score, 4),
                          "instances": form_counts[form]}
@@ -365,6 +434,7 @@ def main() -> int:
                                f"Lok Sabha {loksabha} only (lsExpr contains "
                                f"{loksabha}): {len(members)} members"),
             "tuned_after_seeing_results": False,
+            "containment_tier_enabled": use_containment,
         },
         "asker_multiplicity": {
             "questions": n_q,
@@ -408,7 +478,7 @@ def main() -> int:
     print(json.dumps(out, indent=1, ensure_ascii=False))
 
     # --- per-form detail written to SCRATCH, not the repo ---
-    detail_p = scratch / f"resolution_detail_ls{loksabha}_{pool}.json"
+    detail_p = scratch / f"resolution_detail_ls{loksabha}_{pool}{'_containment' if use_containment else ''}.json"
     detail_p.write_text(json.dumps(
         {"aggregate": out,
          "forms": {f: r for f, r in sorted(results.items())}},
@@ -419,7 +489,7 @@ def main() -> int:
         ((f, r) for f, r in results.items() if r["status"] != "resolved"),
         key=lambda kv: (-kv[1]["instances"], kv[0]),
     )
-    wl = scratch / f"correction_worklist_ls{loksabha}_{pool}.md"
+    wl = scratch / f"correction_worklist_ls{loksabha}_{pool}{'_containment' if use_containment else ''}.md"
     with wl.open("w", encoding="utf-8") as fh:
         fh.write(f"# T013 correction worklist (Lok Sabha {loksabha}, pool: {pool})\n\n")
         fh.write(f"{len(needing)} distinct name forms came out ambiguous or unresolved.\n")
