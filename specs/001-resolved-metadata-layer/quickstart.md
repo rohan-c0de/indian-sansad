@@ -7,7 +7,8 @@ How to prove this feature works end to end. Scenarios map to `spec.md` user stor
 ## Prerequisites
 
 - Python 3.13 and `pytest`.
-- Network access to the upstream host. Note that the only data route verified anywhere in this project is the Lok Sabha member roster; see [research.md](./research.md).
+- Network access to the upstream host. Both Lok Sabha data routes are now verified end to end — the member roster and the question-metadata route; see [spike/route-capture.md](./spike/route-capture.md).
+- **One-time repository setting**: GitHub Pages must be pointed at the **`published` branch**, not `main`. The dataset is force-pushed there as a single commit on every successful refresh (owner decision 2026-10-09, [spike/size-budget.md](./spike/size-budget.md)); `data/published/` is git-ignored on `main`. Nothing in the pipeline can set this, and until it is set the site serves the wrong branch.
 - No credentials, no API key, no paid service. If any step appears to need one, that is a defect against FR-014.
 
 ## Setup
@@ -18,6 +19,8 @@ make refresh    # run one full ingestion and publish locally
 ```
 
 `make refresh` must complete without prompting for anything. A prompt is a failure against FR-009.
+
+`make refresh` writes `data/published/` **locally only** — that directory is git-ignored on `main`. Publishing is the scheduled workflow's job (T058): it force-pushes a single commit to the `published` branch on success, and pushes nothing at all on a failed or partial refresh so the previous snapshot keeps being served.
 
 ## Scenario 1 — Identity resolution across name variants (US1, FR-002)
 
@@ -125,6 +128,8 @@ The check **fails** if an unlisted personal attribute is present in any of those
 
 ```
 make serve-local   # serve web/ and data/published/ from one local static host
+                   # (locally both come from the working tree; in production both come
+                   #  from the `published` branch, which is what keeps them same-origin)
 make test-page     # drive the page in a browser with the upstream blocked at the network level
 ```
 

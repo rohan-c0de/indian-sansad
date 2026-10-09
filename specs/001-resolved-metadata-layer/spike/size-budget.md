@@ -474,6 +474,66 @@ recommended"* in **23.6**. Less acute than the ~297 MiB projection implied (4.0 
 still the constraint that binds first — the Pages site ceiling has 4.7× headroom while the
 repository guidance is breached on the fifth refresh.
 
+## OWNER DECISION — 2026-10-09: publish to a rolling orphan branch
+
+**Decided. The T051 gate is discharged.**
+
+The pipeline publishes the dataset to an **orphan branch named `published`**, as a **single commit
+force-pushed on every successful refresh**. GitHub Pages serves that branch.
+
+- **`main` never holds published data.** `data/published/` is **git-ignored on `main`**, because
+  it is a build output.
+- **`data/assertions/` stays on `main`** — maintainer corrections are an input, not output, and
+  must survive a refresh that rewrites the published branch wholesale.
+- **Before overwriting, the pipeline reads the previous snapshot from the `published` branch.**
+  That read is load-bearing twice: FR-010's last-known-good needs the prior record, and FR-011's
+  signal for a question leaving `resolved` needs something to compare against.
+- **On any failed or partial refresh nothing is pushed**, so the previous snapshot keeps being
+  served. Quiet degradation for visitors (FR-010) falls out of the mechanism rather than needing
+  separate handling.
+- **Every run also commits a small run-timestamp file to `main`**, including a run that finds
+  nothing new, to stop the 60-day inactivity rule disabling the schedule.
+
+### Why this, at the measured size
+
+At the **measured 216.5 MiB per snapshot** — not the earlier **326 MiB projection**, which was
+37% high — full history breaches GitHub's *"ideally less than 1 GB"* on about the **fifth**
+refresh and *"less than 5 GB is strongly recommended"* within **twenty-four**. Publishing only
+changed partitions slows that without bounding it. A rolling orphan branch is the only option on
+the table that **bounds** growth, because the dataset's history is one commit deep at all times.
+
+### The cost, accepted explicitly
+
+**Provenance that `research.md` said came free from git history no longer does.** That file's
+rationale read "Files also give FR-005 provenance and FR-016 refresh dating for free, since
+history is inherent." Force-pushing a single commit destroys exactly that history:
+
+| | Was to come from | **Now met by** |
+|---|---|---|
+| **FR-005** — any join independently verifiable | git history of the published files | **Resolution Records (T049)** |
+| **FR-016** — every published set carries its rebuild date | git commit dates | **An explicit rebuilt-date field on every published set (T093)** |
+
+Neither is a new requirement — `data-model.md` already specifies the Resolution Record and a
+`last_refreshed` field. What changes is that they are now **the only** mechanism rather than a
+belt alongside git's braces.
+
+### Two things UNVERIFIED about this decision
+
+1. **Whether GitHub counts a push to a non-default branch as repository activity** for the 60-day
+   scheduled-workflow rule. The published wording is *"no repository activity ... in 60 days"*
+   and does not enumerate what counts. **This is exactly why the run-timestamp commit to `main`
+   exists** — it makes the keep-alive independent of that reading instead of betting FR-009 on
+   it. If a push to `published` does count, the timestamp commit is harmless redundancy; if it
+   does not, the timestamp commit is the only thing keeping the schedule alive.
+2. **How quickly GitHub reclaims the dropped history on its side.** A force-push makes the old
+   commits unreachable, but unreachable objects persist until the remote garbage-collects, and
+   GitHub publishes no interval for that. So the *stored* repository may not shrink when the
+   working tree does, and a force-push does not guarantee a bounded remote size on any stated
+   schedule. **The check is repository size after the first few refreshes** — `gh api
+   repos/{owner}/{repo} --jq .size` reports it in KB. If it climbs monotonically across refreshes,
+   the orphan branch is bounding the working tree but not the repository, and this decision needs
+   revisiting.
+
 ## T018 — measured window index
 
 | Variant | Distinct terms | Postings | **Bytes** | B/question |
