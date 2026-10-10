@@ -393,6 +393,62 @@ tbody tr:last-child td {
   font-style: italic;
 }
 
+/* The session table is collapsed by default: 21 rows is a wall in front of
+   the figures that matter. <details> needs no script, is keyboard-operable
+   and is announced by screen readers without any ARIA. */
+details.sessions > summary {
+  cursor: pointer;
+  list-style-position: outside;
+  padding: 8px 0;
+  min-height: var(--tap);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+details.sessions > summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.summary-label {
+  font-family: var(--font-head);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.summary-note {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+/* Zero sitting days. A WORD, not a colour -- the flag below is the signal
+   and the amber ground is decoration that carries nothing on its own. */
+.zero-days-note {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  background: var(--flag-bg);
+  border-left: 4px solid var(--flag-text);
+  border-radius: var(--radius);
+  color: var(--flag-text);
+  font-size: 0.84rem;
+}
+
+.zero-days-value {
+  font-weight: 700;
+}
+
+.zero-days-flag {
+  display: block;
+  color: var(--flag-text);
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: normal;
+  max-width: 22ch;
+  margin-left: auto;
+  margin-top: 2px;
+}
+
 /* ---------------------------------------------------------------------- */
 /* Regions that are not built yet (T078, T079, T080)                      */
 /* ---------------------------------------------------------------------- */

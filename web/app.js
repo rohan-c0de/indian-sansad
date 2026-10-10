@@ -25,16 +25,14 @@ import {
   searchIndexRequested,
 } from "./lib/fetch.js";
 import {
-  count,
-  houseName,
-  isMissing,
-  isoDate,
-  NOT_STATED,
-  orderSessions,
-  percent,
-  sessionLabel,
-  stated,
-} from "./lib/format.js";
+  coveredRows,
+  housesClaim,
+  housesNotCovered,
+  longSessionLabel,
+  sessionRows,
+  ZERO_SITTING_DAYS_FLAG,
+} from "./lib/coverage.js";
+import { count, isMissing, isoDate, NOT_STATED, percent, stated } from "./lib/format.js";
 
 /* ---------------------------------------------------------------------- */
 /* Small DOM helpers. No library.                                         */
@@ -73,31 +71,39 @@ function list(className, items, render) {
 /* T077 — the coverage statement                                          */
 /* ---------------------------------------------------------------------- */
 
-const HOUSE_LOK_SABHA = "lok-sabha";
-
 function renderCoverage(container, { coverage, sessions, basis }) {
-  const rows = new Map(coverage.map((row) => [row.house, row]));
-  const lok = rows.get(HOUSE_LOK_SABHA);
-  if (!lok) {
-    renderUnavailable(container, "The coverage statement carries no Lok Sabha row.");
+  // Whichever Houses carry questions, largest first. No House is named here:
+  // naming one would decide whose figures appear, and that is the drift the
+  // derived claim exists to remove.
+  const covered = coveredRows(coverage);
+  if (covered.length === 0) {
+    renderUnavailable(
+      container,
+      "The coverage statement carries no House with any published question.",
+    );
     return;
   }
+  const lok = covered[0];
 
   const frag = document.createDocumentFragment();
 
-  /* --- Houses. The one claim the page must make loudly (FR-013). ------- */
+  /* --- Houses. The one claim the page must make loudly (FR-013).
+         DERIVED from which rows actually carry questions, never typed: if a
+         Rajya Sabha route is ever found, this changes by itself rather than
+         by someone remembering to edit a string. ------------------------- */
   const houses = el("div", "houses");
-  houses.append(el("p", "houses-value", "Lok Sabha only"));
-  const others = coverage.filter((row) => row.house !== HOUSE_LOK_SABHA);
-  if (others.length > 0) {
-    const notCovered = others.map((row) => houseName(row.house)).join(", ");
+  houses.append(el("p", "houses-value", housesClaim(coverage)));
+  const absent = housesNotCovered(coverage);
+  if (absent.length > 0) {
     houses.append(
-      el("p", "houses-note", `${notCovered} is not covered by this dataset.`),
+      el(
+        "p",
+        "houses-note",
+        `${absent.map((h) => h.name).join(", ")} is not covered by this dataset.`,
+      ),
     );
-    for (const row of others) {
-      if (!isMissing(row.unobtainable_reason)) {
-        houses.append(el("p", "houses-why", `Why: ${row.unobtainable_reason}`));
-      }
+    for (const row of absent) {
+      if (row.reason) houses.append(el("p", "houses-why", `Why: ${row.reason}`));
     }
   }
   frag.append(houses);
@@ -185,7 +191,9 @@ function renderCoverage(container, { coverage, sessions, basis }) {
   }
 
   /* --- Sessions, ordered by (term, number). ---------------------------- */
-  frag.append(renderSessions(lok, sessions));
+  for (const row of covered) {
+    frag.append(renderSessions(row, sessions));
+  }
 
   /* --- Known gaps, verbatim. ------------------------------------------- */
   const gaps = Array.isArray(lok.known_gaps) ? lok.known_gaps : [];
@@ -247,22 +255,42 @@ function declaredDuplicates(row) {
 }
 
 function renderSessions(lok, sessions) {
-  const box = el("section", "sessions");
-  box.append(el("h3", null, "Sessions covered"));
+  const rows = sessionRows(lok, sessions);
+
+  /* (b) Twenty-one rows is a wall in front of the figures that matter, so the
+     table is COLLAPSED by default. What stays visible above it: the Houses
+     claim, the period, the question count, both identification rates and the
+     known-gaps list. A <details> needs no script and is keyboard-operable and
+     announced by screen readers for free. */
+  const box = el("details", "sessions");
+  const summary = el("summary");
+  summary.append(el("span", "summary-label", `${count(rows.length)} sessions`));
+  summary.append(
+    el("span", "summary-note", "ordered by term and session number · dates not stated"),
+  );
+  box.append(summary);
+
+  const zeroDay = rows.filter((row) => row.zeroSittingDays);
   box.append(
     el(
       "p",
       "gaps-lede",
-      "Ordered by term and session number. The published record carries no " +
-        `start or end date for any session, so every date below reads "${NOT_STATED}" ` +
-        "— the page does not estimate one.",
+      "The published record carries no start or end date for any session, so every " +
+        `date below reads "${NOT_STATED}" — the page does not estimate one.`,
     ),
   );
-
-  const byId = new Map(
-    (sessions ?? []).map((s) => [`${s.house}/${s.term}/${s.number}`, s]),
-  );
-  const ordered = orderSessions(lok.sessions_covered ?? []);
+  if (zeroDay.length > 0) {
+    /* (c) A text flag, above the table as well as in it, so the reader meets
+       it whether or not they scan the rows. Never colour alone. */
+    box.append(
+      el(
+        "p",
+        "zero-days-note",
+        `${count(zeroDay.length)} session carries ${ZERO_SITTING_DAYS_FLAG}. ` +
+          "Any per-sitting-day figure for it reads n/a rather than dividing by zero.",
+      ),
+    );
+  }
 
   const wrap = el("div", "table-wrap");
   wrap.setAttribute("role", "region");
@@ -285,29 +313,30 @@ function renderSessions(lok, sessions) {
   table.append(thead);
 
   const tbody = el("tbody");
-  for (const session of ordered) {
-    const row = el("tr");
-    const th = el("th", null, sessionLabel(session));
+  for (const session of rows) {
+    const tr = el("tr");
+    const th = el("th", null, longSessionLabel(session));
     th.scope = "row";
-    row.append(th);
+    tr.append(th);
 
-    const record = byId.get(session.sessionId);
-    const start = record ? isoDate(record.start_date) : NOT_STATED;
-    const end = record ? isoDate(record.end_date) : NOT_STATED;
+    const start = isoDate(session.startDate);
+    const end = isoDate(session.endDate);
     const dates =
       start === NOT_STATED && end === NOT_STATED ? NOT_STATED : `${start} – ${end}`;
-    const dateCell = el("td", dates === NOT_STATED ? "not-stated" : null, dates);
-    row.append(dateCell);
+    tr.append(el("td", dates === NOT_STATED ? "not-stated" : null, dates));
 
-    const days = record ? record.sitting_days : null;
-    row.append(
-      el(
-        "td",
-        isMissing(days) ? "num-col not-stated" : "num-col",
-        isMissing(days) ? NOT_STATED : count(days),
-      ),
-    );
-    tbody.append(row);
+    const cell = el("td", "num-col");
+    if (session.sittingDays === null) {
+      cell.classList.add("not-stated");
+      cell.textContent = NOT_STATED;
+    } else if (session.zeroSittingDays) {
+      cell.append(el("span", "zero-days-value", "0"));
+      cell.append(el("span", "zero-days-flag", ZERO_SITTING_DAYS_FLAG));
+    } else {
+      cell.textContent = count(session.sittingDays);
+    }
+    tr.append(cell);
+    tbody.append(tr);
   }
   table.append(tbody);
   wrap.append(table);
@@ -355,8 +384,13 @@ function renderLicence(container, manifest) {
     // fetched from it unless a reader clicks.
     const a = el("a", null, manifest.project_url);
     a.href = manifest.project_url;
+    // (d) The one link that leaves this host. New tab, and `noopener` so the
+    // opened page gets no handle on this one; `noreferrer` so it is not told
+    // where the reader came from.
+    a.target = "_blank";
     a.rel = "noopener noreferrer";
     li.append(a);
+    li.append(el("span", "licence-links-note", " (opens in a new tab)"));
     li.append(el("span", "licence-links-note", " — the project"));
     links.append(li);
   }

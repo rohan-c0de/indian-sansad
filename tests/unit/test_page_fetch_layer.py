@@ -26,7 +26,14 @@ WEB = REPO_ROOT / "web"
 PAGE_TESTS = sorted((REPO_ROOT / "tests" / "page").glob("*.test.mjs"))
 
 #: Every text file that ships as part of the page.
-PAGE_FILES = ("index.html", "style.css", "app.js", "lib/fetch.js", "lib/format.js")
+PAGE_FILES = (
+    "index.html",
+    "style.css",
+    "app.js",
+    "lib/fetch.js",
+    "lib/format.js",
+    "lib/coverage.js",
+)
 
 
 def test_node_is_available_and_the_page_tests_exist() -> None:
@@ -123,17 +130,137 @@ def test_the_unbuilt_regions_are_marked_on_screen_not_just_absent() -> None:
     assert html.count("Not built yet") == 3
 
 
-def test_the_shell_does_not_hardcode_a_figure_or_the_licence() -> None:
-    """Everything numeric and every licence string is read at runtime.
+#: Every field the page reads out of manifest.json or coverage.jsonl. A value
+#: of one of these must never appear as a literal anywhere in web/.
+_RUNTIME_FIELDS = (
+    (
+        "manifest.json",
+        None,
+        (
+            "license",
+            "attribution",
+            "project_url",
+            "license_file",
+            "license_scope",
+            "last_refreshed",
+        ),
+    ),
+    (
+        "coverage.jsonl",
+        "lok-sabha",
+        (
+            "total_questions",
+            "resolved_automatic",
+            "resolved_including_assertions",
+            "assertions_in_effect",
+            "assertions_overriding_an_automatic_match",
+            "ministry_ids",
+            "ministry_names_observed",
+            "ministry_names_without_confirmed_mapping",
+            "sessions_covered_count",
+            "period_start",
+            "period_end",
+            "houses_covered",
+            "last_refreshed",
+            "sc_002_target",
+        ),
+    ),
+)
 
-    The shell may name a measured SIZE in prose (the index is 2.37 MiB) because
-    that is a statement about the dataset's shape, not a published figure. What
-    it must not do is state a count, a rate or a licence that the record owns.
+
+def _published_values() -> dict[str, object]:
+    """The live values of every field the page reads at runtime."""
+    import json
+
+    root = REPO_ROOT / "data" / "published"
+    out: dict[str, object] = {}
+    for name, house, fields in _RUNTIME_FIELDS:
+        path = root / name
+        if not path.is_file():
+            continue
+        if name.endswith(".jsonl"):
+            rows = [json.loads(ln) for ln in path.read_text().splitlines() if ln.strip()]
+            record = next((r for r in rows if r.get("house") == house), rows[0])
+        else:
+            record = json.loads(path.read_text())
+        for field in fields:
+            if field in record:
+                out[f"{name}:{field}"] = record[field]
+    return out
+
+
+def test_the_page_hardcodes_nothing_the_record_supplies() -> None:
+    """Fix (e). Checked against the LIVE values, not a fixed list of strings.
+
+    An earlier version of this test listed six literals by hand. That catches
+    the six and nothing else, and it goes stale the moment a figure changes —
+    the same failure mode as the hand-typed test count in the README. This
+    reads every field the page is known to render and asserts none of their
+    values appears as a literal in any page file.
+
+    Prose about the dataset's SHAPE is still allowed (the index is 2.37 MiB):
+    that is a statement about a file, not a figure the record owns.
     """
-    html = (WEB / "index.html").read_text(encoding="utf-8")
-    body = re.sub(r"<!--.*?-->", "", html, flags=re.S)
-    for forbidden in ("95,268", "94.78", "96.36", "CC-BY-4.0", "CC BY 4.0", "Contains data from"):
-        assert forbidden not in body, f"index.html hardcodes {forbidden!r}"
+    values = _published_values()
+    if not values:
+        pytest.skip("data/published/ not built -- NOT AUDITED, not a pass")
+    assert len(values) > 15, f"only {len(values)} runtime fields found"
+
+    offenders: list[str] = []
+    for name in PAGE_FILES:
+        text = (WEB / name).read_text(encoding="utf-8")
+        body = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+        body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+        for key, value in values.items():
+            if not isinstance(value, (str, int, float)) or isinstance(value, bool):
+                continue
+            literal = str(value)
+            # Short values (a year, a small count) collide with ordinary code.
+            if len(literal) < 6:
+                continue
+            if literal in body:
+                offenders.append(f"{name} contains {key} = {literal[:60]!r}")
+            grouped = f"{value:,}" if isinstance(value, int) else None
+            if grouped and len(grouped) >= 6 and grouped in body:
+                offenders.append(f"{name} contains {key} as {grouped!r}")
+    assert offenders == [], "the page hardcodes what the record supplies:\n" + "\n".join(offenders)
+
+
+def test_the_houses_claim_is_derived_not_typed() -> None:
+    """Fix (a). The words must come out of a function over the coverage rows."""
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+    assert "housesClaim(coverage)" in body
+    assert '"Lok Sabha only"' not in body, "the claim is typed, not derived"
+    assert "Lok Sabha only" not in (WEB / "index.html").read_text(encoding="utf-8")
+
+
+def test_the_session_table_is_collapsed_and_the_key_figures_are_not() -> None:
+    """Fix (b). The table is behind <details>; the figures above it are not."""
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    assert 'el("details", "sessions")' in app
+    assert 'el("summary")' in app
+    assert "sessions`" in app, "the summary must state the session count"
+    # The figures that stay visible are rendered into the fact grid, not the
+    # details element: the grid is appended to the fragment before it.
+    assert app.index('el("div", "fact-grid")') < app.index("renderSessions(lok, sessions)")
+
+
+def test_zero_sitting_days_is_flagged_in_words() -> None:
+    """Fix (c). Text, never colour alone, and n/a rather than a division."""
+    coverage_js = (WEB / "lib" / "coverage.js").read_text(encoding="utf-8")
+    assert "ZERO_SITTING_DAYS_FLAG" in coverage_js
+    assert "0 sitting days as published" in coverage_js
+    assert 'NOT_APPLICABLE = "n/a"' in coverage_js
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    assert "ZERO_SITTING_DAYS_FLAG" in app
+
+
+def test_the_project_link_opens_in_a_new_tab_safely() -> None:
+    """Fix (d)."""
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    assert 'a.target = "_blank"' in app
+    assert 'a.rel = "noopener noreferrer"' in app
 
 
 def test_the_counting_basis_text_is_not_retyped_in_the_page() -> None:
