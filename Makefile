@@ -22,7 +22,7 @@ REPO_ROOT := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 # fall back to /tmp/ where it is unset (most CI runners).
 SANSAD_SCRATCH ?= $(or $(TMPDIR),/tmp/)sansad-scratch
 
-.PHONY: scratch guard setup lint audit-fields \
+.PHONY: scratch guard setup lint yamllint audit-fields \
         refresh verify-joins extract report lookup composition coverage \
         serve-local test-page validate
 
@@ -88,11 +88,16 @@ setup:
 	 "$(VENV_PY)" -m pip list --format=freeze | grep -iE '^(httpx|polars|pytest|ruff)=' || true
 
 # --------------------------------------------------------------------------
-# lint -- ruff check and format verification. Read-only: it reports, it does
-#         not rewrite, so a lint run can never be the thing that changed a
-#         file under a measurement.
+# lint -- ruff check, format verification, AND yamllint. Read-only: it
+#         reports, it does not rewrite, so a lint run can never be the thing
+#         that changed a file under a measurement.
+#
+# yamllint is part of `lint` rather than only standing alone because this is
+# the aggregating check, and a lint target that passes while the workflow YAML
+# is unchecked is how T058 came to record "yamllint reports 0 findings" for
+# two days when the real figure was 9 (2026-10-10).
 # --------------------------------------------------------------------------
-lint:
+lint: yamllint
 	@set -eu -o pipefail; \
 	 if [[ ! -x "$(VENV_PY)" ]]; then \
 	   echo "make lint: no environment at $(VENV). Run 'make setup' first."; \
@@ -100,6 +105,28 @@ lint:
 	 fi; \
 	 "$(VENV_PY)" -m ruff check .; \
 	 "$(VENV_PY)" -m ruff format --check .
+
+# --------------------------------------------------------------------------
+# yamllint -- the YAML half of lint, against the committed .yamllint config.
+#
+# --strict is NOT decoration. yamllint's default exit code for a run whose
+# only findings are WARNINGS is 0 -- verified 2026-10-10: a file reported
+# `warning  missing document start "---"` and exited 0, and exited 2 under
+# --strict. A target that reported findings and exited 0 would be the same
+# hole the config was added to close, so every finding fails here.
+#
+# Scope is `.` and the ignore list lives in .yamllint, not in this recipe:
+# the config is what the CI and a human both read, and a path list here would
+# be a second definition that drifts.
+# --------------------------------------------------------------------------
+yamllint:
+	@set -eu -o pipefail; \
+	 if [[ ! -x "$(VENV_PY)" ]]; then \
+	   echo "make yamllint: no environment at $(VENV). Run 'make setup' first."; \
+	   exit 1; \
+	 fi; \
+	 "$(VENV_PY)" -m yamllint --strict .; \
+	 echo "yamllint: 0 findings (--strict, config .yamllint)"
 
 # --------------------------------------------------------------------------
 # audit-fields -- T031 / quickstart.md scenario 10.

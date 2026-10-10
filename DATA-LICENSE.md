@@ -1,0 +1,117 @@
+# Licence for the published dataset
+
+**Owner decision, 2026-10-10.** This file covers `data/published/` — the
+dataset served from the `published` branch. The code that builds it is covered
+separately by [LICENSE](./LICENSE) (MIT).
+
+## Two layers, and only one of them is ours to license
+
+The published dataset is a derivative work over records this project did not
+create. Those are two different things and they carry different terms.
+
+### The added work — CC BY 4.0
+
+Everything this project contributes is licensed
+**[Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)**:
+
+- **the identity resolution** — the stable `member_id` layer, the name-variant
+  groupings behind it, the five matching tiers and their outcomes, and the
+  maintainer-confirmed assertions in `data/assertions/`;
+- **the joins** — the link from each question to its asking members, and the
+  per-name-form resolution records that make each link auditable;
+- **the ministry identity layer** — `ministry_id`, the confirmed rename
+  mappings, and the former-name history attached to each ministry;
+- **the aggregates** — composition, subject trends, ministry profiles, and the
+  counting-basis statements published beside them;
+- **the indexes** — the subject-search index, including its tokenisation and
+  its encoding;
+- **the partition scheme and schemas** — the subset axes, field definitions and
+  file layouts described in
+  `specs/001-resolved-metadata-layer/contracts/published-dataset.md`;
+- **the coverage statement**, and the prose of this and the other published
+  documentation.
+
+Attribute it to **Indian Sansad Maintainer**, with a link to the project. You
+may share and adapt it, including commercially, under those terms.
+
+### The underlying parliamentary records — not ours, terms unknown to us
+
+The question metadata and the member roster come from the Lok Sabha's own
+published sources. **This project asserts no licence over them, and CC BY 4.0
+above does not and cannot extend to them.** They remain subject to whatever
+terms their source applies.
+
+**We do not know what those terms are.** This is a recorded gap, not an
+oversight and not a judgement that reuse is permitted:
+
+> *"Terms of use, licensing and copyright were excluded from the assessment by
+> owner decision. This feature is specified without any determination of what
+> may lawfully be re-published. That is a deferred question, not a cleared
+> one."*
+> — `specs/001-resolved-metadata-layer/spec.md`, Assumptions
+
+The same exclusion is recorded in
+`.specify/assessments/indian-sansad/intake.md` ("Out of scope for this
+assessment. Do not research terms of use, licensing or copyright"),
+`problem.md` ("This defers a risk; it does not establish that none exists"),
+`decision.md` ("Licensing stays scoped out — deferred, not cleared"),
+`research.md` ("this document makes **no claim** about what may lawfully be
+re-hosted or redistributed") and `.specify/memory/constitution.md`.
+
+**What this means for you.** If you reuse the underlying records — as opposed
+to the resolution, joins and aggregates layered over them — satisfying CC BY
+4.0 is not sufficient, because this project has no standing to grant you
+anything over material it does not own. Establishing the source's terms is
+your responsibility and ours; neither has been done.
+
+## Where the line falls, concretely
+
+Field names below are the ones the dataset actually publishes, read off the
+built files rather than from the schema prose.
+
+**A question record** (`by-session/`, `by-ministry/`, `by-member/`):
+
+| Field | Layer | Licence |
+|---|---|---|
+| `question_id`, `subject`, `type`, `date`, `session`, `house` | source record | the source's terms — **unknown**, see above |
+| `asking_members` — the resolved `member_id` list, which is the whole point of this project | added | CC BY 4.0 |
+| `resolution_status` | added | CC BY 4.0 |
+| `ministry_id` | added | CC BY 4.0 |
+| `source_record_ref`, `last_refreshed` | added | CC BY 4.0 |
+
+Note that a question record carries **no ministry name and no asker name** —
+only ids. The source-derived names sit in the reference and resolution sets:
+
+| Where | Field | Layer |
+|---|---|---|
+| `resolution-records.jsonl` | `name_as_written` | source record |
+| `resolution-records.jsonl` | `member_id`, `method`, `status`, `candidates`, `asserted_by` | added |
+| `reference/members.jsonl` | `canonical_name`, `party`, `state`, `constituency`, `sitting_status`, `terms` | source record |
+| `reference/members.jsonl` | `member_id`; and the *grouping* of `name_variants` under one identity | added |
+| `reference/ministries.jsonl` | `canonical_name`, the individual `name_variants` spellings | source record |
+| `reference/ministries.jsonl` | `ministry_id`, `former_names`; and the *grouping* | added |
+| `reference/sessions.jsonl` | `number`, `term`, `house`, `sitting_days`, `start_date`, `end_date` | source record |
+| `reference/sessions.jsonl` | `session_id` | added |
+| everything under `aggregates/` and `search/` | — | added |
+| `coverage.jsonl` | — | added |
+
+The distinction that recurs is **spelling versus grouping**: each name variant
+is the source's text, while the claim that several variants are one person or
+one ministry is this project's work. The same holds for `former_names`, where
+the names are the source's and the assertion that they are the same ministry is
+a maintainer's.
+
+A single published row therefore mixes both layers. That is in the nature of a
+resolved-metadata layer, and saying so plainly is better than a single licence
+header that would overclaim.
+
+## What is deliberately absent
+
+No document-derived content is published — nothing extracted from a PDF or any
+other document file (FR-015). Debate text and answer text are not here, so
+whatever terms attach to them do not arise.
+
+Members' personal attributes are restricted at the ingest boundary to the
+published field list (FR-008) and the dataset carries no phone number, personal
+email address, postal address, date of birth, marital status or family
+composition, whatever the upstream serves.

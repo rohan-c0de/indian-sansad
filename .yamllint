@@ -8,7 +8,11 @@
 # was wrong, not the file. Correcting it needs a defined standard to be wrong
 # or right against, which is what this file is.
 #
-# Reproduce with:  .venv/bin/yamllint .
+# Reproduce with:  make yamllint
+#
+# which runs `python -m yamllint --strict .`. --strict matters: yamllint's
+# DEFAULT exit code for a run whose only findings are warnings is 0 -- verified
+# 2026-10-10 -- so the plain command would report findings and still pass.
 ---
 extends: default
 

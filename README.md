@@ -116,3 +116,22 @@ specs/             specification artefacts
 `specs/`, `tools/`, `spike/` and the `Makefile` exist. `src/sansad/`, `web/`,
 `data/published/`, `data/assertions/` and `tests/` do not — they are created by
 the phase that first needs them.
+
+## Licence
+
+Two licences, because there are two layers (owner decision, 2026-10-10).
+
+- **Code — MIT.** See [LICENSE](./LICENSE). Copyright © 2026 Indian Sansad
+  Maintainer.
+- **Published dataset — CC BY 4.0 on the added work.** See
+  [DATA-LICENSE.md](./DATA-LICENSE.md). The identity resolution, the joins, the
+  aggregates and the indexes are this project's contribution and are licensed
+  CC BY 4.0. **The underlying parliamentary records are not**, and remain
+  subject to their source's terms.
+
+Those terms are **unknown to this project**, because terms of use, licensing
+and copyright were scoped out of the assessment by owner decision — as the
+section above records, that defers the question rather than clearing it.
+`DATA-LICENSE.md` says where the line falls field by field, so a consumer can
+see which parts of a published row this project can license and which it
+cannot.
