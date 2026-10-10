@@ -231,15 +231,44 @@ extract:
 	   $(if $(CONSTITUENCY),--constituency "$(CONSTITUENCY)",) \
 	   $(if $(OUT),--out "$(OUT)",)
 
+# --------------------------------------------------------------------------
+# report -- T085 / quickstart.md scenario 6 (US2, FR-012, SC-007).
+#
+#   make report MINISTRY="JAL SHAKTI" SESSIONS=5-8 [LS_TERM=18]
+#
+# Prints the published aggregate's figures, an INDEPENDENT recount straight off
+# `by-session/` that never touches the aggregation code, and the counting basis
+# read from the published file. Exits non-zero if the two counts disagree: a
+# report that printed a figure without re-deriving it would be testing nothing,
+# and SC-007 is about reproducibility rather than about having a number to show.
+#
+# SESSIONS is session NUMBERS and covers both terms unless LS_TERM= narrows it
+# -- the tool says so on its own output rather than picking a term silently.
+#
+# LS_TERM, not TERM: every interactive shell EXPORTS `TERM`, so a `TERM ?=`
+# here picks up `xterm-256color` from the environment whenever the caller does
+# not pass one. Measured on this machine -- `make composition` with no TERM
+# given fails with `argument --term: invalid int value: 'xterm-256color'`,
+# which is the same collision in the older target. That one is left as it is
+# rather than renamed in passing: `make composition TERM=18` is the documented
+# interface and a command-line variable overrides the environment, so it works
+# as documented and only the no-argument case is affected. Recorded here so the
+# next person reads it as a known collision rather than a new one.
+# --------------------------------------------------------------------------
+LS_TERM ?=
+
 report:
 	@set -eu -o pipefail; \
-	 echo "make report: NOT IMPLEMENTED YET."; \
-	 echo "  will: produce reproducible counts carrying the FR-012 counting-basis stamp, e.g. MINISTRY=<name> SESSIONS=5-8"; \
-	 echo "  quickstart.md: scenario 6 (US2, FR-012, SC-007)"; \
-	 echo "  implemented by: T085; the basis stamp itself is T064"; \
-	 echo "  Failing deliberately (T035): a stub that exited 0 would let"; \
-	 echo "  'make validate' report success on work that has not been done."; \
-	 exit 1
+	 if [[ -z "$(MINISTRY)" || -z "$(SESSIONS)" ]]; then \
+	   echo "make report: MINISTRY and SESSIONS are both required."; \
+	   echo "  e.g. make report MINISTRY=\"JAL SHAKTI\" SESSIONS=5-8"; \
+	   exit 1; \
+	 fi; \
+	 "$(VENV_PY)" tools/show_report.py \
+	   --ministry "$(MINISTRY)" \
+	   --sessions "$(SESSIONS)" \
+	   $(if $(LS_TERM),--term "$(LS_TERM)",) \
+	   --published "$(REPO_ROOT)/data/published"
 
 lookup:
 	@set -eu -o pipefail; \
@@ -290,15 +319,59 @@ serve-local-mapping:
 	@set -eu -o pipefail; \
 	 $(PYTHON) tools/serve_local.py --print-mapping
 
+# --------------------------------------------------------------------------
+# test-page -- T082 / quickstart.md scenario 12, and the T083 measurement.
+#
+# Starts the static host on an EPHEMERAL port (so two runs cannot collide and
+# a stale server cannot be mistaken for this one), drives the real page in
+# headless Chrome with the upstream blocked at the network level, prints the
+# network log summary, and measures the first-load and first-search bytes.
+#
+# The block is `--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1`:
+# every hostname but the loopback static host is unresolvable inside that
+# browser. That is stronger than blocking the upstream by name, deliberately --
+# a named block would still let a request to some other host succeed and go
+# unnoticed, and scenario 12's claim is that the page needs nothing but this
+# project's own files.
+#
+# NOTHING IS INSTALLED. The driver is `tools/cdp.mjs` plus
+# `tools/drive_page.mjs` over Node 22's built-in WebSocket and fetch: no
+# Puppeteer, no Playwright, no package.json, no node_modules. A browser-driver
+# dependency tree breaks on its own schedule, and Principle II caps upkeep at
+# about 2 hours a week.
+#
+# SCREENS=<dir> also writes the review screenshots at 390 and 1280 CSS px,
+# using CDP device-metric emulation rather than a resized window.
+# --------------------------------------------------------------------------
+SCREENS ?=
+
 test-page:
 	@set -eu -o pipefail; \
-	 echo "make test-page: NOT IMPLEMENTED YET."; \
-	 echo "  will: drive the page in a browser with the upstream blocked at the network level"; \
-	 echo "  quickstart.md: scenario 12 (US2, US3)"; \
-	 echo "  implemented by: T082"; \
-	 echo "  Failing deliberately (T035): a stub that exited 0 would let"; \
-	 echo "  'make validate' report success on work that has not been done."; \
-	 exit 1
+	 if [[ ! -d "$(REPO_ROOT)/data/published" ]]; then \
+	   echo "make test-page: data/published/ is not built. Run 'make refresh' first."; \
+	   exit 1; \
+	 fi; \
+	 command -v node >/dev/null || { echo "make test-page: Node is required."; exit 1; }; \
+	 work="$$(mktemp -d)"; \
+	 log="$$work/serve.log"; \
+	 report="$$work/drive.json"; \
+	 trap 'if [[ -n "$${pid:-}" ]]; then kill "$$pid" 2>/dev/null || true; fi; rm -rf "$$work"' EXIT; \
+	 $(PYTHON) tools/serve_local.py --host 127.0.0.1 --port 0 >"$$log" 2>&1 & \
+	 pid=$$!; \
+	 origin=""; \
+	 for _ in $$(seq 1 100); do \
+	   origin="$$(sed -n 's|^serve-local: \(http://127\.0\.0\.1:[0-9]*\)/.*|\1|p' "$$log" | head -1)"; \
+	   if [[ -n "$$origin" ]]; then break; fi; \
+	   if ! kill -0 "$$pid" 2>/dev/null; then echo "make test-page: the static host exited:"; cat "$$log"; exit 1; fi; \
+	   sleep 0.1; \
+	 done; \
+	 if [[ -z "$$origin" ]]; then echo "make test-page: the static host never reported a port:"; cat "$$log"; exit 1; fi; \
+	 echo "make test-page: static host at $$origin (pid $$pid)"; \
+	 echo ""; \
+	 node tools/drive_page.mjs --origin "$$origin" --report "$$report" \
+	   $(if $(SCREENS),--screens "$(SCREENS)",); \
+	 echo ""; \
+	 "$(VENV_PY)" tools/measure_first_load.py "$$report"
 
 validate:
 	@set -eu -o pipefail; \

@@ -1150,3 +1150,87 @@ And it must record, in the same place, that **neither column is the real
 compressed figure**. That can only be read from the live site's response
 headers after Pages is serving the `published` branch. Until then the encoder,
 the level, and whether a given file is compressed at all are assumptions.
+
+---
+
+# T083 — the MEASURED first load, from a real browser network log
+
+**This closes spike item 5 against the real thing.** Everything above this
+section is file arithmetic; everything in it was read off a browser's network
+log. Measured 2026-10-10 by `make test-page`, which starts `make serve-local`
+on an ephemeral port and drives the page in **headless Chrome 154.0.8037.98**
+(CDP 1.3) with the HTTP cache disabled and the upstream blocked at the network
+level — `--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1`, so every
+hostname but the loopback static host is unresolvable inside that browser.
+
+Reproduce with `make test-page`; the table is printed by
+`tools/measure_first_load.py` from the report `tools/drive_page.mjs` writes.
+
+## Two columns, as the owner required — and a third, because two were not enough
+
+| | wire B | vs T019 | body B | vs T019 | gzip -6 B | vs compressed ref |
+|---|---:|---:|---:|---:|---:|---:|
+| **first page load, no search** | 468,383 | **−88.8%** | 465,387 | **−88.9%** | 74,339 | −91.2% |
+| **first load + first search** (one word, 1 digest) | 4,062,672 | **−2.9%** | 4,059,144 | **−3.0%** | 994,010 | +17.3% |
+| the same, plus "Show 25 more" | 5,636,787 | +34.7% | 5,633,083 | +34.6% | 1,204,085 | +42.1% |
+| **first load + first search** (two words, 2 digests) | 5,636,787 | **+34.7%** | 5,633,083 | **+34.6%** | 1,204,085 | +42.1% |
+
+T019 budget (RAW, the contract): **4,183,979 B**.
+Like-for-like compressed reference (INFORMATIONAL ONLY): **847,324 B**.
+
+**Why there are three columns and not the two the decision asked for.** The
+owner's two are (1) raw bytes from the network log and (2) the offline `gzip -6`
+estimate. But "raw bytes from the network log" is itself two different numbers,
+and the gap between them is the same class of false comparison this document
+already warns about:
+
+- **wire B** is the browser's `encodedDataLength` — the bytes on the wire,
+  **response headers included**. It is what was actually measured.
+- **body B** is the size of the file the static host served. **T019's
+  4,183,979 B was built from file sizes**, so this is the like-for-like column,
+  and it is the one the verdict is read off.
+
+The difference is 3,528 B across 20 requests — about 176 B of headers each. It
+changes no verdict here, which is exactly why it is worth stating: the next
+measurement might have more requests, and a reader who did not know which of
+the two numbers was being quoted could not tell.
+
+**The last two rows are equal because they fetched the same files**, not because
+a row was duplicated: the second session `"Show 25 more"` crossed into
+(`lok-sabha-18-7`) is the second session the `drinking water` first page spans.
+
+## The verdict
+
+- **The gate PASSES on the basis it was set on.** A common word costs
+  **4,059,144 B, −3.0% under** T019's raw budget. The file arithmetic in the
+  T079 section above predicted −4.4%; the measured figure is 1.4 points worse
+  because that projection used a 102,195 B page-shell estimate and the shell is
+  now **465,387 B on first load** — the aggregate, the stylesheet and four more
+  modules.
+- **The two-session case is still over, at +34.6%**, against the +33.2%
+  projected. Within 1.4 points of the projection, and still the **accepted
+  overrun** recorded under T079 — no new decision is taken here.
+- **A visitor who never searches pays 465,387 B**, −88.9% of the budget. The
+  search index is **not requested on page load** — asserted in the page's own
+  `boot()` and confirmed in the log above, where the first `/search/` request
+  appears only in the search phase.
+- **No split of the index is triggered.** The T079 decision said to revisit the
+  one-file index "only if T083's real network measurement breaks the T019
+  budget". It does not.
+
+## What this still does not establish
+
+**Neither gzip column is the real compressed figure, and no run of this tool can
+produce one.** `tools/measure_first_load.py` asserts, from the recorded response
+headers rather than by assumption, that **`Content-Encoding` was absent on every
+response** — `make serve-local` compresses nothing, so every raw figure above is
+genuinely raw. The real compressed number is readable only from the **live
+site's response headers** (`Content-Encoding`, `Content-Length`) once Pages is
+serving the `published` branch. GitHub Pages does not publish which encoder or
+level it uses, and Brotli — which most hosts prefer for text — would be smaller
+than `gzip -6`. Until that reading exists, the encoder, the level and whether a
+given file is compressed at all are assumptions.
+
+**And this is one machine, one browser, over loopback.** It measures what the
+page requests and how large those responses are. It does not measure latency,
+and it is not a measurement of GitHub Pages.
