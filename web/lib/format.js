@@ -130,6 +130,21 @@ export function orderSessions(sessionIds, { direction = "asc" } = {}) {
   return [...parsed, ...unparseable.map((id) => ({ sessionId: id, term: null, number: null }))];
 }
 
+/**
+ * The digest file name for a session id: `lok-sabha/17/4` ->
+ * `lok-sabha-17-4.jsonl`. Mirrors `session_file_name` in
+ * `src/sansad/publish/search_digest.py`.
+ *
+ * It lives here, beside `parseSessionId`, rather than in `lib/search.js`,
+ * because `lib/fetch.js` needs it to build a URL and the transport layer must
+ * not depend on the search logic to know a filename.
+ */
+export function digestFileName(sessionId) {
+  const parsed = parseSessionId(sessionId);
+  if (!parsed) throw new TypeError(`not a session id: ${String(sessionId)}`);
+  return `${parsed.house}-${parsed.term}-${parsed.number}.jsonl`;
+}
+
 /** `17th LS · Session 4` */
 export function sessionLabel(session) {
   if (!session || session.term === null || session.term === undefined) {

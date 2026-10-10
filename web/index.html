@@ -54,7 +54,8 @@
   </section>
 
   <!-- ===================================================================
-       T078 — ministry profile. NOT IMPLEMENTED IN THIS PART.
+       T078 — ministry profile. Rendered from
+       aggregates/ministry-profile.jsonl, fetched on load.
        =================================================================== -->
   <section class="section" id="ministry-profile" aria-labelledby="profile-h">
     <div class="section-head">
@@ -68,10 +69,11 @@
   </section>
 
   <!-- ===================================================================
-       T079 — subject search. NOT IMPLEMENTED IN THIS PART.
-       The search index is NOT fetched here. loadSearchIndex() exists in the
-       fetch layer and is called by nothing on this page yet, which is what
-       keeps a visitor who never searches from paying its 2.37 MiB.
+       T079 — subject search.
+       The index and search/asker-names.jsonl are fetched on the FIRST SEARCH
+       ONLY, and one per-session digest at a time after that. Nothing
+       search-related is requested on page load: boot() asserts that before
+       it renders anything.
        =================================================================== -->
   <section class="section" id="subject-search" aria-labelledby="search-h">
     <div class="section-head">
@@ -79,28 +81,16 @@
       <p class="lede">Prior occurrences of a subject, with dates, ministries and asking
         members.</p>
     </div>
-    <div class="card not-built" data-task="T079">
-      <p class="not-built-tag">Not built yet</p>
-      <p>This region is deliberately empty, and it is empty because a
-        <strong>measurement gate failed</strong> — not because the work was skipped.
-        The subject-search view is task <strong>T079</strong>.</p>
-      <p class="not-built-note">A search result needs the question record, and the
-        smallest published file containing one is a whole session partition. Measured
-        against the real data: showing the first 25 results for a common word costs the
-        index plus one session partition — <strong>4,348,529 bytes, 3.9% over</strong>
-        the first-load budget — and a two-word query that spans two sessions costs
-        <strong>7,236,751 bytes, 73% over</strong>. Shipping it would quietly cut the
-        sustainable audience, so it was stopped and referred to the owner rather than
-        shipped.</p>
-      <p class="not-built-note">The index itself is fine, and <strong>has not been
-        requested</strong>: it is published as one file
-        (<code>search/subject-index.json</code>, 2.37 MiB) fetched on the first search
-        only, so a visitor who never searches never downloads it.</p>
+    <div class="card" id="search-form-host">
+      <p class="status" role="status">Preparing the search box…</p>
     </div>
+    <div id="search-result" data-state="empty"></div>
   </section>
 
   <!-- ===================================================================
-       T080 — two-ministry comparison. NOT IMPLEMENTED IN THIS PART.
+       T080 — two-ministry comparison, over the same aggregate as T078.
+       Nothing is pre-selected: a pair the page picked would read as a
+       comparison someone had asked for.
        =================================================================== -->
   <section class="section" id="compare" aria-labelledby="compare-h">
     <div class="section-head">

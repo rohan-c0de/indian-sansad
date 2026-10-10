@@ -22,11 +22,16 @@ import {
   PublishedFileUnavailable,
   assertSameOrigin,
   fetchNdjson,
+  digestRelativePath,
+  loadAskerNames,
+  loadSearchDigest,
   loadSearchIndex,
   publishedPath,
   requestUrl,
   requestableUrls,
+  requestedDigests,
   resetSearchIndex,
+  searchAssetsRequested,
   searchIndexRequested,
 } from "../../web/lib/fetch.js";
 
@@ -152,8 +157,15 @@ test("every requestable URL is relative and under the published base", () => {
   assert.deepEqual(new Set(Object.keys(PUBLISHED_FILES)), new Set([
     "manifest", "coverage", "countingBasis", "sessions",
     "ministryProfile", "ministries",   // T078 / T080
-    "searchIndex",                     // T079, lazy -- and currently gated
+    "searchIndex", "askerNames",       // T079, both lazy
   ]));
+  // The 21 per-session digests are a PATTERN, not 21 entries: which ones a
+  // search fetches depends on which sessions contain a match, and most
+  // searches fetch one. The pattern still has to be published-relative, which
+  // the loop above asserts over it along with everything else.
+  const pattern = urls.filter((url) => url.includes("<session>"));
+  assert.equal(pattern.length, 1, "the digest pattern is listed exactly once");
+  assert.equal(pattern[0], "./data/published/search/digest/<house>-<term>-<session>.jsonl");
 });
 
 /* ---------------------------------------------------------------------- */
@@ -206,5 +218,72 @@ test("a failed index load does not poison later attempts", async () => {
   const working = recordingFetch('{"terms":["x"],"postings":[[0]]}');
   const index = await loadSearchIndex(opts(working));
   assert.deepEqual(index.terms, ["x"]);
+  resetSearchIndex();
+});
+
+test("the asker-name lookup is lazy too, and fetched once", async () => {
+  resetSearchIndex();
+  const impl = recordingFetch('{"member_id":"ls-1","canonical_name":"A"}\n');
+  const rows = await loadAskerNames(opts(impl));
+  await loadAskerNames(opts(impl));
+  assert.equal(impl.calls.length, 1);
+  assert.deepEqual(rows, [{ member_id: "ls-1", canonical_name: "A" }]);
+  assert.equal(
+    impl.calls[0].url,
+    "https://rohan-c0de.github.io/indian-sansad/data/published/search/asker-names.jsonl",
+  );
+  resetSearchIndex();
+});
+
+test("a session digest resolves to its published path and is fetched ONCE", async () => {
+  resetSearchIndex();
+  assert.equal(digestRelativePath("lok-sabha/17/4"), "search/digest/lok-sabha-17-4.jsonl");
+
+  const impl = recordingFetch('{"question_id":"lok-sabha/17/4/starred/1"}\n');
+  await loadSearchDigest("lok-sabha/17/4", opts(impl));
+  // Page 2 of the same search must not refetch a session page 1 already read.
+  await loadSearchDigest("lok-sabha/17/4", opts(impl));
+  assert.equal(impl.calls.length, 1, "the digest was fetched more than once");
+  assert.equal(
+    impl.calls[0].url,
+    "https://rohan-c0de.github.io/indian-sansad/data/published/search/digest/lok-sabha-17-4.jsonl",
+  );
+  // A DIFFERENT session is a different file, and is fetched.
+  await loadSearchDigest("lok-sabha/18/8", opts(impl));
+  assert.equal(impl.calls.length, 2);
+  assert.deepEqual(requestedDigests(), ["lok-sabha/17/4", "lok-sabha/18/8"]);
+  resetSearchIndex();
+});
+
+test("a failed digest load does not poison that session for a retry", async () => {
+  resetSearchIndex();
+  const failing = recordingFetch("", { status: 503 });
+  await assert.rejects(
+    () => loadSearchDigest("lok-sabha/18/8", opts(failing)),
+    PublishedFileUnavailable,
+  );
+  assert.deepEqual(requestedDigests(), [], "the failure was memoised");
+  const working = recordingFetch('{"question_id":"lok-sabha/18/8/starred/1"}\n');
+  const rows = await loadSearchDigest("lok-sabha/18/8", opts(working));
+  assert.equal(rows.length, 1);
+  resetSearchIndex();
+});
+
+test("NO search file is requested until a search happens — the boot assertion", async () => {
+  // `boot()` throws if this is true at load time, which is what keeps a
+  // visitor who never searches from paying for 2.37 MiB plus a digest. The
+  // narrower searchIndexRequested() would pass while a digest was in flight.
+  resetSearchIndex();
+  assert.equal(searchAssetsRequested(), false);
+
+  const impl = recordingFetch('{"question_id":"x"}\n');
+  await loadSearchDigest("lok-sabha/18/8", opts(impl));
+  assert.equal(searchIndexRequested(), false, "the index itself was still not fetched");
+  assert.equal(searchAssetsRequested(), true, "but a search file was");
+
+  resetSearchIndex();
+  assert.equal(searchAssetsRequested(), false);
+  await loadAskerNames(opts(impl));
+  assert.equal(searchAssetsRequested(), true);
   resetSearchIndex();
 });

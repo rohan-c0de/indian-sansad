@@ -55,10 +55,9 @@ def published(tmp_path, members, question_records):
     **partly** resolved, `ambiguous` gives an ambiguous one, and
     `shared_ques_no` gives both question types.
     """
-    from sansad.views.ministry_profile import ministry_profiles
-
     from sansad.publish.partitions import write_partitions
     from sansad.resolve import resolve_questions
+    from sansad.views.ministry_profile import ministry_profiles
 
     records = []
     for name in ("co_asked.json", "unresolvable.json", "ambiguous.json", "shared_ques_no.json"):
@@ -159,9 +158,8 @@ def test_the_status_counts_sum_to_the_question_count_for_every_row(published):
     one ever appears. Asserting the SUM rather than the three names is what
     makes the invariant survive a fourth bucket.
     """
-    from sansad.views.ministry_profile import STATUS_COUNT_FIELDS
-
     from sansad.publish.aggregates import AGGREGATES_DIR_NAME, MINISTRY_PROFILE_STEM
+    from sansad.views.ministry_profile import STATUS_COUNT_FIELDS
 
     rows = _rows(published / AGGREGATES_DIR_NAME / f"{MINISTRY_PROFILE_STEM}.jsonl")
     assert rows

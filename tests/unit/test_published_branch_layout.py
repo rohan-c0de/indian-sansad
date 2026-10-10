@@ -8,9 +8,10 @@ The workflow previously copied `data/published/.` to the **root** and **nothing
 from `web/`**. Under that layout the coverage statement sat at
 `/coverage.jsonl`, every `/data/...` path T076 fetches would have 404'd, and
 there would have been no page at `/` to fetch them. It was found by review
-(`specs/001-resolved-metadata-layer/mockup/README.md`) and never observed,
-because the workflow has never run -- T058 is ticked "written, statically
-checked, NOT yet run on GitHub".
+(`specs/001-resolved-metadata-layer/mockup/README.md`) and never observed: the
+workflow has now run once on GitHub (run #1, 2026-10-10) but **failed before
+the publish step**, on `make verify-joins` calling a `.venv` that does not
+exist on a runner, so the publish step has still never executed in CI.
 
 **These tests execute the workflow's own shell.** The copy block between
 `# BEGIN LAYOUT` and `# END LAYOUT` is extracted from the YAML and run against
@@ -19,12 +20,15 @@ reimplemented the copy would assert the reimplementation, pass forever, and
 tell us nothing about the file that actually runs on the runner.
 
 **What these tests do not establish.** Nothing here runs on a GitHub runner, so
-every step around the block -- the orphan worktree, the force-push, Pages
-serving the branch -- is still UNVERIFIED. They also run under the local
-`/bin/bash` and BSD `cp`; the runner is `ubuntu-latest` with GNU coreutils. The
-block is written to avoid the one construct where the two are known to differ
-(`cp -R` into or out of an empty or missing directory) by testing for the
-directory and its contents first, rather than relying on `cp`'s behaviour.
+Pages serving the branch is still UNVERIFIED. The steps *around* the block --
+the orphan worktree, the staging assertion and the force-push -- were proved on
+2026-10-10 against a local bare repository standing in for `origin`
+(`specs/001-resolved-metadata-layer/spike/publish-rehearsal.md`), which is not
+the runner either. These tests also run under the local `/bin/bash` and BSD
+`cp`, where the runner is `ubuntu-24.04` with GNU coreutils; the block is
+written to avoid the one construct where the two are known to differ (`cp -R`
+into or out of an empty or missing directory) by testing for the directory and
+its contents first, rather than relying on `cp`'s behaviour.
 """
 
 from __future__ import annotations

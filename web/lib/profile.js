@@ -33,6 +33,45 @@ export const STATUS_FIELDS = Object.freeze([
   { key: "ambiguous", label: "Ambiguous", flagged: true },
 ]);
 
+/** The three keys whose label the page must show with a visible flag. Derived
+ * from STATUS_FIELDS so the two cannot disagree. */
+export const FLAGGED_STATUS_KEYS = Object.freeze(
+  STATUS_FIELDS.filter((f) => f.flagged).map((f) => f.key),
+);
+
+/** One status key's label and whether it is flagged, or null for an unknown
+ * key. The page renders status as TEXT from this and never retypes a label:
+ * T079's result cards and T078's status strip say the same words because they
+ * read the same list. */
+export function statusField(key) {
+  return STATUS_FIELDS.find((f) => f.key === key) ?? null;
+}
+
+/**
+ * Which status bucket ONE question falls in, from the two fields the search
+ * digest publishes: `resolution_status` and `asking_members`.
+ *
+ * The mirror of `_bucket` in `src/sansad/views/ministry_profile.py`, and the
+ * ORDER IS THE SAME ORDER for the same reason: `ambiguous` is tested before
+ * the asker check, because an ambiguous question deliberately publishes no
+ * `asking_members` and would otherwise be counted as "nobody was identified".
+ * `tests/page/search.test.mjs` asserts this against golden cases the Python
+ * side wrote, so the two cannot drift apart silently.
+ *
+ * Returns null for a record carrying no status at all, so the page shows
+ * "not stated" rather than guessing a bucket.
+ */
+export function questionBucket(record) {
+  const status = record?.resolution_status;
+  if (typeof status !== "string" || status.length === 0) return null;
+  if (status === "resolved") return "fully_linked";
+  if (status === "ambiguous") return "ambiguous";
+  if (Array.isArray(record.asking_members) && record.asking_members.length > 0) {
+    return "partly_linked";
+  }
+  return "not_linked";
+}
+
 export class StatusSumMismatch extends Error {
   constructor(message) {
     super(message);
