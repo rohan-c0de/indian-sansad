@@ -407,12 +407,165 @@ test-page:
 	 echo ""; \
 	 "$(VENV_PY)" tools/measure_first_load.py "$$report"
 
+# --------------------------------------------------------------------------
+# validate -- T091. quickstart.md scenarios 1-12 plus the full test suite.
+#
+# THIS IS THE GATE. "Passing `make validate` means every functional
+# requirement with an automatable criterion is met."
+#
+# Four design points, each of which is the difference between a gate and a
+# green light:
+#
+# 1. **It refuses on an unbuilt dataset.** Scenarios 4-8 and 10-12 are checks
+#    on the PUBLISHED record. Run against an absent `data/published/`, the
+#    tools that skip would report NOT PRESENT and the suite would report a
+#    pass -- which is the one wrong signal this target must never send. So the
+#    manifest is required up front, and `audit-fields` is called with
+#    `--require-present` rather than bare.
+#
+# 2. **It runs every check even after one fails**, and prints the captured
+#    output of each failure at the end. Stopping at the first failure hides
+#    the rest until the next run, and a failure whose output was not captured
+#    is a data point destroyed.
+#
+# 3. **It calls the same entry points quickstart.md tells a reader to type**
+#    -- `$(MAKE) verify-joins`, not the tool behind it. A gate that reached
+#    the answer by another route would not be checking the route a maintainer
+#    has.
+#
+# 4. **It says what it does not cover, on success.** SC-003, SC-004, SC-005
+#    and SC-009 are observable only in operation. A green run is not evidence
+#    for any of them, and the place that claim is most likely to be made is
+#    immediately after a green run.
+#
+# Scenario 12 runs `serve-local-mapping` (the URL-to-file mapping, which binds
+# no port) and `test-page` (which starts its own host on an ephemeral port).
+# `make serve-local` itself is NOT called: it blocks by design, and a target
+# that waits forever is not a check.
+#
+# The scenario arguments are variables rather than literals so that a value
+# which stops existing in the dataset is changed in ONE place. They are not
+# arbitrary: each is present in the dataset built on 2026-10-10, and
+# `Aurangabad` is specifically the name that denotes a different seat in two
+# states, so scenario 7's two-state case is the one exercised.
+# --------------------------------------------------------------------------
+VALIDATE_HOUSE ?= lok-sabha/18
+VALIDATE_SESSION ?= 5
+VALIDATE_MINISTRY ?= JAL SHAKTI
+VALIDATE_SESSIONS ?= 5-8
+VALIDATE_MEMBER ?= ls-129
+VALIDATE_STATE ?= Maharashtra
+VALIDATE_CONSTITUENCY ?= Aurangabad
+VALIDATE_LS_TERM ?= 18
+
 validate:
-	@set -eu -o pipefail; \
-	 echo "make validate: NOT IMPLEMENTED YET."; \
-	 echo "  will: run scenarios 1-12 plus the full test suite. It does NOT cover SC-003, SC-004, SC-005 or SC-009 -- those are only observable in operation"; \
-	 echo "  quickstart.md: all scenarios"; \
-	 echo "  implemented by: T091"; \
-	 echo "  Failing deliberately (T035): a stub that exited 0 would let"; \
-	 echo "  'make validate' report success on work that has not been done."; \
-	 exit 1
+	@set -u -o pipefail; \
+	 if [[ ! -x "$(VENV_PY)" ]]; then \
+	   echo "make validate: no environment at $(VENV). Run 'make setup' first."; \
+	   exit 1; \
+	 fi; \
+	 if [[ ! -f "$(REPO_ROOT)/data/published/manifest.json" ]]; then \
+	   echo "make validate: REFUSED -- data/published/ is not built."; \
+	   echo "  Scenarios 4-8 and 10-12 are checks on the published record. Against"; \
+	   echo "  an absent dataset they would report NOT PRESENT, and this target"; \
+	   echo "  would report a pass on work that has not been done."; \
+	   echo "  Run 'make refresh' first."; \
+	   exit 1; \
+	 fi; \
+	 work="$$(mktemp -d)"; \
+	 trap 'rm -rf "$$work"' EXIT; \
+	 : >"$$work/failures"; \
+	 n=0; \
+	 step() { \
+	   local label="$$1"; shift; \
+	   n=$$((n+1)); \
+	   local out="$$work/$$n.log"; \
+	   if "$$@" >"$$out" 2>&1; then \
+	     printf '  [PASS] %s\n' "$$label"; \
+	   else \
+	     printf '  [FAIL] %s\n' "$$label"; \
+	     printf '%s\t%s\n' "$$label" "$$out" >>"$$work/failures"; \
+	   fi; \
+	 }; \
+	 echo "make validate: quickstart.md scenarios 1-12, then the full test suite."; \
+	 echo ""; \
+	 echo "Scenarios 1-3 -- identity resolution (US1; FR-002, FR-003, FR-004)"; \
+	 step "1  one member_id across both recorded name forms" \
+	   "$(VENV_PY)" -m pytest tests/resolution -k variants -q; \
+	 step "2  nothing silently dropped; the count is identical either side" \
+	   "$(VENV_PY)" -m pytest tests/resolution -k unresolved -q; \
+	 step "3  a co-asked question is ONE record carrying every asker" \
+	   "$(VENV_PY)" -m pytest tests/resolution -k co_asked -q; \
+	 echo ""; \
+	 echo "Scenario 4 -- joins are independently verifiable (FR-005)"; \
+	 step "4  every published join has a resolution record" \
+	   $(MAKE) --no-print-directory verify-joins; \
+	 echo ""; \
+	 echo "Scenario 5 -- subsets on every axis FR-007 names (FR-007, guarantee 6)"; \
+	 step "5a session -- one partition file" \
+	   $(MAKE) --no-print-directory extract HOUSE="$(VALIDATE_HOUSE)" SESSION="$(VALIDATE_SESSION)"; \
+	 step "5b ministry -- one partition file" \
+	   $(MAKE) --no-print-directory extract MINISTRY="$(VALIDATE_MINISTRY)"; \
+	 step "5c member -- one partition file" \
+	   $(MAKE) --no-print-directory extract MEMBER="$(VALIDATE_MEMBER)"; \
+	 step "5d state -- reference set plus the matching members' files only" \
+	   $(MAKE) --no-print-directory extract STATE="$(VALIDATE_STATE)"; \
+	 step "5e constituency -- reference set plus the matching members' files only" \
+	   $(MAKE) --no-print-directory extract CONSTITUENCY="$(VALIDATE_CONSTITUENCY)"; \
+	 echo ""; \
+	 echo "Scenario 6 -- counts reproducible, basis stated (US2; FR-012, SC-007)"; \
+	 step "6  the published aggregate recounted off by-session/" \
+	   $(MAKE) --no-print-directory report MINISTRY="$(VALIDATE_MINISTRY)" SESSIONS="$(VALIDATE_SESSIONS)"; \
+	 echo ""; \
+	 echo "Scenario 7 -- the constituency entry point (US3, SC-008)"; \
+	 step "7  a seat name in two states lists both, holders not merged" \
+	   $(MAKE) --no-print-directory lookup CONSTITUENCY="$(VALIDATE_CONSTITUENCY)"; \
+	 echo ""; \
+	 echo "Scenario 8 -- composition totals reconcile (US4)"; \
+	 step "8  every dimension sums to the term's total membership" \
+	   $(MAKE) --no-print-directory composition LS_TERM="$(VALIDATE_LS_TERM)"; \
+	 echo ""; \
+	 echo "Scenario 9 -- degrade quietly, alert the maintainer (FR-010, FR-011, SC-006)"; \
+	 step "9  unavailable, shape-changed and truncated upstream in turn" \
+	   "$(VENV_PY)" -m pytest tests/resilience -q; \
+	 echo ""; \
+	 echo "Scenario 10 -- field scope is bounded (FR-008, SC-010, Principle V)"; \
+	 step "10 all three scopes present and clean" \
+	   "$(VENV_PY)" tools/guard_no_raw_payloads.py "$(REPO_ROOT)" --audit-fields --require-present; \
+	 echo ""; \
+	 echo "Scenario 11 -- coverage honesty (FR-013)"; \
+	 step "11 a statement per House, Lok Sabha only while RS is absent" \
+	   $(MAKE) --no-print-directory coverage; \
+	 echo ""; \
+	 echo "Scenario 12 -- the page runs over the published files, upstream blocked"; \
+	 step "12a the URL-to-file mapping is the published-branch layout" \
+	   $(MAKE) --no-print-directory serve-local-mapping; \
+	 step "12b the real page in a real browser, every hostname but loopback unresolvable" \
+	   $(MAKE) --no-print-directory test-page; \
+	 echo ""; \
+	 echo "The full test suite"; \
+	 step "every test in tests/" "$(VENV_PY)" -m pytest -q; \
+	 echo ""; \
+	 if [[ -s "$$work/failures" ]]; then \
+	   count="$$(wc -l <"$$work/failures" | tr -d ' ')"; \
+	   echo "make validate: FAIL -- $$count of $$n check(s) failed."; \
+	   while IFS="$$(printf '\t')" read -r label out; do \
+	     echo ""; \
+	     echo "=== $$label ==="; \
+	     tail -40 "$$out"; \
+	   done <"$$work/failures"; \
+	   exit 1; \
+	 fi; \
+	 echo "make validate: PASS -- $$n check(s): quickstart.md scenarios 1-12 and the full test suite."; \
+	 echo ""; \
+	 echo "What a green run here does NOT cover (quickstart.md -> Full gate):"; \
+	 echo "  SC-003  newly published material picked up with no manual step"; \
+	 echo "          -- needs a SCHEDULED run nobody started"; \
+	 echo "  SC-004  upkeep within about 2 hours a week"; \
+	 echo "          -- needs weeks of operation to measure"; \
+	 echo "  SC-005  running cost stays at zero per month"; \
+	 echo "          -- needs a billing period to elapse"; \
+	 echo "  SC-009  the published record is used by someone other than the maintainer"; \
+	 echo "          -- needs another person"; \
+	 echo "  All four are observable only in operation. This run is not evidence"; \
+	 echo "  for any of them, and it does not become evidence by being green."
