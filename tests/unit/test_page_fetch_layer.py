@@ -33,6 +33,8 @@ PAGE_FILES = (
     "lib/fetch.js",
     "lib/format.js",
     "lib/coverage.js",
+    "lib/profile.js",
+    "lib/chart.js",
 )
 
 
@@ -85,13 +87,35 @@ def _code_lines(path: Path) -> list[tuple[int, str]]:
     return out
 
 
+#: The ONE exempt string, exempt for a reason that can itself be checked: it
+#: is an XML namespace IDENTIFIER required by `document.createElementNS`, not
+#: a URL. Browsers never dereference it, so there is no request. Exempted as
+#: an exact string rather than as a host, so anything else on w3.org is still
+#: a finding.
+SVG_NAMESPACE = "http://www.w3.org/2000/svg"
+
+
 @pytest.mark.parametrize("name", PAGE_FILES)
 def test_no_page_file_names_another_host(name: str) -> None:
     """No CDN, no web font, no analytics, no beacon — in code, not just intent."""
-    offenders = [
-        (number, line.strip()) for number, line in _code_lines(WEB / name) if _OFF_HOST.search(line)
-    ]
+    offenders = []
+    for number, line in _code_lines(WEB / name):
+        for match in _OFF_HOST.finditer(line):
+            if SVG_NAMESPACE in line and match.group(0) in SVG_NAMESPACE:
+                continue
+            offenders.append((number, line.strip()))
     assert offenders == [], f"{name} names an outside host: {offenders}"
+
+
+def test_the_svg_namespace_is_used_only_as_a_namespace() -> None:
+    """Keeps the exemption above honest: that string may appear only as the
+    argument to createElementNS, never in a fetch, an href or a src."""
+    chart = (WEB / "lib" / "chart.js").read_text(encoding="utf-8")
+    assert chart.count(SVG_NAMESPACE) == 1
+    assert f'const NS = "{SVG_NAMESPACE}"' in chart
+    assert "createElementNS(NS" in chart
+    for forbidden in ("fetch(NS", "src = NS", "href = NS"):
+        assert forbidden not in chart
 
 
 @pytest.mark.parametrize("name", PAGE_FILES)
@@ -121,13 +145,22 @@ def test_the_shell_loads_the_module_and_the_stylesheet_relatively() -> None:
     assert '<html lang="en">' in html
 
 
-def test_the_unbuilt_regions_are_marked_on_screen_not_just_absent() -> None:
-    """T078, T079 and T080 are out of scope here. A blank region reads as a
-    bug; a region that says what it is does not."""
+def test_the_only_unbuilt_region_is_the_one_a_gate_stopped() -> None:
+    """T078 and T080 are built. T079 is NOT, and that is a measurement result
+    rather than unfinished work: showing the first 25 results for a common word
+    costs 4,348,529 B against T019's 4,183,979 B budget, and a two-word query
+    costs 7,236,751 B. The region has to say so on screen, because a blank
+    region reads as a bug and a missing one reads as a feature nobody wanted.
+    """
     html = (WEB / "index.html").read_text(encoding="utf-8")
-    for task in ("T078", "T079", "T080"):
-        assert f'data-task="{task}"' in html, f"{task}'s region is not marked"
-    assert html.count("Not built yet") == 3
+    assert 'data-task="T079"' in html, "T079's region is not marked"
+    for built in ("T078", "T080"):
+        assert f'data-task="{built}"' not in html, f"{built} is built; its region should be gone"
+    assert html.count("Not built yet") == 1
+    assert "measurement gate failed" in html
+    # The real containers the built views render into.
+    for node_id in ("profile-picker", "profile-result", "compare-picker", "compare-result"):
+        assert f'id="{node_id}"' in html, f"{node_id} is missing"
 
 
 #: Every field the page reads out of manifest.json or coverage.jsonl. A value

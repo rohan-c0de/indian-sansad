@@ -54,14 +54,10 @@
       <h2 id="profile-h">Ministry profile</h2>
       <p class="lede">Question load for one ministry across a span of sessions.</p>
     </div>
-    <div class="card not-built" data-task="T078">
-      <p class="not-built-tag">Not built yet</p>
-      <p>This region is deliberately empty. The ministry profile view is task
-        <strong>T078</strong>, which is not part of this change. The data it will read
-        is already published — <code>aggregates/ministry-profile.jsonl</code>, 1,146
-        rows — and the counting basis it must show beside every figure is published
-        alongside it.</p>
+    <div class="card" id="profile-picker">
+      <p class="status" role="status">Reading the ministry profile…</p>
     </div>
+    <div id="profile-result" data-state="loading"></div>
   </section>
 
   <!-- ===================================================================
@@ -78,16 +74,21 @@
     </div>
     <div class="card not-built" data-task="T079">
       <p class="not-built-tag">Not built yet</p>
-      <p>This region is deliberately empty. The subject-search view is task
-        <strong>T079</strong>. Its index is published as a single file
-        (<code>search/subject-index.json</code>, 2.37 MiB) and
-        <strong>has not been requested</strong> — it is fetched on the first search
+      <p>This region is deliberately empty, and it is empty because a
+        <strong>measurement gate failed</strong> — not because the work was skipped.
+        The subject-search view is task <strong>T079</strong>.</p>
+      <p class="not-built-note">A search result needs the question record, and the
+        smallest published file containing one is a whole session partition. Measured
+        against the real data: showing the first 25 results for a common word costs the
+        index plus one session partition — <strong>4,348,529 bytes, 3.9% over</strong>
+        the first-load budget — and a two-word query that spans two sessions costs
+        <strong>7,236,751 bytes, 73% over</strong>. Shipping it would quietly cut the
+        sustainable audience, so it was stopped and referred to the owner rather than
+        shipped.</p>
+      <p class="not-built-note">The index itself is fine, and <strong>has not been
+        requested</strong>: it is published as one file
+        (<code>search/subject-index.json</code>, 2.37 MiB) fetched on the first search
         only, so a visitor who never searches never downloads it.</p>
-      <p class="not-built-note">When it is built, results will be ordered newest
-        session first — by term then session number, descending — then by newest
-        question date, then by question number. Every query word must match. No
-        result is scored or graded, because the index publishes nothing to grade
-        with.</p>
     </div>
   </section>
 
@@ -99,11 +100,10 @@
       <h2 id="compare-h">Compare two ministries</h2>
       <p class="lede">The same sessions and the same counting basis for both.</p>
     </div>
-    <div class="card not-built" data-task="T080">
-      <p class="not-built-tag">Not built yet</p>
-      <p>This region is deliberately empty. Two-ministry comparison is task
-        <strong>T080</strong>.</p>
+    <div class="card" id="compare-picker">
+      <p class="status" role="status">Reading the ministry profile…</p>
     </div>
+    <div id="compare-result" data-state="loading"></div>
   </section>
 
 </main>

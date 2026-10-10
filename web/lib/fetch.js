@@ -173,6 +173,11 @@ export const PUBLISHED_FILES = Object.freeze({
   coverage: "coverage.jsonl",
   countingBasis: "aggregates/counting-basis.jsonl",
   sessions: "reference/sessions.jsonl",
+  // T078/T080. Precomputed, because research.md records that fetching ~10^5
+  // question records into a page is not viable: 284,685 B of aggregate
+  // replaces the 842,496 B one-by-ministry file T019 budgeted for.
+  ministryProfile: "aggregates/ministry-profile.jsonl",
+  ministries: "reference/ministries.jsonl",
   searchIndex: "search/subject-index.json",
 });
 
@@ -186,6 +191,8 @@ export const fetchManifest = (o) => fetchJson(PUBLISHED_FILES.manifest, o);
 export const fetchCoverage = (o) => fetchNdjson(PUBLISHED_FILES.coverage, o);
 export const fetchCountingBasis = (o) => fetchNdjson(PUBLISHED_FILES.countingBasis, o);
 export const fetchSessions = (o) => fetchNdjson(PUBLISHED_FILES.sessions, o);
+export const fetchMinistryProfile = (o) => fetchNdjson(PUBLISHED_FILES.ministryProfile, o);
+export const fetchMinistries = (o) => fetchNdjson(PUBLISHED_FILES.ministries, o);
 
 /* ------------------------------------------------------------------------ */
 /* The search index, fetched LAZILY -- on the first search only.            */

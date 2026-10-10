@@ -16,14 +16,28 @@
  * executing it.
  */
 
+import { legend, stackedColumns } from "./lib/chart.js";
 import {
   CrossOriginRefused,
   fetchCountingBasis,
   fetchCoverage,
   fetchManifest,
+  fetchMinistries,
+  fetchMinistryProfile,
   fetchSessions,
   searchIndexRequested,
 } from "./lib/fetch.js";
+import {
+  STATUS_FIELDS,
+  basisFor,
+  compare,
+  profileMinistries,
+  profileSessions,
+  selectSpan,
+  share,
+  spanChange,
+  spanTotals,
+} from "./lib/profile.js";
 import {
   coveredRows,
   housesClaim,
@@ -476,6 +490,8 @@ export async function boot(doc = document) {
     );
   }
 
+  if (basis.status === "fulfilled") views.basis = basis.value;
+
   if (manifest.status === "fulfilled") {
     renderLicence(licenceBody, manifest.value);
   } else {
@@ -485,6 +501,8 @@ export async function boot(doc = document) {
       describe(manifest.reason),
     );
   }
+
+  await bootViews(doc);
 }
 
 function describe(error) {
@@ -503,4 +521,538 @@ if (typeof document !== "undefined") {
   } else {
     boot();
   }
+}
+
+/* ====================================================================== */
+/* T078 — ministry profile, and T080 — two-ministry comparison            */
+/* ====================================================================== */
+
+/** Everything the two views read. Fetched once, shared. */
+const views = {
+  rows: [],
+  ministries: [],
+  sessions: [],
+  basis: [],
+  ready: false,
+};
+
+function option(value, label, selected) {
+  const node = el("option", null, label);
+  node.value = value;
+  if (selected) node.selected = true;
+  return node;
+}
+
+function labelledSelect(id, labelText, options, selectedValue) {
+  const wrap = el("label", "field");
+  wrap.htmlFor = id;
+  wrap.append(el("span", "field-label", labelText));
+  const select = el("select");
+  select.id = id;
+  select.name = id;
+  for (const [value, text] of options) {
+    select.append(option(value, text, value === selectedValue));
+  }
+  wrap.append(select);
+  return { wrap, select };
+}
+
+/** The counting basis, read from the published file and rendered beside the
+ * figures. Never retyped: `basisFor` looks it up by the unit the rows name. */
+function basisBlock(span, { head = "How these figures were counted" } = {}) {
+  const record = basisFor(span, views.basis);
+  const box = el("div", "basis");
+  box.append(el("p", "basis-head", head));
+  if (!record) {
+    box.append(
+      el("p", "basis-text", "The counting basis could not be read from the published files."),
+    );
+    return box;
+  }
+  box.append(el("p", "basis-text", record.counting_basis));
+  box.append(
+    el(
+      "p",
+      "basis-src",
+      `Read from aggregates/counting-basis.jsonl, unit "${record.unit}", ` +
+        `basis version ${stated(record.basis_version)}.`,
+    ),
+  );
+  return box;
+}
+
+function changeText(c) {
+  if (!c) return NOT_STATED;
+  const sign = c.absolute > 0 ? "+" : "";
+  const abs = `${sign}${count(c.absolute)}`;
+  if (c.percent === null) {
+    // A percent change from zero is undefined, not infinite and not 100%.
+    return `${abs} (no percentage: the first session was zero)`;
+  }
+  const pSign = c.percent > 0 ? "+" : "";
+  return `${abs} (${pSign}${c.percent.toFixed(1)}%)`;
+}
+
+function statusStrip(totals, { heading }) {
+  const box = el("div", "status-strip");
+  box.append(el("p", "strip-head", heading));
+  const ul = el("ul", "status-list");
+  for (const field of STATUS_FIELDS) {
+    const value = totals.status[field.key];
+    const li = el("li", field.flagged ? "status-item flagged" : "status-item");
+    if (field.flagged) {
+      // The flag is a WORD, not a colour. Removing every colour from this
+      // page leaves the meaning intact.
+      li.append(el("span", "flag-word", "flagged"));
+    }
+    li.append(el("span", "status-label", field.label));
+    li.append(el("span", "status-value", count(value)));
+    const pct = share(value, totals.questions);
+    li.append(el("span", "status-share", pct === null ? NOT_STATED : `${pct.toFixed(1)}%`));
+    ul.append(li);
+  }
+  box.append(ul);
+  box.append(
+    el(
+      "p",
+      "strip-note",
+      `These four account for all ${count(totals.questions)} questions — they are a ` +
+        "split of the same total, not a subset of it. A question whose asking members " +
+        "were not all identified is counted in every figure here and flagged, never " +
+        "filtered out.",
+    ),
+  );
+  return box;
+}
+
+function mixTable(span, types, totals) {
+  const section = el("section", "mix-block");
+  section.append(el("h4", null, "Question type mix, by session"));
+  section.append(
+    el(
+      "p",
+      "helper",
+      "ALL questions, whether or not the asking member was identified. The " +
+        "ministry and the question type are read off the question record, not " +
+        "off resolution — so this is not a resolved-only figure.",
+    ),
+  );
+
+  const wrap = el("div", "table-wrap");
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", "Questions per session by type, scrollable");
+  wrap.tabIndex = 0;
+  const table = el("table");
+  const caption = el("caption", "visually-hidden");
+  caption.textContent =
+    "Questions per session for the selected ministry, by question type and by how " +
+    "completely each question is linked to a member.";
+  table.append(caption);
+
+  const thead = el("thead");
+  const hrow = el("tr");
+  const headings = ["Session", "Questions", ...types];
+  for (const field of STATUS_FIELDS) headings.push(field.label);
+  for (const text of headings) {
+    const th = el("th", text === "Session" ? null : "num-col", text);
+    th.scope = "col";
+    hrow.append(th);
+  }
+  thead.append(hrow);
+  table.append(thead);
+
+  const tbody = el("tbody");
+  for (const entry of span) {
+    const tr = el("tr");
+    const th = el("th", null, longSessionLabel(entry.session));
+    th.scope = "row";
+    tr.append(th);
+    tr.append(el("td", "num-col", count(entry.questions)));
+    for (const type of types) tr.append(el("td", "num-col", count(entry.typeMix[type] ?? 0)));
+    for (const field of STATUS_FIELDS) {
+      tr.append(
+        el("td", field.flagged ? "num-col td-flag" : "num-col", count(entry.status[field.key])),
+      );
+    }
+    if (!entry.present) {
+      tr.classList.add("row-absent");
+      th.append(el("span", "row-absent-note", "no questions in the record"));
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+
+  const tfoot = el("tfoot");
+  const frow = el("tr");
+  const fth = el("th", null, "Total");
+  fth.scope = "row";
+  frow.append(fth);
+  frow.append(el("td", "num-col", count(totals.questions)));
+  for (const type of types) frow.append(el("td", "num-col", count(totals.typeMix[type] ?? 0)));
+  for (const field of STATUS_FIELDS) {
+    frow.append(
+      el("td", field.flagged ? "num-col td-flag" : "num-col", count(totals.status[field.key])),
+    );
+  }
+  tfoot.append(frow);
+  table.append(tfoot);
+
+  wrap.append(table);
+  section.append(wrap);
+  section.append(
+    el(
+      "p",
+      "footnote",
+      '"Partly linked": at least one asking member was identified and at least one was ' +
+        'not. "Not linked": none were. "Ambiguous": the name matched more than one ' +
+        "member and the page will not guess. All three are still counted as questions " +
+        "in every column to their left.",
+    ),
+  );
+  return section;
+}
+
+function renderProfileResult(container, { ministry, span }) {
+  const totals = spanTotals(span);
+  const delta = spanChange(span);
+  const types = [...new Set(span.flatMap((e) => Object.keys(e.typeMix)))].sort();
+
+  const frag = document.createDocumentFragment();
+
+  const head = el("div", "result-head");
+  head.append(el("h3", null, ministry.name));
+  head.append(
+    el(
+      "p",
+      "result-span",
+      `${longSessionLabel(span[0].session)} to ${longSessionLabel(span[span.length - 1].session)}` +
+        ` · ${count(span.length)} sessions · session dates are ${NOT_STATED}`,
+    ),
+  );
+  if (ministry.formerNames.length > 0) {
+    // Rename DATES are not published. Showing "(renamed 2021)" would be a
+    // claim the record does not support.
+    head.append(
+      el(
+        "p",
+        "former-names",
+        `Formerly: ${ministry.formerNames.join("; ")}. Questions under every name ` +
+          "above are counted together. The record does not publish when a rename " +
+          `happened, so no date is shown — it is ${NOT_STATED}.`,
+      ),
+    );
+  }
+  frag.append(head);
+
+  const stats = el("div", "fact-grid");
+  stats.append(
+    fact("Questions asked", count(totals.questions), `across ${count(span.length)} sessions`),
+  );
+  for (const type of types) {
+    const pct = share(totals.typeMix[type] ?? 0, totals.questions);
+    stats.append(
+      fact(
+        `${type.charAt(0)}${type.slice(1).toLowerCase()} share`,
+        pct === null ? NOT_STATED : `${pct.toFixed(1)}%`,
+        `${count(totals.typeMix[type] ?? 0)} of ${count(totals.questions)} questions`,
+      ),
+    );
+  }
+  stats.append(
+    fact(
+      "Not fully linked to a member",
+      count(totals.flagged),
+      "counted in every figure on this page, never filtered out",
+    ),
+  );
+  frag.append(stats);
+
+  /* How both changed across the span: first selected session vs last. */
+  const changeBox = el("section", "change-block");
+  changeBox.append(el("h4", null, "How this changed across the span"));
+  if (delta.singleSession) {
+    changeBox.append(
+      el("p", "helper", "One session is selected, so there is nothing to compare it with."),
+    );
+  } else {
+    changeBox.append(
+      el(
+        "p",
+        "helper",
+        `First selected session (${longSessionLabel(delta.firstSession)}) against last ` +
+          `(${longSessionLabel(delta.lastSession)}).`,
+      ),
+    );
+    const ul = el("ul", "change-list");
+    const q = el("li");
+    q.append(el("span", "change-label", "Questions"));
+    q.append(el("span", "change-value", changeText(delta.questions)));
+    q.append(
+      el("span", "change-from", `${count(delta.questions.first)} → ${count(delta.questions.last)}`),
+    );
+    ul.append(q);
+    for (const entry of delta.byType) {
+      const li = el("li");
+      li.append(el("span", "change-label", entry.type));
+      li.append(el("span", "change-value", changeText(entry.count)));
+      const sf = entry.shareFirst === null ? NOT_STATED : `${entry.shareFirst.toFixed(1)}%`;
+      const sl = entry.shareLast === null ? NOT_STATED : `${entry.shareLast.toFixed(1)}%`;
+      li.append(el("span", "change-from", `share ${sf} → ${sl}`));
+      ul.append(li);
+    }
+    changeBox.append(ul);
+  }
+  frag.append(changeBox);
+
+  frag.append(statusStrip(totals, { heading: "How completely each question is linked to a member" }));
+  frag.append(basisBlock(span));
+
+  if (types.length > 0 && totals.questions > 0) {
+    const chartBox = el("section", "chart-block");
+    chartBox.append(el("h4", null, "Questions per session, by type"));
+    chartBox.append(legend(types));
+    chartBox.append(
+      stackedColumns(
+        span.map((entry) => ({
+          label: `S${entry.session.number}`,
+          total: entry.questions,
+          parts: entry.typeMix,
+        })),
+        types,
+        {
+          title: `Questions per session for ${ministry.name}, by question type`,
+          description:
+            "A stacked column per session. The same figures are given in the table below.",
+        },
+      ),
+    );
+    frag.append(chartBox);
+  }
+
+  frag.append(mixTable(span, types, totals));
+  replaceChildren(container, frag);
+  container.dataset.state = "ready";
+}
+
+function renderCompareResult(container, { ministries, result }) {
+  const frag = document.createDocumentFragment();
+  const [left, right] = result.sides;
+  const names = new Map(ministries.map((m) => [m.ministryId, m.name]));
+  const span = left.span;
+
+  frag.append(
+    el(
+      "p",
+      "helper",
+      `${longSessionLabel(span[0].session)} to ${longSessionLabel(span[span.length - 1].session)}` +
+        ` · ${count(span.length)} sessions · the same span and the same counting basis for both.`,
+    ),
+  );
+
+  const rows = [
+    ["Questions asked", (side) => count(side.totals.questions)],
+    ...result.types.map((type) => [
+      `${type} share`,
+      (side) => {
+        const pct = share(side.totals.typeMix[type] ?? 0, side.totals.questions);
+        return pct === null ? NOT_STATED : `${pct.toFixed(1)}% (${count(side.totals.typeMix[type] ?? 0)})`;
+      },
+    ]),
+    ...STATUS_FIELDS.map((field) => [
+      field.label,
+      (side) => count(side.totals.status[field.key]),
+      field.flagged,
+    ]),
+    [
+      "Change across the span",
+      (side) => (side.change.singleSession ? NOT_STATED : changeText(side.change.questions)),
+    ],
+  ];
+
+  /* The table, for a wide screen -- inside its own scroll container. */
+  const wrap = el("div", "table-wrap");
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", "Two-ministry comparison, scrollable");
+  wrap.tabIndex = 0;
+  const table = el("table", "table-compare");
+  const thead = el("thead");
+  const hrow = el("tr");
+  for (const text of ["Figure", names.get(left.ministryId), names.get(right.ministryId)]) {
+    const th = el("th", null, text);
+    th.scope = "col";
+    hrow.append(th);
+  }
+  thead.append(hrow);
+  table.append(thead);
+  const tbody = el("tbody");
+  for (const [label, render, flagged] of rows) {
+    const tr = el("tr", flagged ? "tr-flag" : null);
+    const th = el("th", null, label);
+    th.scope = "row";
+    if (flagged) th.append(el("span", "flag-word", "flagged"));
+    tr.append(th);
+    tr.append(el("td", "num-col", render(left)));
+    tr.append(el("td", "num-col", render(right)));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  wrap.append(table);
+  frag.append(wrap);
+
+  /* The same totals as cards, for a phone. Identical numbers by construction:
+   * both forms render from the same `rows` list. */
+  const cards = el("ul", "compare-cards");
+  for (const side of result.sides) {
+    const li = el("li", "card");
+    li.append(el("p", "cc-name", names.get(side.ministryId)));
+    const dl = el("dl", "cc-list");
+    for (const [label, render, flagged] of rows) {
+      const dt = el("dt", flagged ? "flagged" : null, label);
+      if (flagged) dt.append(el("span", "flag-word", "flagged"));
+      dl.append(dt);
+      dl.append(el("dd", null, render(side)));
+    }
+    li.append(dl);
+    cards.append(li);
+  }
+  frag.append(cards);
+
+  frag.append(
+    basisBlock(span, { head: "The counting basis used for BOTH columns" }),
+  );
+  replaceChildren(container, frag);
+  container.dataset.state = "ready";
+}
+
+/* ---------------------------------------------------------------------- */
+/* Pickers and wiring                                                     */
+/* ---------------------------------------------------------------------- */
+
+function sessionOptions() {
+  return views.sessions.map((s) => [s.sessionId, longSessionLabel(s)]);
+}
+
+function ministryOptions() {
+  return views.ministries.map((m) => [m.ministryId, m.name]);
+}
+
+function buildProfileView(doc) {
+  const picker = doc.getElementById("profile-picker");
+  const result = doc.getElementById("profile-result");
+  if (!picker || !result) return;
+
+  const sessions = sessionOptions();
+  const ministries = ministryOptions();
+  const first = sessions[0]?.[0];
+  const last = sessions[sessions.length - 1]?.[0];
+
+  const ministry = labelledSelect("profile-ministry", "Ministry", ministries, ministries[0]?.[0]);
+  const from = labelledSelect("profile-from", "From session", sessions, first);
+  const to = labelledSelect("profile-to", "To session", sessions, last);
+
+  const form = el("div", "picker");
+  form.append(ministry.wrap, from.wrap, to.wrap);
+  replaceChildren(picker, form);
+
+  const draw = () => {
+    const chosen = views.ministries.find((m) => m.ministryId === ministry.select.value);
+    const span = selectSpan(views.rows, {
+      ministryId: ministry.select.value,
+      fromSession: from.select.value,
+      toSession: to.select.value,
+      allSessions: views.sessions,
+    });
+    if (span.length === 0) {
+      renderUnavailable(result, "That span contains no session.");
+      return;
+    }
+    try {
+      renderProfileResult(result, { ministry: chosen, span });
+    } catch (error) {
+      // A status split that does not account for every question is a data
+      // fault, not a rendering preference. Say so rather than show it.
+      renderUnavailable(result, "These figures did not add up and were not shown.", describe(error));
+    }
+  };
+
+  for (const select of [ministry.select, from.select, to.select]) {
+    select.addEventListener("change", draw);
+  }
+  draw();
+}
+
+function buildCompareView(doc) {
+  const picker = doc.getElementById("compare-picker");
+  const result = doc.getElementById("compare-result");
+  if (!picker || !result) return;
+
+  const sessions = sessionOptions();
+  const ministries = ministryOptions();
+  const first = sessions[0]?.[0];
+  const last = sessions[sessions.length - 1]?.[0];
+
+  const a = labelledSelect("compare-a", "First ministry", ministries, ministries[0]?.[0]);
+  const b = labelledSelect("compare-b", "Second ministry", ministries, ministries[1]?.[0]);
+  const from = labelledSelect("compare-from", "From session", sessions, first);
+  const to = labelledSelect("compare-to", "To session", sessions, last);
+
+  const form = el("div", "picker");
+  form.append(a.wrap, b.wrap, from.wrap, to.wrap);
+  replaceChildren(picker, form);
+
+  const draw = () => {
+    try {
+      const comparison = compare(views.rows, {
+        ministryIds: [a.select.value, b.select.value],
+        fromSession: from.select.value,
+        toSession: to.select.value,
+        allSessions: views.sessions,
+      });
+      if (comparison.sides[0].span.length === 0) {
+        renderUnavailable(result, "That span contains no session.");
+        return;
+      }
+      renderCompareResult(result, { ministries: views.ministries, result: comparison });
+    } catch (error) {
+      renderUnavailable(result, "These figures did not add up and were not shown.", describe(error));
+    }
+  };
+
+  for (const select of [a.select, b.select, from.select, to.select]) {
+    select.addEventListener("change", draw);
+  }
+  draw();
+}
+
+async function bootViews(doc) {
+  const profileResult = doc.getElementById("profile-result");
+  const compareResult = doc.getElementById("compare-result");
+  const [rows, ministries] = await Promise.allSettled([
+    fetchMinistryProfile(),
+    fetchMinistries(),
+  ]);
+
+  if (rows.status !== "fulfilled") {
+    for (const node of [profileResult, compareResult]) {
+      if (node) {
+        renderUnavailable(
+          node,
+          "The ministry profile could not be read from the published files.",
+          describe(rows.reason),
+        );
+      }
+    }
+    return;
+  }
+
+  views.rows = rows.value;
+  views.sessions = profileSessions(views.rows);
+  views.ministries = profileMinistries(
+    views.rows,
+    ministries.status === "fulfilled" ? ministries.value : [],
+  );
+  views.ready = true;
+
+  buildProfileView(doc);
+  buildCompareView(doc);
 }

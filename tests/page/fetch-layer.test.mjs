@@ -146,9 +146,13 @@ test("every requestable URL is relative and under the published base", () => {
     assert.ok(!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url), `${url} looks absolute`);
     assert.ok(!url.startsWith("//"), `${url} is protocol-relative`);
   }
-  // The five this part can reach, and no more.
+  // Exactly what the page can reach, and no more. An entry here that nothing
+  // calls would overstate the request surface, which is the thing T082 will
+  // assert against a real network log.
   assert.deepEqual(new Set(Object.keys(PUBLISHED_FILES)), new Set([
-    "manifest", "coverage", "countingBasis", "sessions", "searchIndex",
+    "manifest", "coverage", "countingBasis", "sessions",
+    "ministryProfile", "ministries",   // T078 / T080
+    "searchIndex",                     // T079, lazy -- and currently gated
   ]));
 });
 

@@ -85,3 +85,11 @@ Thumbs.db
 *.log
 .vscode/
 .idea/
+
+# ---------------------------------------------------------------------------
+# Page screenshots -- captured by hand from `make serve-local` for review.
+# Build output of a review step, not source: they are regenerated whenever the
+# page changes, and ten full-page PNGs at two widths would be committed binary
+# that nothing reads. Kept OUT of the tree's history deliberately.
+# ---------------------------------------------------------------------------
+page-screens/

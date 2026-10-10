@@ -30,6 +30,8 @@ WEB = REPO_ROOT / "web"
 
 PAGE_FILES = ("index.html", "style.css", "app.js", "lib/fetch.js", "lib/format.js")
 
+PUBLISHED_BASE_PREFIX = "./data/published/"
+
 _OFF_HOST = re.compile(r"(?:https?:)?//[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _BASE = re.compile(r"""PUBLISHED_BASE\s*=\s*["']([^"']+)["']""")
 _ENTRY = re.compile(r"""^\s*([A-Za-z][A-Za-z0-9]*)\s*:\s*["']([^"']+)["'],?\s*$""", re.M)
@@ -79,19 +81,49 @@ def main() -> int:
     eager = eager_names(declared)
 
     print("Every URL this page can request")
-    print("=" * 64)
-    print(f"{'when':<12} {'name':<16} url")
-    print("-" * 64)
+    print("=" * 92)
+    print(f"{'when':<11}{'name':<17}{'bytes':>12}  url")
+    print("-" * 92)
     problems: list[str] = []
+    published = REPO_ROOT / "data" / "published"
+    eager_bytes = lazy_bytes = 0
+    missing = False
     for name, url in declared:
         when = "on load" if name in eager else "on demand"
-        print(f"{when:<12} {name:<16} {url}")
+        path = published / url[len(PUBLISHED_BASE_PREFIX) :]
+        if path.is_file():
+            size = path.stat().st_size
+            if name in eager:
+                eager_bytes += size
+            else:
+                lazy_bytes += size
+            shown = f"{size:,}"
+        else:
+            shown = "NOT BUILT"
+            missing = True
+        print(f"{when:<11}{name:<17}{shown:>12}  {url}")
         if not url.startswith("./"):
             problems.append(f"{name}: {url} is not a relative path")
         if url.startswith("//") or re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", url):
             problems.append(f"{name}: {url} is absolute or protocol-relative")
-    print("-" * 64)
+    print("-" * 92)
     print(f"{len(declared)} URL(s): {len(eager)} on load, {len(declared) - len(eager)} on demand")
+    if missing:
+        print("  (sizes are from the locally built dataset; some files are NOT BUILT)")
+    else:
+        print(f"  on load  : {eager_bytes:>12,} B   = {eager_bytes / 1048576:.2f} MiB")
+        print(f"  on demand: {lazy_bytes:>12,} B   = {lazy_bytes / 1048576:.2f} MiB")
+        print(f"  all      : {eager_bytes + lazy_bytes:>12,} B")
+        print()
+        print("  Against T019's budgets (spike/size-budget.md):")
+        print(
+            f"    ministry-profile view, 904,231 B   -> on load is "
+            f"{100 * eager_bytes / 904231 - 100:+.1f}%"
+        )
+        print(
+            f"    with subject search, 4,183,979 B   -> on load + index is "
+            f"{100 * (eager_bytes + lazy_bytes) / 4183979 - 100:+.1f}%"
+        )
     print()
     print("Outbound LINKS (not requests -- nothing is fetched unless clicked):")
     print("  manifest.project_url, rendered in the footer from the published manifest")
