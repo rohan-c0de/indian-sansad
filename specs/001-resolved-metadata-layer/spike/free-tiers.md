@@ -265,7 +265,15 @@ satisfied structurally rather than by configuration, which is the strongest form
 
 **Verdict: VERIFIED by construction, not by execution.** No page has been served and no fetch
 has been made from one. The claim rests on how GitHub Pages maps a repository to an origin, not
-on an observation. `quickstart.md` scenario 12 (`make serve-local`, `make test-page`) is what
+on an observation.
+
+**The workflow did not in fact publish this layout until 2026-10-10**, and that is worth
+recording here rather than only at the workflow. `refresh.yml` copied `data/published/.` to the
+**branch root** and nothing from `web/` — so the left-hand column above was right about the
+origin and wrong about both paths: `/` held the dataset's `coverage.jsonl` rather than the page,
+and `/data/...` did not exist. The two artefacts disagreed for two days and neither was
+authoritative; the owner settled it on 2026-10-10 by changing the workflow to match this file.
+The mismatch was never observed, because the workflow has never run. `quickstart.md` scenario 12 (`make serve-local`, `make test-page`) is what
 turns this into an executed check, and it belongs to Phase 6.
 
 ## Attribution: a deviation the owner decided, recorded not buried

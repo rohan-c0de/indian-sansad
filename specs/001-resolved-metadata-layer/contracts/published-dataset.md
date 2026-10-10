@@ -15,12 +15,30 @@ This feature's external interface is **a published dataset**, not a service. Its
 | Resolution records | One record per name form encountered, with its outcome (FR-005). |
 | Ministries, Sessions, Constituencies | Reference sets, whole. A ministry record carries its current display name and any former names from confirmed rename mappings. |
 | Precomputed aggregates | Counts and trends, including User Story 4's composition and subject-trend files, with the counting basis stated (FR-012). |
-| Subject-search index | Published so in-browser subject search needs no server. **Measured at 3,002,356 bytes (2.86 MiB)** over the full 95,269-question window, subjects only; see [spike/size-budget.md](../spike/size-budget.md). Consumers should expect the page to fetch it lazily, only on an actual search. |
+| Subject-search index | Published so in-browser subject search needs no server. **One file**, `search/subject-index.json`, **measured at 2,484,758 bytes (2.37 MiB)** over all 95,268 published questions, subjects only — 16,979 distinct terms, 352,735 postings; see [spike/size-budget.md](../spike/size-budget.md) → T072. It carries **no similarity grade, score or weight**: nothing in it ranks one match above another, so a consumer presenting results as "closest first" is inventing an order the data does not contain. Consumers should expect the page to fetch it lazily, only on an actual search. *(Figure corrected 2026-10-10: this row read **3,002,356 bytes (2.86 MiB)** over "95,269 questions", which was the T018 **prototype's** measurement, not the published file's. The published file is smaller because its document list is prefix-encoded, and covers one question fewer because the declared duplicate is dropped — guarantee 5.)* |
 | Coverage statement | One per House, always present (FR-013). |
 
 There is **no per-state or per-constituency question partition**. Those subsets are reached by filtering the member reference set and then taking the matching members' files — a deliberate choice, since both are member attributes and a separate partition would republish the per-member files under a key the member set already supplies.
 
 Each set is published in both newline-delimited JSON and CSV. The two are the same records; neither is authoritative over the other.
+
+## Where it is published
+
+The dataset lives on the rolling orphan branch **`published`**, which GitHub Pages serves, and which every successful refresh force-pushes as a **single commit** — so its history is one commit deep at all times and a consumer cannot fetch a previous snapshot from it. `main` carries the code; `data/published/` is git-ignored there as a build output.
+
+**The layout on that branch is** (owner decision 2026-10-10):
+
+```
+/                        the page          (from web/)
+/data/published/...      the dataset       (from data/published/)
+/.nojekyll               so Pages serves files whose names begin with _
+```
+
+So a published set named `reference/members.jsonl` in this contract is fetched at `/data/published/reference/members.jsonl`, relative to wherever the branch is served. **The page and the dataset are on one origin by construction** — GitHub Pages serves one site per repository — which is load-bearing rather than convenient: the upstream sends no `Access-Control-Allow-Origin` (verified first-hand, `spike/route-capture.md` T005), so a browser is refused cross-origin reads, and a dataset on a different origin from the page would hit the identical wall against this project's own files.
+
+**This changed on 2026-10-10 and the change is breaking for anyone who had already taken the branch.** The workflow previously copied the dataset to the **branch root** — `coverage.jsonl`, `by-session/`, `reference/` directly at `/` — and published no page at all. Under the breaking-change policy below this would require announcement in the coverage statement before taking effect; it does **not**, because **the branch has never existed**: the workflow has never run, nothing has ever been published, and so no consumer can have depended on the old layout. Recorded here rather than passed over, because that will not be true of the next layout change.
+
+`make serve-local` serves the same two paths from one local static host so that a path which resolves locally resolves as served.
 
 ## Guarantees a consumer may rely on
 

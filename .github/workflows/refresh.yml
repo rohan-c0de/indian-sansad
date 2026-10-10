@@ -37,7 +37,9 @@
 ---
 name: refresh
 
-on:
+# Quoted: YAML 1.1 reads a bare `on` as boolean true, and yamllint flags it.
+# GitHub accepts the quoted form. See .yamllint.
+"on":
   schedule:
     # 02:40 UTC daily. Not on the hour: GitHub's own docs warn that schedules
     # may be delayed when the queue is busy, and the top of the hour is the
@@ -163,12 +165,56 @@ jobs:
           git rm -rq --cached . 2>/dev/null || true
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
 
-          cp -R "${GITHUB_WORKSPACE}/data/published/." .
+          # --- published-branch layout (owner decision 2026-10-10) ----------
+          # The page at the branch ROOT and the dataset under data/published/,
+          # so the page's same-origin paths (T076) resolve exactly as served.
+          #
+          # This step previously copied data/published/. to the ROOT and
+          # NOTHING from web/. Under that layout every path T076 fetches would
+          # have 404'd (/data/... did not exist; the coverage statement sat at
+          # /coverage.jsonl) and there would have been no page at / to fetch
+          # them. Found by review -- mockup/README.md, "What must change" --
+          # and never observed, because this workflow has never run.
+          #
+          # Everything between the two markers below is EXTRACTED AND EXECUTED
+          # by tests/unit/test_published_branch_layout.py, so the layout has a
+          # single definition and the test cannot drift from it. It must
+          # therefore depend on nothing but $GITHUB_WORKSPACE and $PWD.
+          # BEGIN LAYOUT
+          # web/ is untracked and empty today, so it does NOT EXIST in a CI
+          # checkout at all -- git cannot track an empty directory. Publish the
+          # dataset alone in that case rather than failing: a dataset with no
+          # page is a usable release, and under `set -e` an unguarded cp would
+          # turn today's empty web/ into a failed refresh.
+          if [ -d "${GITHUB_WORKSPACE}/web" ] && [ -n "$(ls -A "${GITHUB_WORKSPACE}/web")" ]; then
+            cp -R "${GITHUB_WORKSPACE}/web/." .
+            echo "layout: copied web/ to the branch root"
+          else
+            echo "layout: web/ is absent or empty -- dataset only, no page at /"
+          fi
+
+          # The dataset is copied SECOND so that on any path collision the
+          # dataset wins over a page file of the same name.
+          mkdir -p data/published
+          cp -R "${GITHUB_WORKSPACE}/data/published/." data/published/
+
           # GitHub Pages would otherwise run the dataset through Jekyll and
           # refuse to serve files whose names begin with an underscore.
           touch .nojekyll
+          # END LAYOUT
 
           git add -A
+
+          # The layout change made this step newly dependent on `.gitignore`
+          # having been deleted by the `find ... -rm` above: data/published/ is
+          # git-ignored on `main`, and it was not when the dataset went to the
+          # branch root. If that ever stops holding, `git add -A` stages the
+          # page and nothing else and this job would force-push an empty
+          # dataset over a good one. Assert on the INDEX, not on the disk.
+          git diff --cached --name-only -- data/published/manifest.json \
+            | grep -qx 'data/published/manifest.json' \
+            || { echo "::error::data/published/ was not staged -- refusing to publish"; exit 1; }
+          echo "staged $(git diff --cached --name-only | wc -l) file(s)"
           git commit -q -m "Published dataset $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git push --force origin published
           echo "published: force-pushed a single commit to \`published\`"

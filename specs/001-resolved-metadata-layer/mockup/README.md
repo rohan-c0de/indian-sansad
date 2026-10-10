@@ -260,6 +260,23 @@ between artifacts, not a reproduced failure.
 **(a) is the smaller change** — it touches one workflow step rather than a
 requirement — but the choice is the owner's, not this mockup's.
 
+> **SETTLED 2026-10-10 — the owner chose (a).** `refresh.yml`'s publish step
+> now copies `web/.` to the branch root and `data/published/.` to
+> `data/published/`, guarded so that today's empty-and-untracked `web/` (which
+> does not exist in a CI checkout at all) publishes the dataset alone rather
+> than failing. T076's path wording, the contract and T015's asserted layout
+> are all unchanged and now agree with the workflow.
+>
+> The copy block is delimited by `# BEGIN LAYOUT` / `# END LAYOUT` and is
+> **extracted and executed** by `tests/unit/test_published_branch_layout.py`,
+> so the layout has one definition rather than a workflow and a test that can
+> drift apart. Those tests were checked against the OLD block before being
+> trusted: 5 of 10 fail on it, 10 of 10 pass on the new one.
+>
+> Still **not observed**. The workflow has never run, so this remains a
+> contradiction resolved on paper; T082's network-log assertion is what turns
+> it into an executed check.
+
 **Which task should own it: T081.** It is open, and its own wording —
 "serve `web/` and `data/published/` from one local static host on one origin,
 **as the T015 host does**" — cannot be completed correctly until it is settled

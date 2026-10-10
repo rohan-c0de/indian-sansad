@@ -1,0 +1,42 @@
+# yamllint configuration.
+#
+# Added 2026-10-10 because there was none, and T058 had recorded "`yamllint`
+# reports 0 findings" for .github/workflows/refresh.yml -- a claim that does
+# not reproduce. With yamllint's DEFAULT configuration that file reports 9
+# findings (8 line-length errors at 81-93 characters, 1 truthy warning on
+# `on:`), and it did so before the 2026-10-10 layout change as well. The claim
+# was wrong, not the file. Correcting it needs a defined standard to be wrong
+# or right against, which is what this file is.
+#
+# Reproduce with:  .venv/bin/yamllint .
+---
+extends: default
+
+rules:
+  # yamllint's default is 80. A GitHub Actions workflow carries shell inside
+  # `run: |` block scalars, where the 10-space step indent leaves 70 columns
+  # for a command; wrapping a `test ... || { echo ...; exit 1; }` guard across
+  # lines to satisfy a YAML style rule makes the SHELL harder to read, and the
+  # shell is the part that can be wrong. 100 is a project decision, recorded
+  # here rather than left to the tool's default.
+  line-length:
+    max: 100
+
+  # `on:` is the GitHub Actions trigger key and cannot be renamed. YAML 1.1
+  # reads a bare `on` as boolean true, so yamllint's truthy rule flags it.
+  # It is quoted as `"on":` in the workflow, which GitHub accepts and which
+  # removes the ambiguity rather than suppressing the warning about it -- so
+  # this entry allows the quoted form, it does not switch the rule off.
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: true
+
+# `.specify/` is vendored Spec Kit scaffolding, not this project's YAML: its
+# files arrived with the toolchain and are committed so the workflow is
+# reproducible, not maintained here. Linting them would report findings nobody
+# in this repository can act on without diverging from upstream. `.venv/` is a
+# build artefact. Neither is excluded from `make guard` or `make audit-fields`,
+# which are the checks that carry Principle V.
+ignore: |
+  .specify/
+  .venv/
