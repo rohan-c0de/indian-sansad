@@ -113,13 +113,85 @@ def test_guarantee_4_one_question_record_carries_all_its_askers(variant_members,
 # ---------------------------------------------------------------------------
 # 5. Coverage is declared, not implied  -- PENDING T053
 # ---------------------------------------------------------------------------
-def test_guarantee_5_coverage_statement_is_published_per_house():
+def test_guarantee_5_coverage_statement_is_published_per_house(tmp_path):
     """ "The coverage statement names the period, the sessions included, known
     gaps, the current resolution rate, and whether the data is current or
-    last-known-good."""
-    from sansad.publish import coverage  # PENDING T053
+    last-known-good."
 
-    assert hasattr(coverage, "write_coverage_statements")
+    And one per House, **including a House with no route**: an omitted statement
+    reads as "not looked at", where `data-model.md` requires the opposite.
+    """
+    from sansad.model._common import House
+    from sansad.publish.coverage import (
+        CoverageInputs,
+        write_coverage_statements,
+    )
+    from sansad.publish.formats import read_ndjson
+
+    lok_sabha = CoverageInputs(
+        house=House.LOK_SABHA,
+        period_start="2019-06-21",
+        period_end="2026-08-12",
+        sessions_covered=("lok-sabha/17/1", "lok-sabha/18/2"),
+        last_refreshed="2026-10-09",
+        total_questions=95_268,
+        resolved_automatic=90_298,
+        resolved_assisted=91_796,
+        assertions_in_effect=4,
+        assertions_overriding_an_automatic_match=0,
+        duplicate_records_declared=("lok-sabha/17/4/unstarred/2204",),
+        ministry_ids=56,
+        ministry_names_observed=64,
+        ministry_names_without_confirmed_mapping=56,
+        ministry_name_groups_merged_by_normalisation=(("COMMUNICATION", "COMMUNICATIONS"),),
+        ministry_names_in_reference_set_with_no_questions=4,
+    )
+    rajya_sabha = CoverageInputs(
+        house=House.RAJYA_SABHA,
+        period_start="not stated",
+        period_end="not stated",
+        sessions_covered=(),
+        last_refreshed="2026-10-09",
+        total_questions=0,
+        resolved_automatic=0,
+        resolved_assisted=0,
+        unobtainable_reason="No Rajya Sabha route has been identified.",
+    )
+    write_coverage_statements(tmp_path, [lok_sabha, rajya_sabha])
+    rows = {r["house"]: r for r in read_ndjson(tmp_path / "coverage.jsonl")}
+
+    assert set(rows) == {"lok-sabha", "rajya-sabha"}, (
+        "a House with no route still needs a statement"
+    )
+
+    ls = rows["lok-sabha"]
+    # BOTH rates, each with its denominator -- "MUST be published, not merely
+    # computed, so SC-002 is externally checkable".
+    assert ls["total_questions"] == 95_268
+    assert ls["resolved_automatic"] == 90_298
+    assert ls["resolved_including_assertions"] == 91_796
+    assert round(ls["resolution_rate_automatic"], 4) == 0.9478
+    assert round(ls["resolution_rate_including_assertions"], 4) == 0.9636
+    # ...and the two verdicts differ, which is the whole reason for two rates.
+    assert ls["sc_002_met_on_automatic_rate"] is False
+    assert ls["sc_002_met_on_published_rate"] is True
+
+    assert ls["assertions_in_effect"] == 4
+    assert ls["assertions_overriding_an_automatic_match"] == 0
+    assert ls["duplicate_records_declared"] == ["lok-sabha/17/4/unstarred/2204"]
+    assert ls["ministry_ids"] == 56
+    assert ls["ministry_names_in_reference_set_with_no_questions"] == 4
+    assert ls["last_known_good"] == "current"
+
+    gaps = " ".join(ls["known_gaps"])
+    for anomaly in ("lok-sabha/18/1", "lok-sabha/18/8", "lok-sabha/17/13"):
+        assert anomaly in gaps, f"{anomaly} is not declared"
+    assert "lok-sabha/17/4/unstarred/2204" in gaps
+
+    rs = rows["rajya-sabha"]
+    assert rs["unobtainable_reason"]
+    # A House with no route must not claim knowledge of another House's gaps.
+    assert not [g for g in rs["known_gaps"] if "lok-sabha" in g]
 
 
 # ---------------------------------------------------------------------------
@@ -228,15 +300,54 @@ def test_guarantee_6_non_identical_records_sharing_an_id_are_refused(fixtures_di
         load_question_records(rows, last_refreshed="2026-10-09")
 
 
-def test_guarantee_6_a_question_id_in_several_partitions_is_one_question():
-    """The partition half: the same record republished under several keys.
+def test_guarantee_6_a_question_id_in_several_partitions_is_one_question(
+    tmp_path, variant_members, question_records
+):
+    """ "a `question_id` appearing in several files is **one** question: a
+    consumer combining partitions must de-duplicate on `question_id` rather
+    than sum across them."
 
-    The identity half is asserted above and passes. This one needs the
-    partitions T051 writes.
+    Asserted on the published files: the same question genuinely appears in
+    several *files*, never twice in one, and summing across axes over-counts by
+    exactly the co-asking multiplier.
     """
-    from sansad.publish import partitions  # PENDING T051
+    from sansad.publish.formats import NDJSON_SUFFIX, read_ndjson
+    from sansad.publish.partitions import (
+        BY_MEMBER_DIR,
+        BY_MINISTRY_DIR,
+        BY_SESSION_DIR,
+        write_partitions,
+    )
+    from sansad.resolve import resolve_questions
 
-    assert hasattr(partitions, "write_partitions")
+    result = resolve_questions(question_records("co_asked.json"), variant_members)
+    write_partitions(tmp_path, result.questions)
+
+    per_axis: dict[str, list[str]] = {}
+    for axis in (BY_SESSION_DIR, BY_MINISTRY_DIR, BY_MEMBER_DIR):
+        ids: list[str] = []
+        for path in sorted((tmp_path / axis).glob(f"*{NDJSON_SUFFIX}")):
+            rows = read_ndjson(path)
+            file_ids = [r["question_id"] for r in rows]
+            assert len(file_ids) == len(set(file_ids)), (
+                f"{path.name}: the same question_id appears twice in ONE file"
+            )
+            ids.extend(file_ids)
+        per_axis[axis] = ids
+
+    # Each question is published exactly once per session and per ministry.
+    assert sorted(per_axis[BY_SESSION_DIR]) == sorted({q.question_id for q in result.questions})
+    assert len(per_axis[BY_MINISTRY_DIR]) == len(result.questions)
+
+    # by-member republishes a co-asked question once per asker -- which is why
+    # summing across partitions over-counts and the guarantee says de-duplicate.
+    assert len(per_axis[BY_MEMBER_DIR]) > len(set(per_axis[BY_MEMBER_DIR]))
+    assert set(per_axis[BY_MEMBER_DIR]) <= set(per_axis[BY_SESSION_DIR])
+    combined = per_axis[BY_SESSION_DIR] + per_axis[BY_MINISTRY_DIR] + per_axis[BY_MEMBER_DIR]
+    assert len(set(combined)) == len(result.questions), (
+        "de-duplicating on question_id must recover the true question count"
+    )
+    assert len(combined) > len(set(combined)), "summing across axes must over-count"
 
 
 # ---------------------------------------------------------------------------
@@ -261,10 +372,49 @@ def test_guarantee_7_every_entity_carries_the_date_it_was_last_rebuilt(
     assert FIXTURE_REFRESHED_ON != NOT_STATED
 
 
-def test_guarantee_7_every_published_set_carries_its_rebuild_date():
-    from sansad.publish import partitions  # PENDING T051
+def test_guarantee_7_every_published_set_carries_its_rebuild_date(
+    tmp_path, variant_members, question_records
+):
+    """ "Every published set carries the date it was last rebuilt (FR-016)."
 
-    assert hasattr(partitions, "PARTITION_MANIFEST_NAME")
+    The per-record half is asserted above; this is the per-set half, which is
+    the manifest. It also carries the file and record counts a consumer needs
+    to tell a complete snapshot from a truncated one.
+    """
+    import json
+
+    from sansad.publish.partitions import (
+        PARTITION_MANIFEST_NAME,
+        write_manifest,
+        write_partitions,
+    )
+    from sansad.resolve import resolve_questions
+
+    result = resolve_questions(question_records("co_asked.json"), variant_members)
+    partitions = write_partitions(tmp_path, result.questions)
+    path = write_manifest(
+        tmp_path,
+        last_refreshed="2026-10-09",
+        sets={p.axis: {"files": p.files, "records": p.records} for p in partitions},
+    )
+
+    assert path.name == PARTITION_MANIFEST_NAME
+    body = json.loads(path.read_text(encoding="utf-8"))
+    assert body["last_refreshed"] == "2026-10-09"
+    assert set(body["sets"]) == {"by-session", "by-ministry", "by-member"}
+    for counts in body["sets"].values():
+        assert counts["files"] > 0
+        assert counts["records"] > 0
+
+    # Byte-deterministic: the snapshot is force-pushed as one commit, and an
+    # unexplained diff in a one-commit-deep history cannot be diffed.
+    first = path.read_bytes()
+    write_manifest(
+        tmp_path,
+        last_refreshed="2026-10-09",
+        sets={p.axis: {"files": p.files, "records": p.records} for p in partitions},
+    )
+    assert path.read_bytes() == first
 
 
 # ---------------------------------------------------------------------------

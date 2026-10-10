@@ -21,7 +21,7 @@
   ],
   "listOfQuestions": [
     {
-      "quesNo": 401, "lokNo": "18", "sessionNo": "4", "date": "2024-11-01",
+      "quesNo": 401, "lokNo": "18", "sessionNo": "4", "date": "01.11.2024",
       "type": "UNSTARRED", "subjects": "Placeholder subject, two askers each needing an assertion",
       "ministry": "Ministry of Placeholder Affairs",
       "member": ["R.K. Venkat", "Muthusamy T"],
@@ -32,7 +32,7 @@
       "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
     },
     {
-      "quesNo": 402, "lokNo": "18", "sessionNo": "4", "date": "2024-11-02",
+      "quesNo": 402, "lokNo": "18", "sessionNo": "4", "date": "02.11.2024",
       "type": "UNSTARRED", "subjects": "Placeholder subject, one asserted asker and one already resolvable",
       "ministry": "Ministry of Placeholder Affairs",
       "member": ["R.K. Venkat", "Priya Anand"],

@@ -1,0 +1,39 @@
+{
+  "_policy": "Maintainer-confirmed ministry rename mappings. Hand-authored, owner-confirmed, never generated.",
+  "_decision": "Owner decision 2026-10-09 (specs/001-resolved-metadata-layer/spike/ministry-identity.md). ministry_id is the slug of the FIRST name a ministry was seen under: assigned once, never changed, never reused. A rename attaches the new name to the EXISTING id -- the older id is kept, the new name becomes canonical_name, the old one goes to former_names.",
+  "_why_not_mincode": "/api_ls/question/getMinistry serves minCode, but it is per-term: 10 of the 52 names present in both terms carry a different code, and 14 of the 56 shared codes name a different ministry in each term. Four of those pairs have both names carrying questions simultaneously for years, which is code reuse, not a rename. minCode is not used for identity and is not published.",
+  "_evidence_rule": "A mapping rests on DATE HANDOFF alone: the old name's last question strictly precedes the new name's first, with no overlap. A shared minCode is NOT evidence -- it was only a candidate rule.",
+  "_not_asserted": "Table 3 candidates get no mapping (four shared-code pairs overlap in time; COOPERATION began mid-term with no predecessor; three names are merely sparse; PRIME MINISTER has one question). Table 4 names carry zero questions in the window, get no id, are not published, and are counted in the coverage statement.",
+  "_normalisation_not_assertion": "Trivial spelling variants are resolved by name normalisation, not here: EDUCATION/Education (case) and MICRO, SMALL.../MICRO,SMALL... (punctuation) by the existing slug; COMMUNICATION/COMMUNICATIONS and ENVIRONMENT, FORESTS.../ENVIRONMENT, FOREST... by the singular fold.",
+  "confirmed_on": "2026-10-09",
+  "renames": [
+    {
+      "ministry_id": "shipping",
+      "canonical_name": "PORTS, SHIPPING AND WATERWAYS",
+      "former_names": ["SHIPPING"],
+      "confirmed_on": "2026-10-09",
+      "evidence": "Date handoff: SHIPPING last question 2020-09-22 (144 Qs); PORTS, SHIPPING AND WATERWAYS first question 2021-02-04 (848 Qs). Gap 135 days, no overlap."
+    },
+    {
+      "ministry_id": "heavy-industries-and-public-enterprises",
+      "canonical_name": "HEAVY INDUSTRIES",
+      "former_names": ["HEAVY INDUSTRIES AND PUBLIC ENTERPRISES"],
+      "confirmed_on": "2026-10-09",
+      "evidence": "Date handoff: HEAVY INDUSTRIES AND PUBLIC ENTERPRISES last question 2021-03-23 (177 Qs); HEAVY INDUSTRIES first question 2021-07-20 (508 Qs). Gap 119 days, no overlap."
+    },
+    {
+      "ministry_id": "human-resource-development",
+      "canonical_name": "EDUCATION",
+      "former_names": ["HUMAN RESOURCE DEVELOPMENT"],
+      "confirmed_on": "2026-10-09",
+      "evidence": "Date handoff: HUMAN RESOURCE DEVELOPMENT last question 2020-03-23 (888 Qs); Education first question 2020-09-14. Gap 175 days, no overlap. The successor covers BOTH written forms -- 'Education' (2,115 Qs, 17th LS) and 'EDUCATION' (1,586 Qs, 18th LS) differ only by case and already normalise to one id, so the successor side is 3,701 questions."
+    },
+    {
+      "ministry_id": "ayurveda-yoga-naturopathy-unani-siddha-and-homeopathy-ayush",
+      "canonical_name": "AYUSH",
+      "former_names": ["AYURVEDA,YOGA & NATUROPATHY,UNANI,SIDDHA AND HOMEOPATHY (AYUSH)"],
+      "confirmed_on": "2026-10-09",
+      "evidence": "Date handoff: the long form's last question 2024-02-09 (1,211 Qs); AYUSH first question 2024-07-26 (658 Qs). Gap 168 days, no overlap. An abbreviation, which the singular fold cannot resolve -- hence an assertion."
+    }
+  ]
+}

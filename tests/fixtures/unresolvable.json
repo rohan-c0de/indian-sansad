@@ -3,7 +3,7 @@
   "_exercises": "FR-004 / US1 scenario 3: an unresolvable asker MUST be retained with resolution_status 'unresolved', and MUST NOT be dropped or assigned a guessed member.",
   "listOfQuestions": [
     {
-      "quesNo": 201, "lokNo": "18", "sessionNo": "2", "date": "2024-08-01",
+      "quesNo": 201, "lokNo": "18", "sessionNo": "2", "date": "01.08.2024",
       "type": "UNSTARRED", "subjects": "Placeholder subject, unresolvable asker",
       "ministry": "Ministry of Placeholder Affairs",
       "member": ["Zzyzx Qwerty Nonexistentname"],
@@ -14,7 +14,7 @@
       "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
     },
     {
-      "quesNo": 202, "lokNo": "18", "sessionNo": "2", "date": "2024-08-02",
+      "quesNo": 202, "lokNo": "18", "sessionNo": "2", "date": "02.08.2024",
       "type": "UNSTARRED", "subjects": "Placeholder subject, one resolvable and one not",
       "ministry": "Ministry of Placeholder Affairs",
       "member": ["Shri Sunil Kumar Singh", "Zzyzx Qwerty Nonexistentname"],

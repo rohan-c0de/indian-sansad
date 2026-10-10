@@ -1,0 +1,210 @@
+# T058 -- the scheduled refresh AND publish. Owns the publish mechanism and the
+# 60-day keep-alive (owner decision 2026-10-09, spike/size-budget.md).
+#
+# Provider: GitHub Actions on a PUBLIC repository with standard GitHub-hosted
+# runners -- chosen in spike/free-tiers.md T007 because it is the only candidate
+# whose scheduled-job support AND behaviour at the limit are both published
+# where the limit is published. For public repositories "GitHub Actions usage is
+# free ... no monthly minute allowance applies, because usage is not metered",
+# so there is no meter to exceed (FR-014).
+#
+# Sized against measured reality (spike/free-tiers.md T008):
+#   - job ceiling 6 hours, and "the job is terminated and fails" at it;
+#   - a FULL re-ingest is ~46 min (95,269 questions x ~29 ms) plus a 46.5 s
+#     roster fetch -- about a seventh of the ceiling, which is not as
+#     comfortable as "~10^5 records" sounds. timeout-minutes below is set well
+#     under the ceiling so an overrun fails fast rather than burning hours.
+#   - "Scheduled workflows will only run on the default branch", which is why
+#     this file lives on main and publishes to `published` rather than running
+#     from it.
+
+---
+name: refresh
+
+on:
+  schedule:
+    # 02:40 UTC daily. Not on the hour: GitHub's own docs warn that schedules
+    # may be delayed when the queue is busy, and the top of the hour is the
+    # busiest minute. The shortest interval the platform allows is 5 minutes;
+    # daily is far more than FR-009 needs.
+    - cron: "40 2 * * *"
+  workflow_dispatch:
+
+# (e) The force-push to `published` and the keep-alive commit to `main` both
+# need write access. The T009 spike workflow deliberately held read-only
+# permissions; this one cannot.
+permissions:
+  contents: write
+
+concurrency:
+  # Two refreshes force-pushing one orphan branch would race, and the loser
+  # would publish a snapshot built from a half-read upstream.
+  group: refresh-and-publish
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # (a) Read the PREVIOUS snapshot before overwriting anything. FR-010's
+      # last-known-good and FR-011's signal for a question leaving `resolved`
+      # both need the prior record to compare against, and after the publish
+      # step it is gone -- the branch is one commit deep.
+      #
+      # continue-on-error: the very first run has no `published` branch yet, and
+      # that is a valid state, not a failure.
+      - name: Check out the previous published snapshot
+        id: previous
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: published
+          path: .previous-snapshot
+          fetch-depth: 1
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: |
+          set -eu -o pipefail
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet -e '.[dev]'
+
+      # The scratch root must be outside the repository tree. make scratch
+      # asserts it and refuses rather than falling back (Principle V).
+      - name: Create the out-of-tree scratch root
+        id: scratch
+        run: |
+          set -eu -o pipefail
+          echo "SANSAD_SCRATCH=${RUNNER_TEMP}/sansad-scratch" >> "$GITHUB_ENV"
+          SANSAD_SCRATCH="${RUNNER_TEMP}/sansad-scratch" make scratch
+
+      - name: Guard the tree before anything fetches
+        run: make guard
+
+      # One full ingestion and publish, prompting for nothing (FR-009).
+      # --previous points at the snapshot checked out above, so a failure
+      # retains it and re-dates it as last-known-good (T054) instead of
+      # publishing an empty or partial record.
+      - name: Refresh and publish locally
+        id: refresh
+        run: |
+          set -eu -o pipefail
+          python -m sansad.cli \
+            --source upstream \
+            --published-dir data/published \
+            --previous .previous-snapshot
+
+      # The only automated thing standing between the upstream's personal-data
+      # payload and publication (SC-010). Run against what will ACTUALLY be
+      # published, not against what was specified.
+      - name: Audit the field scope of the built dataset
+        run: |
+          set -eu -o pipefail
+          make guard
+          make audit-fields
+
+      - name: Verify every published join is auditable
+        run: make verify-joins
+
+      # (b) On success: force-push a SINGLE commit to the orphan branch
+      # `published`, which GitHub Pages serves. The history is one commit deep
+      # at all times, which is what bounds the size -- 216.5 MiB measured per
+      # refresh would breach GitHub's "ideally less than 1 GB" guidance on about
+      # the fifth refresh with full history.
+      #
+      # (c) On a failed or partial refresh this step does not run, so NOTHING is
+      # pushed and the previous snapshot keeps being served (FR-010).
+      - name: Publish to the rolling orphan branch
+        if: steps.refresh.outcome == 'success'
+        env:
+          GIT_AUTHOR_NAME: Indian Sansad Maintainer
+          GIT_AUTHOR_EMAIL: noreply@users.noreply.github.com
+          GIT_COMMITTER_NAME: Indian Sansad Maintainer
+          GIT_COMMITTER_EMAIL: noreply@users.noreply.github.com
+        run: |
+          set -eu -o pipefail
+          test -d data/published/by-session || { echo "nothing built; refusing"; exit 1; }
+          test -f data/published/manifest.json || { echo "no manifest; refusing"; exit 1; }
+
+          WORK="${RUNNER_TEMP}/published-worktree"
+          rm -rf "$WORK"
+          # An ORPHAN worktree: no parent, so the pushed commit carries no
+          # history and the branch cannot accumulate past snapshots.
+          git worktree add --detach "$WORK"
+          cd "$WORK"
+          git checkout --orphan published
+          git rm -rq --cached . 2>/dev/null || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+
+          cp -R "${GITHUB_WORKSPACE}/data/published/." .
+          # GitHub Pages would otherwise run the dataset through Jekyll and
+          # refuse to serve files whose names begin with an underscore.
+          touch .nojekyll
+
+          git add -A
+          git commit -q -m "Published dataset $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push --force origin published
+          echo "published: force-pushed a single commit to \`published\`"
+
+      # (d) On EVERY run, including one that finds nothing new, commit a small
+      # run-timestamp file to `main`. This is the keep-alive against the rule
+      # T008 recorded: "In a public repository, scheduled workflows are
+      # automatically disabled when no repository activity has occurred in 60
+      # days."
+      #
+      # It lives on `main` because whether a push to a NON-DEFAULT branch counts
+      # as repository activity is UNVERIFIED, and FR-009 must not rest on that
+      # reading. if: always() -- a keep-alive that only runs on success stops
+      # running exactly when the repository has gone quiet.
+      - name: Keep-alive commit to main
+        if: always()
+        env:
+          GIT_AUTHOR_NAME: Indian Sansad Maintainer
+          GIT_AUTHOR_EMAIL: noreply@users.noreply.github.com
+          GIT_COMMITTER_NAME: Indian Sansad Maintainer
+          GIT_COMMITTER_EMAIL: noreply@users.noreply.github.com
+        run: |
+          set -eu -o pipefail
+          cd "${GITHUB_WORKSPACE}"
+          mkdir -p .github/last-run
+          cat > .github/last-run/refresh.json <<JSON
+          {
+            "last_attempted": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "refresh_outcome": "${{ steps.refresh.outcome }}",
+            "previous_snapshot_checkout": "${{ steps.previous.outcome }}",
+            "run_id": "${{ github.run_id }}",
+            "note": "Keep-alive against the 60-day scheduled-workflow disable rule.",
+            "why_main": "Whether a push to a non-default branch counts as",
+            "why_main_cont": "repository activity is UNVERIFIED; FR-009 does not rest on it."
+          }
+          JSON
+          git add .github/last-run/refresh.json
+          git -c user.name="$GIT_AUTHOR_NAME" -c user.email="$GIT_AUTHOR_EMAIL" \
+            commit -q -m "Refresh keep-alive $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]" \
+            || { echo "no change to commit"; exit 0; }
+          git push origin HEAD:main
+
+      # The maintainer's half of the FR-010/FR-011 split: loud here, quiet for
+      # the visitor. The job's own failure is the delivery mechanism, which
+      # costs nothing on a free tier -- Principle I.
+      - name: Report the refresh outcome
+        if: always()
+        run: |
+          set -eu -o pipefail
+          echo "refresh outcome: ${{ steps.refresh.outcome }}"
+          if [ "${{ steps.refresh.outcome }}" != "success" ]; then
+            echo "::error::Refresh failed. Nothing was pushed to \`published\`;"
+            echo "::error::the previous snapshot keeps being served (FR-010)."
+            exit 1
+          fi

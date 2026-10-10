@@ -212,3 +212,109 @@ def apply_assertion(
 def seeded_forms(assertions: Iterable[Assertion]) -> tuple[str, ...]:
     """The written forms these assertions cover, sorted."""
     return tuple(sorted(a.name_as_written for a in assertions))
+
+
+# ===========================================================================
+# Ministry rename mappings (owner decision 2026-10-09)
+# ===========================================================================
+#
+# Here rather than in a module of their own, for the reason the member
+# assertions are here: `data/assertions/` is an **input** that must survive a
+# refresh rewriting the published branch wholesale, and one loader enforcing
+# "only owner-confirmed pairs, never generated" is better than two that can
+# drift apart.
+#
+# Why a mapping is needed at all: `/api_ls/question/getMinistry` serves a
+# `minCode`, but it is per-term -- 10 of the 52 names present in both terms
+# carry a different code, and 14 of the 56 shared codes name a different
+# ministry in each term, part genuine rename and part the code reused for
+# something unrelated. Question records carry only the name. So a rename cannot
+# be detected automatically and is recorded by hand or not at all.
+
+MINISTRY_ASSERTIONS_FILE = "ministries.json"
+
+
+@dataclass(frozen=True, slots=True)
+class MinistryRename:
+    """One owner-confirmed rename: the names that collapse into one id.
+
+    `ministry_id` is **the older id, kept**. The decision is explicit that a
+    rename attaches the new name to the existing id rather than minting a new
+    one, so the id outlives the name it was slugged from -- which is what makes
+    "assigned once, never changed" survive a rename at all.
+    """
+
+    #: The id kept -- the slug of the FIRST name this ministry was seen under.
+    ministry_id: str
+    #: The current display name.
+    canonical_name: str
+    #: Names previously seen, newest-last. Never empty for a rename.
+    former_names: tuple[str, ...]
+    #: Why the owner confirmed it. Required, as for member assertions.
+    evidence: str
+    confirmed_on: str = NOT_STATED
+
+    def __post_init__(self) -> None:
+        if not self.ministry_id.strip():
+            raise ValueError("a ministry rename needs the id it keeps")
+        if not self.canonical_name.strip():
+            raise ValueError(f"{self.ministry_id}: a rename needs a canonical_name")
+        if not self.former_names:
+            raise ValueError(
+                f"{self.ministry_id}: a rename with no former_names is not a rename. "
+                f"A ministry seen under one name only needs no mapping -- it mints "
+                f"its own id."
+            )
+        if not self.evidence.strip():
+            raise ValueError(
+                f"{self.ministry_id}: a rename needs recorded evidence. These "
+                f"mappings merge two question histories; one nobody can review is "
+                f"not reviewable."
+            )
+
+    @property
+    def names(self) -> tuple[str, ...]:
+        """Every name that maps to this id, former names first."""
+        return (*self.former_names, self.canonical_name)
+
+
+def load_ministry_renames(directory: Path | None = None) -> tuple[MinistryRename, ...]:
+    """Load the confirmed ministry renames, or an empty tuple.
+
+    An absent file is a valid state -- a project with no confirmed renames yet.
+    A malformed one raises rather than being skipped, for the same reason the
+    member loader does: a silently-skipped mapping file looks exactly like a
+    ministry splitting in two on the next refresh.
+    """
+    root = directory if directory is not None else assertions_dir()
+    path = root / MINISTRY_ASSERTIONS_FILE
+    if not path.is_file():
+        return ()
+
+    body = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(body, Mapping):
+        raise ValueError(f"{path}: expected an object carrying 'renames'")
+    confirmed_on = str(body.get("confirmed_on") or NOT_STATED)
+
+    renames: list[MinistryRename] = []
+    claimed: dict[str, str] = {}
+    for row in body.get("renames") or []:
+        rename = MinistryRename(
+            ministry_id=str(row["ministry_id"]),
+            canonical_name=str(row["canonical_name"]),
+            former_names=tuple(str(n) for n in row.get("former_names") or ()),
+            evidence=str(row.get("evidence") or ""),
+            confirmed_on=str(row.get("confirmed_on") or confirmed_on),
+        )
+        for name in rename.names:
+            previous = claimed.get(name)
+            if previous is not None and previous != rename.ministry_id:
+                raise ValueError(
+                    f"ministry name {name!r} is mapped to both {previous!r} and "
+                    f"{rename.ministry_id!r}. Two confirmed mappings disagreeing is a "
+                    f"correction to make by hand, not one for this loader to pick a "
+                    f"winner from."
+                )
+            claimed[name] = rename.ministry_id
+        renames.append(rename)
+    return tuple(renames)

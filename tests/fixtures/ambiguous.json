@@ -3,7 +3,7 @@
   "_exercises": "Edge Cases: an ambiguous form MUST list its candidates; an ambiguous match MUST NOT be silently collapsed to the first candidate.",
   "listOfQuestions": [
     {
-      "quesNo": 301, "lokNo": "18", "sessionNo": "3", "date": "2024-09-01",
+      "quesNo": 301, "lokNo": "18", "sessionNo": "3", "date": "01.09.2024",
       "type": "STARRED", "subjects": "Placeholder subject, ambiguous asker",
       "ministry": "Ministry of Placeholder Affairs",
       "member": ["Kavita Rao"],

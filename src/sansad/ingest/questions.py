@@ -84,7 +84,9 @@ __all__ = [
     "IngestionFailed",
     "QuestionRecord",
     "fetch_question_records",
+    "iso_date",
     "load_question_records",
+    "ministry_fold_key",
     "ministry_id_for",
     "question_id_for",
     "session_id_for",
@@ -116,6 +118,18 @@ _SESSION_NO_KEYS: Sequence[str] = ("sessionNo", "sessionNumber", "session")
 
 _SLUG_STRIP = re.compile(r"[^a-z0-9]+")
 
+#: The upstream's observed date format. **Asserted, not assumed.**
+#:
+#: `spike/route-capture.md` T006 open item 1 recorded the format as unasserted:
+#: "The field is a string and was not parsed, because parsing it would mean
+#: reading values. The pipeline must assert the format on first ingest rather
+#: than assume ISO-8601 -- FR-013 excludes questions outside the covered
+#: window, and a misparsed date silently mis-scopes that exclusion."
+#:
+#: Asserted on 2026-10-09 over the full window: `DD.MM.YYYY` on 34,720 of
+#: 34,720 and 60,549 of 60,549 records, no other shape and no empty value.
+_UPSTREAM_DATE = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})$")
+
 
 class IngestionFailed(RuntimeError):
     """A refresh could not complete, or completed partially.
@@ -145,6 +159,12 @@ class QuestionRecord:
 
     question: Question
     asker_forms: tuple[str, ...]
+    #: The ministry name **exactly as written**, for the same reason
+    #: `asker_forms` is here: `Question.ministry_id` holds the *minted* id, and
+    #: deciding ministry identity needs the name plus the whole window's
+    #: first-seen order (`sansad.publish.reference.MinistryRegistry`). A slug
+    #: cannot be un-slugged.
+    ministry_name: str = ""
 
 
 def _pick(record: Mapping[str, Any], keys: Sequence[str]) -> Any:
@@ -161,6 +181,42 @@ def _text(record: Mapping[str, Any], keys: Sequence[str], default: str = NOT_STA
     if value is None:
         return default
     return str(value).strip() or default
+
+
+def iso_date(value: str) -> str:
+    """Convert the upstream's `DD.MM.YYYY` to ISO-8601, or raise.
+
+    **Published dates are ISO-8601, and that is a deliberate conversion.** Three
+    reasons, in order of weight:
+
+    1. `DD.MM.YYYY` is **ambiguous to a consumer**: `01.04.2022` reads as 1
+       April or 4 January depending on where the reader is from. ISO-8601 has
+       one reading.
+    2. It **sorts wrongly as a string**. Taking the min and max of the window's
+       dates lexicographically returns `01.04.2022 .. 31.07.2026` where the
+       truth is `2019-06-21 .. 2026-08-12`. That was a real defect in the
+       Coverage Statement's period, found by reading the first dry run's output,
+       and fixing it at every comparison site instead of at the boundary would
+       leave the next site to get it wrong.
+    3. FR-013 excludes questions outside the covered window, and
+       `route-capture.md` names a misparsed date as the way that exclusion gets
+       silently mis-scoped.
+
+    An unparseable date **raises**. The format is asserted over 95,269 records,
+    so a value that does not match it is an upstream shape change and belongs in
+    a maintainer signal (FR-011), not in a published record as-is.
+    """
+    text = (value or "").strip()
+    match = _UPSTREAM_DATE.match(text)
+    if match is None:
+        raise ValueError(
+            f"question date {text!r} is not the asserted upstream format DD.MM.YYYY. "
+            f"The format was asserted over all 95,269 records of the covered window; "
+            f"a divergence is an upstream shape change (FR-011), not something to "
+            f"coerce."
+        )
+    day, month, year = match.groups()
+    return f"{year}-{month}-{day}"
 
 
 def session_id_for(house: House, lok_no: str, session_no: str) -> str:
@@ -222,15 +278,69 @@ def question_id_for(
 
 
 def ministry_id_for(name: str) -> str:
-    """A provisional `ministry_id` slugged from the ministry name.
+    """The **minted** `ministry_id` for a ministry name: its slug.
 
-    **This does not yet satisfy `data-model.md`'s stability rule** -- see the
-    module docstring's declared gap. T052 reconciles against
-    `/api_ls/question/getMinistry`, which is the reference set; until then a
-    rename upstream mints a second id.
+    Owner decision 2026-10-09 (`spike/ministry-identity.md`): `ministry_id` is
+    the slug of the **first** name a ministry was seen under, assigned once and
+    never changed. This function mints the per-name candidate; deciding which
+    name was first, and which minted ids collapse together, is
+    `sansad.publish.reference.MinistryRegistry`, because that needs the whole
+    window to see first-seen dates and the confirmed rename mappings.
+
+    **`minCode` is deliberately not used.** The reference set does serve one,
+    but it is per-term: 10 of the 52 names present in both terms carry a
+    different code, and 14 of the 56 shared codes name a different ministry in
+    each term. Question records carry only the name in any case.
+
+    The slug is kept **unfolded** -- see `ministry_fold_key` for why the fold is
+    a matching device rather than the published id.
     """
     slug = _SLUG_STRIP.sub("-", (name or "").strip().lower()).strip("-")
     return slug or NOT_STATED
+
+
+#: Tokens shorter than this keep their trailing `s`. Four is chosen so `ports`
+#: folds; no name in the window depends on the boundary either way.
+_FOLD_MIN_TOKEN = 4
+
+
+def ministry_fold_key(name: str) -> str:
+    """A matching key that folds a trailing plural off each token.
+
+    **A matching device, not an identity.** The published `ministry_id` is the
+    unfolded slug of the first name seen; this key only decides *which names
+    are the same ministry*. Keeping the two apart is the discipline
+    `sansad.resolve.normalise` holds to for member names -- "normalisation is
+    for matching only" -- and it keeps published ids readable
+    (`agriculture-and-farmers-welfare`, not `agriculture-and-farmer-welfare`).
+
+    Approved by owner decision 2026-10-09. Measured over the window's **64**
+    distinct ministry names it merges exactly **four** groups and creates **no
+    false merge**:
+
+    | Variant A | Variant B | Difference | Resolved by |
+    |---|---|---|---|
+    | `EDUCATION` | `Education` | case | the slug alone |
+    | `MICRO, SMALL ...` | `MICRO,SMALL ...` | punctuation | the slug alone |
+    | `COMMUNICATIONS` | `COMMUNICATION` | trailing plural | **this fold** |
+    | `ENVIRONMENT,  FORESTS ...` | `ENVIRONMENT, FOREST ...` | plural + space | **this fold** |
+
+    The last two carry 325 and 3,010 questions, and neither needs a maintainer
+    assertion as a result.
+
+    **Its limit, stated rather than discovered later**: a trailing-`s` rule, not
+    lemmatisation. It does not resolve an abbreviation (`AYUSH` against its long
+    form), a reordering, or a word substitution -- those need a confirmed
+    mapping, and four such mappings exist.
+
+    **No merge is silent**: `MinistryRegistry` reports every group this key
+    merged and the Coverage Statement publishes the list (T053).
+    """
+    slug = ministry_id_for(name)
+    return "-".join(
+        token[:-1] if len(token) >= _FOLD_MIN_TOKEN and token.endswith("s") else token
+        for token in slug.split("-")
+    )
 
 
 def _asker_forms(record: Mapping[str, Any]) -> tuple[str, ...]:
@@ -274,16 +384,17 @@ def question_record_from(
             f"composite cannot be published under a minted one."
         )
 
+    ministry_name = _text(filtered, _MINISTRY_KEYS, default="")
     question_type = _text(filtered, _TYPE_KEYS)
     question_id = question_id_for(house, lok_no, session_no, question_type, ques_no)
     question = Question(
         question_id=question_id,
         house=house,
         session=session_id_for(house, lok_no, session_no),
-        date=_text(filtered, _DATE_KEYS),
+        date=iso_date(_text(filtered, _DATE_KEYS, default="")),
         type=question_type,
         subject=_text(filtered, _SUBJECT_KEYS),
-        ministry_id=ministry_id_for(_text(filtered, _MINISTRY_KEYS, default="")),
+        ministry_id=ministry_id_for(ministry_name),
         # Empty and `unresolved` until `sansad.resolve` says otherwise. The
         # entity never holds a name string in place of an identity.
         asking_members=(),
@@ -291,7 +402,11 @@ def question_record_from(
         source_record_ref=f"{source_route}#{question_id}",
         last_refreshed=last_refreshed or NOT_STATED,
     )
-    return QuestionRecord(question=question, asker_forms=_asker_forms(filtered))
+    return QuestionRecord(
+        question=question,
+        asker_forms=_asker_forms(filtered),
+        ministry_name=ministry_name,
+    )
 
 
 @dataclass(frozen=True, slots=True)

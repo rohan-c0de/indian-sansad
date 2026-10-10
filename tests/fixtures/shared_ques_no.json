@@ -4,7 +4,7 @@
   "_why_these_records": "quesNo is numbered per (session, type). This fixture reproduces the exact shape at minimum size: one STARRED and one UNSTARRED question in the SAME session with the SAME quesNo, which the old composite merged into one id and the corrected one keeps apart.",
   "listOfQuestions": [
     {
-      "quesNo": 55, "lokNo": "18", "sessionNo": "5", "date": "2025-02-03",
+      "quesNo": 55, "lokNo": "18", "sessionNo": "5", "date": "03.02.2025",
       "type": "STARRED", "subjects": "Placeholder subject, starred, quesNo 55",
       "ministry": "Ministry of Placeholder Affairs",
       "member": ["Shri Sunil Kumar Singh"],
@@ -15,7 +15,7 @@
       "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
     },
     {
-      "quesNo": 55, "lokNo": "18", "sessionNo": "5", "date": "2025-02-04",
+      "quesNo": 55, "lokNo": "18", "sessionNo": "5", "date": "04.02.2025",
       "type": "UNSTARRED", "subjects": "Placeholder subject, UNSTARRED, same quesNo and session",
       "ministry": "Ministry of Placeholder Affairs",
       "member": ["Smt. Asha Devi Verma"],
@@ -26,7 +26,7 @@
       "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
     },
     {
-      "quesNo": 56, "lokNo": "18", "sessionNo": "5", "date": "2025-02-05",
+      "quesNo": 56, "lokNo": "18", "sessionNo": "5", "date": "05.02.2025",
       "type": "UNSTARRED   ", "subjects": "Placeholder subject, type carries trailing whitespace as the 17th LS serves it",
       "ministry": "Ministry of Placeholder Affairs",
       "member": ["Shri Sunil Kumar Singh"],
@@ -37,7 +37,7 @@
       "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
     },
     {
-      "quesNo": 57, "lokNo": "18", "sessionNo": "5", "date": "2025-02-06",
+      "quesNo": 57, "lokNo": "18", "sessionNo": "5", "date": "06.02.2025",
       "type": "UNSTARRED", "subjects": "Placeholder subject, served twice by the upstream",
       "ministry": "Ministry of Placeholder Affairs",
       "member": ["Smt. Asha Devi Verma"],
@@ -48,7 +48,7 @@
       "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
     },
     {
-      "quesNo": 57, "lokNo": "18", "sessionNo": "5", "date": "2025-02-06",
+      "quesNo": 57, "lokNo": "18", "sessionNo": "5", "date": "06.02.2025",
       "type": "UNSTARRED", "subjects": "Placeholder subject, served twice by the upstream",
       "ministry": "Ministry of Placeholder Affairs",
       "member": ["Smt. Asha Devi Verma"],

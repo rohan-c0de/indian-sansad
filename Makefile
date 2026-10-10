@@ -137,35 +137,67 @@ audit-fields:
 # printed "quickstart.md:  sessions" where the scenario belonged.
 # ========================================================================
 
-refresh:
-	@set -eu -o pipefail; \
-	 echo "make refresh: NOT IMPLEMENTED YET."; \
-	 echo "  will: run one full ingestion and publish to data/published/ locally, with no prompting (a prompt is a failure against FR-009)"; \
-	 echo "  quickstart.md: setup step -- writes data/published/ locally only; publishing is the scheduled workflow's job"; \
-	 echo "  implemented by: T055"; \
-	 echo "  Failing deliberately (T035): a stub that exited 0 would let"; \
-	 echo "  'make validate' report success on work that has not been done."; \
-	 exit 1
+# --------------------------------------------------------------------------
+# refresh -- T055. One full ingestion and publish, prompting for NOTHING.
+#
+# "make refresh must complete without prompting for anything. A prompt is a
+# failure against FR-009." So this passes --source explicitly rather than
+# letting anything be inferred, and the default source is `scratch`: a command
+# that reaches the upstream unless told otherwise is one that reaches it by
+# accident. SOURCE=upstream is the fetching path the workflow calls.
+#
+# Writes data/published/ LOCALLY only -- it is git-ignored on main. Publishing
+# is the scheduled workflow's job (T058).
+# --------------------------------------------------------------------------
+SOURCE ?= scratch
+PREVIOUS ?=
 
+refresh: scratch
+	@set -eu -o pipefail; \
+	 if [[ ! -x "$(VENV_PY)" ]]; then \
+	   echo "make refresh: no environment at $(VENV). Run 'make setup' first."; \
+	   exit 1; \
+	 fi; \
+	 SANSAD_SCRATCH="$(SANSAD_SCRATCH)" "$(VENV_PY)" -m sansad.cli \
+	   --source "$(SOURCE)" \
+	   --published-dir "$(REPO_ROOT)/data/published" \
+	   $(if $(PREVIOUS),--previous "$(PREVIOUS)",)
+
+# --------------------------------------------------------------------------
+# verify-joins -- T056 / quickstart.md scenario 4 (FR-005).
+#
+# Recomputes nothing: it reads the published files and confirms a consumer
+# could audit any join without re-deriving it.
+# --------------------------------------------------------------------------
 verify-joins:
 	@set -eu -o pipefail; \
-	 echo "make verify-joins: NOT IMPLEMENTED YET."; \
-	 echo "  will: check that every published join has a Resolution Record enabling independent verification"; \
-	 echo "  quickstart.md: scenario 4 (FR-005)"; \
-	 echo "  implemented by: T056"; \
-	 echo "  Failing deliberately (T035): a stub that exited 0 would let"; \
-	 echo "  'make validate' report success on work that has not been done."; \
-	 exit 1
+	 "$(VENV_PY)" tools/verify_joins.py "$(REPO_ROOT)/data/published"
 
+# --------------------------------------------------------------------------
+# extract -- T057 / quickstart.md scenario 5 (FR-007), all five axes.
+#
+#   make extract HOUSE=lok-sabha/17 SESSION=1
+#   make extract MINISTRY=defence
+#   make extract MEMBER=ls-5199
+#   make extract STATE=Maharashtra
+#   make extract CONSTITUENCY=Raigad
+#
+# Session, ministry and member each come from their own partition in ONE fetch.
+# State and constituency resolve through the member reference set plus only the
+# matching members' files -- the tool asserts that budget and names every file
+# it opened, because a fetch count is the only way to tell "reached the subset"
+# from "filtered the whole record in memory".
+# --------------------------------------------------------------------------
 extract:
 	@set -eu -o pipefail; \
-	 echo "make extract: NOT IMPLEMENTED YET."; \
-	 echo "  will: emit a subset on any of the five FR-007 axes without taking the whole record: HOUSE/SESSION, MINISTRY, MEMBER, STATE, CONSTITUENCY"; \
-	 echo "  quickstart.md: scenario 5 (US2, US3, FR-007)"; \
-	 echo "  implemented by: T057"; \
-	 echo "  Failing deliberately (T035): a stub that exited 0 would let"; \
-	 echo "  'make validate' report success on work that has not been done."; \
-	 exit 1
+	 "$(VENV_PY)" tools/extract.py --published "$(REPO_ROOT)/data/published" \
+	   $(if $(HOUSE),--house "$(HOUSE)",) \
+	   $(if $(SESSION),--session "$(SESSION)",) \
+	   $(if $(MINISTRY),--ministry "$(MINISTRY)",) \
+	   $(if $(MEMBER),--member "$(MEMBER)",) \
+	   $(if $(STATE),--state "$(STATE)",) \
+	   $(if $(CONSTITUENCY),--constituency "$(CONSTITUENCY)",) \
+	   $(if $(OUT),--out "$(OUT)",)
 
 report:
 	@set -eu -o pipefail; \
@@ -197,15 +229,16 @@ composition:
 	 echo "  'make validate' report success on work that has not been done."; \
 	 exit 1
 
+# --------------------------------------------------------------------------
+# coverage -- T053 / quickstart.md scenario 11 (FR-013).
+#
+# Prints the published Coverage Statement for every House, including the one
+# with no route: "If Rajya Sabha data is absent, the statement says Lok Sabha
+# only -- it must not imply coverage it does not have."
+# --------------------------------------------------------------------------
 coverage:
 	@set -eu -o pipefail; \
-	 echo "make coverage: NOT IMPLEMENTED YET."; \
-	 echo "  will: print one Coverage Statement per House: period, sessions, known gaps, resolution rate -- and say Lok Sabha only if Rajya Sabha is absent"; \
-	 echo "  quickstart.md: scenario 11 (FR-013)"; \
-	 echo "  implemented by: T053"; \
-	 echo "  Failing deliberately (T035): a stub that exited 0 would let"; \
-	 echo "  'make validate' report success on work that has not been done."; \
-	 exit 1
+	 "$(VENV_PY)" tools/show_coverage.py "$(REPO_ROOT)/data/published"
 
 serve-local:
 	@set -eu -o pipefail; \

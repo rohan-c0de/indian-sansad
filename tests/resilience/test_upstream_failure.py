@@ -25,6 +25,8 @@ visitor actually experiences, and a skipped test for it would read as a pass.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import httpx
 import pytest
 
@@ -43,7 +45,7 @@ def _record(ques_no: int) -> dict:
         "quesNo": ques_no,
         "lokNo": "18",
         "sessionNo": "1",
-        "date": "2024-07-01",
+        "date": "01.07.2024",
         "type": "UNSTARRED",
         "subjects": "Placeholder subject",
         "ministry": "Ministry of Placeholder Affairs",
@@ -211,23 +213,130 @@ def test_a_complete_response_is_accepted():
 # ---------------------------------------------------------------------------
 # The visitor's half of FR-010 -- PENDING T053 / T054
 # ---------------------------------------------------------------------------
-def test_the_coverage_statement_flags_the_record_as_last_known_good():
-    from sansad.publish import coverage  # PENDING T053
+def _snapshot(root: Path, *, last_refreshed: str) -> Path:
+    """A minimal but COMPLETE published snapshot, for the retention tests."""
+    from sansad.model._common import House
+    from sansad.publish.coverage import CoverageInputs, write_coverage_statements
+    from sansad.publish.partitions import write_manifest
 
-    assert hasattr(coverage, "write_coverage_statements")
+    for axis in ("by-session", "by-ministry", "by-member"):
+        (root / axis).mkdir(parents=True, exist_ok=True)
+        (root / axis / "x.jsonl").write_text('{"question_id":"q1"}\n', encoding="utf-8")
+        (root / axis / "x.csv").write_text("question_id\nq1\n", encoding="utf-8")
+    write_coverage_statements(
+        root,
+        [
+            CoverageInputs(
+                house=House.LOK_SABHA,
+                period_start="2019-06-21",
+                period_end="2026-08-12",
+                sessions_covered=("lok-sabha/17/1",),
+                last_refreshed=last_refreshed,
+                total_questions=10,
+                resolved_automatic=9,
+                resolved_assisted=10,
+            )
+        ],
+    )
+    write_manifest(
+        root,
+        last_refreshed=last_refreshed,
+        sets={"by-session": {"files": 2, "records": 1}},
+    )
+    return root
 
 
-def test_a_failed_refresh_retains_the_previous_snapshot_re_dated():
+def test_the_coverage_statement_flags_the_record_as_last_known_good(tmp_path):
+    """FR-010: the record "MUST remain coherent and dated rather than empty or
+    partial", and `last_known_good` must say which it is.
+
+    The date it carries must be the date of the **last successful** refresh, not
+    today's. Re-stamping today onto a snapshot that is not from today would make
+    stale data look fresh, which is the one thing FR-010 exists to prevent.
+    """
+    from sansad.publish.formats import read_ndjson
+    from sansad.publish.last_known_good import retain_previous
+
+    previous = _snapshot(tmp_path / "previous", last_refreshed="2026-10-01")
+    destination = tmp_path / "published"
+
+    found = retain_previous(
+        previous, destination, reason="upstream unavailable", today="2026-10-09"
+    )
+
+    assert found.usable, found.reason
+    row = read_ndjson(destination / "coverage.jsonl")[0]
+    assert row["last_known_good"] == "last-known-good"
+    assert row["last_refreshed"] == "2026-10-01", "a stale snapshot must keep its own date"
+    assert row["last_attempted"] == "2026-10-09"
+    assert row["last_known_good_reason"] == "upstream unavailable"
+
+
+def test_a_failed_refresh_retains_the_previous_snapshot_re_dated(tmp_path):
     """ "the previously published record is retained and re-dated as
     last-known-good rather than replaced by an empty or partial one" (T054)."""
-    from sansad.publish import last_known_good  # PENDING T054
+    from sansad.publish.last_known_good import retain_previous
 
-    assert hasattr(last_known_good, "retain_previous")
+    previous = _snapshot(tmp_path / "previous", last_refreshed="2026-10-01")
+    destination = tmp_path / "published"
+
+    retain_previous(previous, destination, reason="shape change", today="2026-10-09")
+
+    # Every question partition survived -- nothing was emptied.
+    for axis in ("by-session", "by-ministry", "by-member"):
+        assert (destination / axis / "x.jsonl").is_file()
+        assert (destination / axis / "x.csv").is_file()
+    assert (destination / "manifest.json").is_file()
 
 
-def test_the_visitor_never_sees_an_error_state():
-    """FR-010's quiet half, which is a property of the published record rather
-    than of the pipeline: a failed refresh leaves a coherent, dated record."""
-    from sansad.publish import last_known_good  # PENDING T054
+def test_an_incomplete_previous_snapshot_is_not_promoted(tmp_path):
+    """A partial directory is not a snapshot, and serving it would present a
+    partial record as complete -- which SC-006 forbids.
 
-    assert hasattr(last_known_good, "retain_previous")
+    It reports rather than raises: a failed refresh with no good fallback is a
+    state to describe, not a second exception on top of the first.
+    """
+    from sansad.publish.last_known_good import inspect_previous, retain_previous
+
+    half = tmp_path / "half"
+    (half / "by-session").mkdir(parents=True)
+    (half / "by-session" / "x.jsonl").write_text('{"question_id":"q1"}\n', encoding="utf-8")
+
+    found = inspect_previous(half)
+    assert found.exists and not found.usable
+    assert "by-ministry" in found.missing and "manifest.json" in found.missing
+    assert "SC-006" in found.reason
+
+    destination = tmp_path / "published"
+    assert not retain_previous(half, destination, reason="x", today="y").usable
+    assert not destination.exists(), "an unusable snapshot must not be copied anywhere"
+
+    # ...and an absent one is simply absent, not an error.
+    assert not inspect_previous(tmp_path / "nothing-here").exists
+    assert not inspect_previous(None).exists
+
+
+def test_the_visitor_never_sees_an_error_state(tmp_path):
+    """FR-010's quiet half: a failed refresh leaves a coherent, dated record.
+
+    "Fails if: visitors see an error." Asserted on the retained snapshot: every
+    field a reader needs is still populated, the statement still parses, and the
+    staleness is self-describing rather than an error page.
+    """
+    from sansad.publish.formats import read_csv, read_ndjson
+    from sansad.publish.last_known_good import retain_previous
+
+    previous = _snapshot(tmp_path / "previous", last_refreshed="2026-10-01")
+    destination = tmp_path / "published"
+    retain_previous(previous, destination, reason="upstream 503", today="2026-10-09")
+
+    rows = read_ndjson(destination / "coverage.jsonl")
+    assert len(rows) == 1
+    row = rows[0]
+    for required in ("house", "period_start", "period_end", "total_questions", "last_refreshed"):
+        assert row.get(required) not in (None, ""), required
+    # Coherent, not empty or partial.
+    assert row["total_questions"] == 10
+    assert row["sessions_covered"] == ["lok-sabha/17/1"]
+    # Both formats stay in step, so a CSV consumer sees the same staleness.
+    assert read_csv(destination / "coverage.csv")[0]["last_known_good"] == "last-known-good"

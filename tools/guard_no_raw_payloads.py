@@ -190,6 +190,29 @@ PAYLOAD_SUFFIXES: frozenset[str] = frozenset(
 
 PAYLOAD_SIZE_CEILING_BYTES = 64 * 1024  # 64 KB, per T002
 
+# Prefixes the size ceiling does NOT apply to, and the reason, which is the one
+# T031 already recorded for `--audit-fields`:
+#
+#   "The 64 KB payload ceiling is NOT applied inside `data/published/`. That
+#    ceiling exists to catch a committed raw upstream response masquerading as a
+#    fixture... Applying the fixture ceiling there would fail on every
+#    [partition]."
+#
+# Added to the TREE scan on 2026-10-09, when T051-T055 produced
+# `data/published/` for the first time and `make guard` went red on **759 size
+# violations and 0 attribute violations**. The two modes of this tool disagreed:
+# `--audit-fields` exempted the published dataset and the tree scan did not.
+# The tree scan was wrong -- `data/published/` is a build output, git-ignored on
+# `main`, and the Makefile's own note says `guard` "scans the committed tree".
+#
+# **Attributes are still scanned there.** Only the fixture ceiling is exempted,
+# so nothing goes unchecked: a prohibited attribute in a published file still
+# fails this guard, and `--audit-fields` covers the same scope under the rules
+# SC-010 requires. A guard that is permanently red after every refresh is a
+# guard that gets switched off, which is worse than no guard because it looks
+# like one.
+SIZE_CEILING_EXEMPT_PREFIXES: tuple[str, ...] = ("data/published/",)
+
 # Binary and generated files are not scanned for text. They are still size-checked
 # when payload-shaped.
 UNSCANNABLE_SUFFIXES: frozenset[str] = frozenset(
@@ -630,7 +653,10 @@ def main(argv: list[str] | None = None) -> int:
         suffix = path.suffix.lower()
 
         # --- size ceiling, applied to payload-shaped files ---
-        if suffix in PAYLOAD_SUFFIXES:
+        # ...except in a build output, where large files are the product rather
+        # than a smuggled fixture. See SIZE_CEILING_EXEMPT_PREFIXES.
+        exempt_from_ceiling = relpath.startswith(SIZE_CEILING_EXEMPT_PREFIXES)
+        if suffix in PAYLOAD_SUFFIXES and not exempt_from_ceiling:
             size = path.stat().st_size
             if size > args.max_payload_bytes:
                 size_violations.append(

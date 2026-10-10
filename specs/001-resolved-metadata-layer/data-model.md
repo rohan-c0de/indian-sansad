@@ -101,13 +101,13 @@ The audit link between a written name form and the identity it resolved to. This
 
 | Field | Notes |
 |---|---|
-| `session_id` | House plus session number. |
+| `session_id` | House, **term** and session number — e.g. `lok-sabha/17/1`. **Corrected 2026-10-09**: the id was House plus session number, which conflates the two Lok Sabhas in the covered window (both number sessions from 1, and both carry questions in sessions 2–8 — seven collisions). |
 | `house` | Which House. |
 | `number` | Session number as the House numbers it. |
 | `start_date`, `end_date` | Period covered. |
 | `sitting_days` | Count, where known. |
 
-**Note**: Lok Sabha and Rajya Sabha number sessions independently; `session_id` MUST be scoped by House so the two series are never conflated (Key Entities, House).
+**Note**: Lok Sabha and Rajya Sabha number sessions independently; `session_id` MUST be scoped by House so the two series are never conflated (Key Entities, House) — **and by term**, because successive Lok Sabhas also number their sessions from 1, so House alone is not enough inside a window spanning two of them.
 
 ## Constituency
 
