@@ -44,7 +44,10 @@ published to GitHub.**
 - **Resolution meets SC-002**: **96.36%** (91,796 of 95,268 questions) with four owner-confirmed
   maintainer assertions; **94.78%** automatic. Both are published separately, because the
   automatic rate is below the 95% target.
-- **159 tests pass**; `make guard`, `make lint` and `make audit-fields` are clean.
+- **The test suite passes** — `.venv/bin/python -m pytest` — and `make guard`, `make lint` and
+  `make audit-fields` are clean. No count is quoted here on purpose: a hand-typed
+  figure beside a growing suite went stale twice in two days, and a number nobody
+  re-measures is worse than no number.
 
 ### Not done
 
