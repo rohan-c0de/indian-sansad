@@ -24,19 +24,50 @@ five principles that gate the work.
 
 ## Current status
 
-**The blocking spike is complete; the pipeline is not built.** This repository contains the
-specification artefacts, the Phase 1 guard rails, and the Phase 2 spike with its measurements.
-`src/sansad/`, `web/` and `data/published/` do not exist yet.
+**73 of 100 tasks are done** ([`tasks.md`](specs/001-resolved-metadata-layer/tasks.md)). The
+pipeline is built and the dataset is built. **The reader page is not built, and nothing has been
+published to GitHub.**
 
-**Phase 3 is unblocked and has not started.** Both owner decisions it waited on were recorded
-on 2026-10-09 — see
-[`spike/spike-report.md`](specs/001-resolved-metadata-layer/spike/spike-report.md) and
-[`spike/size-budget.md`](specs/001-resolved-metadata-layer/spike/size-budget.md):
+### Done
 
-- **Identity resolution**: the bidirectional token-containment tier is **adopted**, and
-  **SC-002 stays at 95%** — met by improving resolution, not by lowering the target.
-- **Repository growth**: the dataset is published to a **rolling `published` branch** as a single
-  force-pushed commit; `data/published/` is git-ignored on `main`.
+- **Phases 1–5 complete** — guard rails (T001–T003), the blocking spike (T004–T020), the
+  foundational layer (T021–T035), User Story 1 (T036–T061) and User Story 4 (T062–T069).
+- **Phase 6's dataset side complete** — T070–T073: per-ministry profiles and the subject-search
+  index, with their contract tests.
+- **The pipeline has been run end to end once against the live upstream** — 2026-10-10,
+  **52m 38s measured**, fetching, resolving and publishing all **95,268** questions. That is the
+  only end-to-end timing that exists.
+- **The dataset is built**: **1,768 files, 257,804,931 bytes (245.9 MiB)** — 24.0% of the 1 GiB
+  GitHub Pages ceiling — across the by-session, by-ministry and by-member partitions, the
+  reference sets, the aggregates, the 2.37 MiB subject-search index and the coverage statement,
+  each in both NDJSON and CSV.
+- **Resolution meets SC-002**: **96.36%** (91,796 of 95,268 questions) with four owner-confirmed
+  maintainer assertions; **94.78%** automatic. Both are published separately, because the
+  automatic rate is below the 95% target.
+- **147 tests pass**; `make guard`, `make lint` and `make audit-fields` are clean.
+
+### Not done
+
+- **The reader page does not exist.** `web/` is empty. T074–T085 — the page shell, the fetch
+  layer, the coverage display, the ministry-profile and subject-search views, two-ministry
+  comparison and `make serve-local` — are open. A static mockup of the intended page sits at
+  [`mockup/`](specs/001-resolved-metadata-layer/mockup/) and is wired to nothing.
+- **The refresh workflow has never run on GitHub.** `.github/workflows/refresh.yml` is written
+  and statically checked (`make yamllint`, 0 findings) but unproven: the daily schedule, the
+  force-push to the `published` branch and the 60-day keep-alive are all unobservable locally.
+  **The `published` branch does not exist**, so GitHub Pages cannot be pointed at it yet.
+- **`main` must stay unprotected.** The workflow pushes a keep-alive commit directly to `main` on
+  every run, against GitHub's rule that a public repository's scheduled workflows are disabled
+  after 60 days without repository activity. Branch protection blocking direct pushes would make
+  the job fail every run — **loudly, by design**, rather than leaving the 60-day protection
+  silently void. See
+  [`spike/free-tiers.md`](specs/001-resolved-metadata-layer/spike/free-tiers.md) →
+  *`main` must stay unprotected*.
+- **Lok Sabha only.** No Rajya Sabha data is published — see *What is still unknown* below. The
+  coverage statement declares this rather than implying both Houses.
+- **Phases 7, 8 and 9 have not started** — the state and constituency entry point (T086–T090),
+  polish and gate evidence (T091–T097), and the Rajya Sabha route investigation (T098–T100).
+  `make validate` is still a deliberately-failing stub, owned by T091.
 
 ### What the spike established
 
@@ -113,9 +144,8 @@ spike/             throwaway spike code (Phase 2); not production
 specs/             specification artefacts
 ```
 
-`specs/`, `tools/`, `spike/` and the `Makefile` exist. `src/sansad/`, `web/`,
-`data/published/`, `data/assertions/` and `tests/` do not — they are created by
-the phase that first needs them.
+Everything above exists except `web/`, which is empty. `data/published/` is a build output,
+git-ignored on `main` and served from the `published` branch.
 
 ## Licence
 

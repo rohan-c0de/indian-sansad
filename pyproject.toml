@@ -7,6 +7,20 @@ name = "sansad"
 version = "0.1.0"
 description = "A resolved metadata layer over the Indian parliamentary record"
 readme = "README.md"
+
+# PEP 639 form: `license` is an SPDX expression STRING and `license-files` is a
+# glob list, which together emit Metadata 2.4's `License-Expression` and
+# `License-File` rather than the deprecated `License:` free-text field.
+# Supported by hatchling from 1.27.0; the unpinned `requires = ["hatchling"]`
+# below resolves to 1.32.4 (verified 2026-10-10 by building a wheel and reading
+# the emitted METADATA), so NO backend version bump was needed.
+#
+# This covers the CODE only, which is what a wheel contains. The published
+# dataset is CC BY 4.0 on the added work and is NOT shipped in the wheel, so
+# DATA-LICENSE.md is deliberately absent from license-files -- listing it here
+# would attach a dataset licence to a distribution that carries no dataset.
+license = "MIT"
+license-files = ["LICENSE"]
 # Pinned, not a floor-with-headroom. plan.md names Python 3.13 and the spike's
 # measured figures were produced on 3.13.5; 3.14 is unverified here.
 requires-python = ">=3.13,<3.14"

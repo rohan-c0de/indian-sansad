@@ -94,6 +94,11 @@ def _workspace(tmp_path: Path, *, web: str) -> Path:
     (published / "by-session" / "lok-sabha-18-7.jsonl").write_text('{"question_id": "x"}\n')
     (published / "coverage.jsonl").write_text('{"house": "lok-sabha"}\n')
 
+    # Both licence files live at the REPOSITORY root, not under web/ or
+    # data/published/, so they are a third thing the layout has to place.
+    (workspace / "LICENSE").write_text("MIT License\n")
+    (workspace / "DATA-LICENSE.md").write_text("# Licence for the published dataset\n")
+
     if web == "populated":
         page = workspace / "web"
         (page / "assets").mkdir(parents=True)
@@ -155,6 +160,11 @@ def test_page_at_the_root_and_dataset_under_data_published(tmp_path: Path, targe
     # And no doubled path from copying a directory into itself.
     assert not (target / "data" / "published" / "data").exists()
 
+    # The licences are at the branch root, where a consumer of the branch
+    # actually looks for them.
+    assert (target / "LICENSE").read_text() == "MIT License\n"
+    assert (target / "DATA-LICENSE.md").exists()
+
     # Pages must not run the dataset through Jekyll.
     assert (target / ".nojekyll").is_file()
 
@@ -200,6 +210,32 @@ def test_web_today_is_in_fact_empty_or_absent() -> None:
     ).stdout.strip()
     assert tracked == "", f"web/ now tracks files: {tracked!r} -- T074 has landed"
     assert not page.exists() or not any(page.iterdir())
+
+
+@pytest.mark.parametrize("web", ["populated", "empty", "absent"])
+def test_the_licences_are_published_whatever_the_page_state(
+    tmp_path: Path, target: Path, web: str
+) -> None:
+    """A consumer who takes the `published` branch gets the dataset and no
+    repository, so a licence that stays on `main` is a licence they never see.
+    Both files publish on every run, including the dataset-only runs -- the
+    dataset is the thing DATA-LICENSE.md is about, so a run that publishes the
+    dataset without it is the case that matters most."""
+    workspace = _workspace(tmp_path, web=web)
+    result = _run_layout(workspace, target)
+    assert result.returncode == 0, result.stderr
+
+    assert (target / "LICENSE").is_file(), "LICENSE missing from the branch root"
+    assert (target / "DATA-LICENSE.md").is_file(), "DATA-LICENSE.md missing"
+    # At the ROOT -- not swept into the dataset directory.
+    assert not (target / "data" / "published" / "LICENSE").exists()
+
+
+def test_both_licence_files_exist_to_be_published() -> None:
+    """Pins the premise: the workflow copies these two by name, so a rename in
+    the repository must fail here rather than silently publish nothing."""
+    assert (REPO_ROOT / "LICENSE").is_file()
+    assert (REPO_ROOT / "DATA-LICENSE.md").is_file()
 
 
 def test_the_dataset_wins_a_path_collision(tmp_path: Path, target: Path) -> None:

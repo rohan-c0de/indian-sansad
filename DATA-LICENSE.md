@@ -31,8 +31,37 @@ Everything this project contributes is licensed
 - **the coverage statement**, and the prose of this and the other published
   documentation.
 
-Attribute it to **Indian Sansad Maintainer**, with a link to the project. You
-may share and adapt it, including commercially, under those terms.
+You may share and adapt it, including commercially, under those terms. The
+attribution to use, verbatim:
+
+> Contains data from Indian Sansad (https://github.com/rohan-c0de/indian-sansad), licensed CC BY 4.0, built over records published by the Lok Sabha.
+
+It names the source layer as well as this project, because an attribution that
+credited only this project would imply the records themselves are ours.
+
+### This line points at the repository, not at a published site
+
+There is no public site yet: the `published` branch does not exist until the
+first workflow run, and GitHub Pages can only be pointed at it afterwards. The
+URL above is the repository, which does exist.
+
+**Once a Pages URL exists, every one of these needs updating. The list is here
+so none is missed, and none of them is done.**
+
+| Where | What changes |
+|---|---|
+| `DATA-LICENSE.md` — the attribution line above | the canonical link becomes the site, or names both |
+| `README.md` | carries **no URL at all** today; wants the site link, at least in the Licence section |
+| `contracts/published-dataset.md` → "Where it is published" | says paths resolve "relative to wherever the branch is served"; can name the origin |
+| `spike/free-tiers.md` lines ~258-259 | `https://rohan-c0de.github.io/indian-sansad/...` is written there as a **prediction**; T015's verdict is "VERIFIED by construction, not by execution" and becomes observed |
+| `spike/free-tiers.md` line ~287 | records that the URL is derived from the maintainer's handle — the live Attribution deviation; the decision to transfer to an organisation would change the URL again |
+| `specs/001-resolved-metadata-layer/mockup/README.md` lines ~224-225 | the same predicted URLs |
+| `data/published/coverage.jsonl` and `manifest.json` | **neither carries a project URL or this attribution string today.** A consumer who takes only the files therefore has no link to attribute, which is a gap in CC BY compliance, not a cosmetic one. Needs a field added in `src/sansad/publish/coverage.py` and `partitions.py` → `write_manifest`, plus a contract test |
+| `web/index.html`, `web/app.js` (T074, T076) | not built; the page should display the attribution rather than leave a visitor to find this file |
+
+Changing the URL later does not invalidate anything already distributed under
+CC BY 4.0 — the licence does not expire — but a stale link is a broken
+attribution for anyone following it.
 
 ### The underlying parliamentary records — not ours, terms unknown to us
 

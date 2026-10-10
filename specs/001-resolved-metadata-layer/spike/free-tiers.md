@@ -276,6 +276,46 @@ authoritative; the owner settled it on 2026-10-10 by changing the workflow to ma
 The mismatch was never observed, because the workflow has never run. `quickstart.md` scenario 12 (`make serve-local`, `make test-page`) is what
 turns this into an executed check, and it belongs to Phase 6.
 
+## `main` must stay unprotected, and a protected `main` fails loudly by design
+
+**Recorded 2026-10-10.** The refresh workflow pushes **directly to `main`** on every run,
+including runs that find nothing new:
+
+```
+git push origin HEAD:main          # the keep-alive, step 11, if: always()
+```
+
+This is the keep-alive against the rule T008 recorded — *"In a public repository, scheduled
+workflows are automatically disabled when no repository activity has occurred in 60 days"* — and
+it lives on `main` because **whether a push to a non-default branch counts as repository activity
+is UNVERIFIED**, and FR-009 must not rest on that reading.
+
+**So branch protection on `main` that blocks direct pushes would break the refresh.** Not
+subtly:
+
+- The step retries **once** after rebasing on the current `origin/main`, then gives up. Under
+  `set -eu` a second rejection exits non-zero.
+- The step is `if: always()`, so it runs — and fails — **even on a run whose publish succeeded**.
+  The job would go red every day with a good dataset on the `published` branch.
+- The 60-day auto-disable protection would be void from the first run, which is the failure that
+  matters, because it is silent on its own timescale: the schedule simply stops two months later.
+
+**That loudness is deliberate and is the right trade.** The alternative — swallowing a rejected
+keep-alive push with `|| true` — would leave the job green while the protection it exists to
+provide quietly did nothing, and the consequence would surface sixty days later as a schedule
+that stopped running for no visible reason. A red job on day one is the cheaper failure.
+Principle I: the signal costs nothing on a free tier.
+
+**If `main` is protected later**, the options are to give the Actions actor a documented bypass,
+or to move the keep-alive — and moving it means first **verifying** that a push to a non-default
+branch counts as repository activity, which nobody here has done. Changing it on the current
+assumption would trade a loud failure for an unverified one.
+
+**Status: UNVERIFIED in both directions.** The workflow has never run, `main` has never been
+pushed to by anything but a human, and this file does not know whether protection is configured
+on the remote. GitHub's default for a new repository is no protection, so the expected state is
+"unprotected" — but that is a default, not an observation.
+
 ## Attribution: a deviation the owner decided, recorded not buried
 
 The constitution's Scope of Authority says: *"The work is published under a project name, not the

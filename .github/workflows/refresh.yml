@@ -198,6 +198,14 @@ jobs:
           mkdir -p data/published
           cp -R "${GITHUB_WORKSPACE}/data/published/." data/published/
 
+          # The licences, at the root. A consumer who takes this branch gets
+          # the dataset and no repository, so a licence that stays on `main` is
+          # one they never see -- and DATA-LICENSE.md is specifically about the
+          # dataset this branch carries. Copied on EVERY run, including the
+          # dataset-only runs where web/ is absent.
+          cp "${GITHUB_WORKSPACE}/LICENSE" LICENSE
+          cp "${GITHUB_WORKSPACE}/DATA-LICENSE.md" DATA-LICENSE.md
+
           # GitHub Pages would otherwise run the dataset through Jekyll and
           # refuse to serve files whose names begin with an underscore.
           touch .nojekyll
