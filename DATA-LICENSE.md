@@ -46,7 +46,7 @@ first workflow run, and GitHub Pages can only be pointed at it afterwards. The
 URL above is the repository, which does exist.
 
 **Once a Pages URL exists, every one of these needs updating. The list is here
-so none is missed, and none of them is done.**
+so none is missed.** One row is done; the rest are not.
 
 | Where | What changes |
 |---|---|
@@ -56,7 +56,7 @@ so none is missed, and none of them is done.**
 | `spike/free-tiers.md` lines ~258-259 | `https://rohan-c0de.github.io/indian-sansad/...` is written there as a **prediction**; T015's verdict is "VERIFIED by construction, not by execution" and becomes observed |
 | `spike/free-tiers.md` line ~287 | records that the URL is derived from the maintainer's handle — the live Attribution deviation; the decision to transfer to an organisation would change the URL again |
 | `specs/001-resolved-metadata-layer/mockup/README.md` lines ~224-225 | the same predicted URLs |
-| `data/published/coverage.jsonl` and `manifest.json` | **neither carries a project URL or this attribution string today.** A consumer who takes only the files therefore has no link to attribute, which is a gap in CC BY compliance, not a cosmetic one. Needs a field added in `src/sansad/publish/coverage.py` and `partitions.py` → `write_manifest`, plus a contract test |
+| `data/published/coverage.jsonl`/`.csv` and `manifest.json` | **DONE 2026-10-10.** Both now carry `license`, `attribution`, `project_url`, `license_file` and `license_scope`, so a consumer who takes a single file has the terms and the link in hand. **The update site is now one module — `src/sansad/publish/attribution.py`** — which both writers spread and which `tests/contract/test_attribution.py` asserts is character-for-character the attribution line above, so the file and the data cannot drift. Changing the URL means changing that module; the published files follow on the next refresh. Cost: **+2,549 bytes**, 0.001% of the dataset |
 | `web/index.html`, `web/app.js` (T074, T076) | not built; the page should display the attribution rather than leave a visitor to find this file |
 
 Changing the URL later does not invalidate anything already distributed under

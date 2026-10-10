@@ -44,7 +44,7 @@ published to GitHub.**
 - **Resolution meets SC-002**: **96.36%** (91,796 of 95,268 questions) with four owner-confirmed
   maintainer assertions; **94.78%** automatic. Both are published separately, because the
   automatic rate is below the 95% target.
-- **147 tests pass**; `make guard`, `make lint` and `make audit-fields` are clean.
+- **159 tests pass**; `make guard`, `make lint` and `make audit-fields` are clean.
 
 ### Not done
 

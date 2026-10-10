@@ -31,8 +31,12 @@ The dataset lives on the rolling orphan branch **`published`**, which GitHub Pag
 ```
 /                        the page          (from web/)
 /data/published/...      the dataset       (from data/published/)
+/LICENSE                 the code licence, MIT
+/DATA-LICENSE.md         the dataset licence, CC BY 4.0 on the added work
 /.nojekyll               so Pages serves files whose names begin with _
 ```
+
+Both licence files are copied to the branch root on every refresh, including a refresh that publishes no page: a consumer who takes this branch gets the dataset and no repository, so a licence that stayed on `main` would be one they never see. The machine-readable form of the same terms is on `manifest.json` and the Coverage Statement — guarantee 10.
 
 So a published set named `reference/members.jsonl` in this contract is fetched at `/data/published/reference/members.jsonl`, relative to wherever the branch is served. **The page and the dataset are on one origin by construction** — GitHub Pages serves one site per repository — which is load-bearing rather than convenient: the upstream sends no `Access-Control-Allow-Origin` (verified first-hand, `spike/route-capture.md` T005), so a browser is refused cross-origin reads, and a dataset on a different origin from the page would hit the identical wall against this project's own files.
 
@@ -51,6 +55,7 @@ So a published set named `reference/members.jsonl` in this contract is fetched a
 7. **Freshness is stated.** Every published set carries the date it was last rebuilt (FR-016).
 8. **Field scope is bounded.** No member attribute outside the published list appears, absent a recorded decision authorising it (FR-008, SC-010).
 9. **No document-derived content.** Nothing in the dataset is extracted from a PDF or any other document file (FR-015). Consumers wanting debate or answer text will not find it here.
+10. **The licence travels with the data** (owner decision 2026-10-10). `manifest.json` and every Coverage Statement carry five fields — `license` (`CC-BY-4.0`), `attribution` (the string to reproduce verbatim), `project_url`, `license_file` (`DATA-LICENSE.md`) and `license_scope` (one line stating that the licence covers the **added work only** and the underlying parliamentary records are **not** covered). A consumer who takes a single file therefore has the terms and the link in hand without fetching the repository. **These five fields appear on those two sets and nowhere else** — not on question rows, not on aggregate rows, not in the search index, not on the reference or resolution sets. That is deliberate on both counts: inline on the 92,942 subject-trend rows the strings would cost what T064's inline counting basis cost (179 MiB, since corrected), and a per-row licence field would assert that *that row* is CC BY 4.0, which `DATA-LICENSE.md` denies — a published row mixes this project's added work with source records it cannot license. The claim is true of the dataset and false of a row. The whole addition measured **+2,549 bytes**, 0.001% of the dataset, all of it in those three files.
 
 ## What this contract explicitly does not promise
 
