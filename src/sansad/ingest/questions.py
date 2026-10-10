@@ -62,9 +62,11 @@ gap rather than papered over: a rename today would mint a second id.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -78,11 +80,13 @@ from sansad.signals.alerts import Signal, SignalLog, ingestion_failure
 
 __all__ = [
     "BASE_URL",
+    "CHECKPOINT_COMPLETE_SUFFIX",
     "DEFAULT_PAGE_SIZE",
     "MAX_VERIFIED_PAGE_SIZE",
     "QUESTION_PATH",
     "IngestionFailed",
     "QuestionRecord",
+    "checkpoint_is_complete",
     "fetch_question_records",
     "iso_date",
     "load_question_records",
@@ -409,6 +413,42 @@ def question_record_from(
     )
 
 
+#: Suffix of the sidecar that marks a checkpoint file COMPLETE.
+#:
+#: A partial checkpoint and a complete one look identical on disk -- both are
+#: valid JSONL -- so completeness is recorded out of band and only written
+#: after the truncation check has passed. Without this, a fetch killed on its
+#: last page would leave a file that a resume would happily treat as the whole
+#: term, and the published record would be short by however much was missing
+#: with nothing anywhere saying so.
+CHECKPOINT_COMPLETE_SUFFIX = ".complete.json"
+
+
+def checkpoint_is_complete(path: Path) -> int | None:
+    """The record count a complete checkpoint holds, or None.
+
+    None means "do not resume from this": the sidecar is absent, unreadable, or
+    disagrees with the number of lines actually in the file. Disagreement is
+    treated as incomplete rather than repaired -- a checkpoint whose own marker
+    does not match it is evidence of something unexplained, and resuming from it
+    would bake that in.
+    """
+    path = Path(path)
+    sidecar = path.with_name(path.name + CHECKPOINT_COMPLETE_SUFFIX)
+    if not path.is_file() or not sidecar.is_file():
+        return None
+    try:
+        marker = json.loads(sidecar.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    claimed = marker.get("records")
+    if not isinstance(claimed, int):
+        return None
+    with path.open(encoding="utf-8") as handle:
+        actual = sum(1 for line in handle if line.strip())
+    return claimed if claimed == actual else None
+
+
 @dataclass(frozen=True, slots=True)
 class DuplicateRecord:
     """One `question_id` the upstream served more than once.
@@ -571,6 +611,7 @@ def fetch_question_records(
     signals: SignalLog | None = None,
     check_upstream_shape: bool = True,
     duplicates: list[DuplicateRecord] | None = None,
+    checkpoint: Path | None = None,
 ) -> tuple[QuestionRecord, ...]:
     """Page through one term (or one session) and map every record.
 
@@ -578,6 +619,22 @@ def fetch_question_records(
     Coverage Statement to declare (FR-013). The truncation check below compares
     against the **records received**, not the records kept, so dropping an
     upstream duplicate can never be mistaken for a short fetch.
+
+    `checkpoint` is a path **under `$SANSAD_SCRATCH`** -- outside the repository
+    tree -- to which each page's **allowlist-filtered** records are appended as
+    they arrive, flushed per page. It exists because this fetch is otherwise
+    all-or-nothing: the measured full window takes ~71 minutes, records are held
+    in memory, and a dropped connection on the last page discarded every
+    minute of it. With a checkpoint per term, a late failure costs the current
+    term rather than the whole window.
+
+    **What is written is post-allowlist, never a raw body.** The filter is
+    applied per page, before the write, so an excluded attribute never reaches
+    the file -- the same boundary rule that applies to every other write in this
+    project (Principle V). The format is deliberately identical to the slices
+    `spike/fetch_slice.py` produced, so resuming re-reads them through
+    `load_question_records`, which is the same code path `--source scratch`
+    already exercises rather than a second one written for failures only.
 
     Raises:
         IngestionFailed: if the upstream is unreachable, answers with an error
@@ -601,57 +658,85 @@ def fetch_question_records(
     stage = f"questions loksabha={loksabha} session={session if session is not None else 'all'}"
     url = f"{base_url}{QUESTION_PATH}"
 
+    # Filtered per page rather than at the end, so nothing unfiltered is ever
+    # held longer than one page and the checkpoint can only ever receive
+    # post-allowlist records.
     collected: list[Mapping[str, Any]] = []
     expected: int | None = None
     page_no = 1  # 1-based. `pageNo=0` is an HTTP 500 on this service.
     shape_checked = not check_upstream_shape
 
-    while True:
-        params: dict[str, Any] = {
-            "loksabhaNo": loksabha,
-            "pageNo": page_no,
-            "pageSize": page_size,
-            "locale": "en",
-        }
-        if session is not None:
-            params["sessionNumber"] = session
-        try:
-            body = fetch_json(url, params=params, timeout=timeout, client=client)
-        except Exception as exc:
-            # The error CLASS and a short message only. Never a response body:
-            # "An alert that pastes the payload it is warning about has
-            # published the payload."
-            signal = log.add(
-                ingestion_failure(
-                    stage=f"{stage} page={page_no}",
-                    reason=type(exc).__name__,
-                    house=house.value,
+    handle = None
+    if checkpoint is not None:
+        checkpoint = Path(checkpoint)
+        checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        # Any stale sidecar must go FIRST: if this fetch dies early, an old
+        # marker left beside a half-written file would make the next run resume
+        # from a partial term.
+        sidecar = checkpoint.with_name(checkpoint.name + CHECKPOINT_COMPLETE_SUFFIX)
+        sidecar.unlink(missing_ok=True)
+        handle = checkpoint.open("w", encoding="utf-8", newline="\n")
+
+    try:
+        while True:
+            params: dict[str, Any] = {
+                "loksabhaNo": loksabha,
+                "pageNo": page_no,
+                "pageSize": page_size,
+                "locale": "en",
+            }
+            if session is not None:
+                params["sessionNumber"] = session
+            try:
+                body = fetch_json(url, params=params, timeout=timeout, client=client)
+            except Exception as exc:
+                # The error CLASS and a short message only. Never a response body:
+                # "An alert that pastes the payload it is warning about has
+                # published the payload."
+                signal = log.add(
+                    ingestion_failure(
+                        stage=f"{stage} page={page_no}",
+                        reason=type(exc).__name__,
+                        house=house.value,
+                    )
                 )
-            )
-            raise IngestionFailed(signal) from exc
+                raise IngestionFailed(signal) from exc
 
-        records, total = _page(body)
-        if expected is None:
-            expected = total
+            records, total = _page(body)
+            if expected is None:
+                expected = total
 
-        if not shape_checked and records:
-            # Shape detection must see the upstream's OWN field names, including
-            # excluded ones -- a prohibited field being ADDED is invisible
-            # otherwise. Names only; no value is read.
-            divergence = check_shape(QUESTION_PATH, records)
-            if divergence is not None:
-                log.add(divergence)
-            shape_checked = True
+            if not shape_checked and records:
+                # Shape detection must see the upstream's OWN field names, including
+                # excluded ones -- a prohibited field being ADDED is invisible
+                # otherwise. Names only; no value is read.
+                divergence = check_shape(QUESTION_PATH, records)
+                if divergence is not None:
+                    log.add(divergence)
+                shape_checked = True
 
-        collected.extend(records)
+            # Filter at the boundary, then persist. In that order, always.
+            filtered_page = [filter_record(dict(r)) for r in records]
+            collected.extend(filtered_page)
+            if handle is not None and filtered_page:
+                for record in filtered_page:
+                    handle.write(
+                        json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
+                    )
+                # Flushed per page: an unflushed buffer is not a checkpoint.
+                handle.flush()
 
-        # Past the end is "200 with 0 records, not an error", so an empty page
-        # is the stop condition.
-        if not records:
-            break
-        if expected is not None and len(collected) >= expected:
-            break
-        page_no += 1
+            # Past the end is "200 with 0 records, not an error", so an empty page
+            # is the stop condition.
+            if not records:
+                break
+            if expected is not None and len(collected) >= expected:
+                break
+            page_no += 1
+
+    finally:
+        if handle is not None:
+            handle.close()
 
     if expected is not None and len(collected) != expected:
         signal = log.add(
@@ -669,8 +754,28 @@ def fetch_question_records(
         signal.detail["received"] = len(collected)
         raise IngestionFailed(signal)
 
+    # Only now is the checkpoint complete. Writing this marker before the
+    # truncation check would certify a short term as whole.
+    if checkpoint is not None:
+        checkpoint.with_name(checkpoint.name + CHECKPOINT_COMPLETE_SUFFIX).write_text(
+            json.dumps(
+                {
+                    "records": len(collected),
+                    "expected": expected,
+                    "loksabha": loksabha,
+                    "session": session,
+                    "page_size": page_size,
+                    "route": QUESTION_PATH,
+                },
+                indent=1,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     return load_question_records(
-        (filter_record(dict(r)) for r in collected),
+        collected,
         house=house,
         last_refreshed=last_refreshed,
         already_filtered=True,

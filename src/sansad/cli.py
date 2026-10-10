@@ -40,8 +40,10 @@ from sansad.ingest.members import load_members
 from sansad.ingest.questions import (
     DuplicateRecord,
     QuestionRecord,
+    checkpoint_is_complete,
     load_question_records,
 )
+from sansad.ingest.transport import scratch_path
 from sansad.model._common import House
 from sansad.model.coverage_statement import Freshness
 from sansad.publish.coverage import (
@@ -150,8 +152,41 @@ def _load_from_upstream(last_refreshed: str, duplicates: list[DuplicateRecord], 
     # hung request must still fail and raise a maintainer signal (FR-011)
     # rather than sit until the job's 6-hour ceiling kills it.
     members = fetch_members(timeout=ROSTER_TIMEOUT_SECONDS, last_refreshed=last_refreshed)
+
+    # --- per-term checkpoints, under $SANSAD_SCRATCH ------------------------
+    #
+    # The measured full window takes ~71 minutes and the records are held in
+    # memory, so before this the fetch was all-or-nothing: a dropped connection
+    # on the last page discarded every minute of it. Each term is now persisted
+    # as it is fetched, post-allowlist, OUTSIDE the repository tree -- and a
+    # term whose checkpoint is marked complete is re-read instead of re-fetched.
+    #
+    # `scratch_path` is what guarantees "outside the tree": it resolves the path
+    # with symlinks and `..` collapsed and raises rather than falling back if it
+    # lands inside the repository.
+    #
+    # The 17th is fetched FIRST and is the expensive one -- ~58 of the ~71
+    # minutes -- so the checkpoint that matters most is written earliest.
     records: list[QuestionRecord] = []
     for term in WINDOW_TERMS:
+        checkpoint = scratch_path("live-refresh", f"questions_ls{term}.jsonl")
+        already = checkpoint_is_complete(checkpoint)
+        if already is not None:
+            print(
+                f"refresh: term {term} already complete at {checkpoint} "
+                f"({already:,} records) -- re-reading, not re-fetching",
+                flush=True,
+            )
+            records.extend(
+                load_question_records(
+                    _read_jsonl(checkpoint),
+                    last_refreshed=last_refreshed,
+                    duplicates=duplicates,
+                    already_filtered=True,
+                )
+            )
+            continue
+        print(f"refresh: fetching term {term} -> {checkpoint}", flush=True)
         records.extend(
             fetch_question_records(
                 loksabha=term,
@@ -159,8 +194,10 @@ def _load_from_upstream(last_refreshed: str, duplicates: list[DuplicateRecord], 
                 signals=signals,
                 duplicates=duplicates,
                 timeout=QUESTION_PAGE_TIMEOUT_SECONDS,
+                checkpoint=checkpoint,
             )
         )
+        print(f"refresh: term {term} complete ({len(records):,} records so far)", flush=True)
     return members, records
 
 

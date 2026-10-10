@@ -340,3 +340,152 @@ def test_the_visitor_never_sees_an_error_state(tmp_path):
     assert row["sessions_covered"] == ["lok-sabha/17/1"]
     # Both formats stay in step, so a CSV consumer sees the same staleness.
     assert read_csv(destination / "coverage.csv")[0]["last_known_good"] == "last-known-good"
+
+
+# ---------------------------------------------------------------------------
+# Per-term checkpoints -- a 71-minute fetch must not be all-or-nothing
+# ---------------------------------------------------------------------------
+def _checkpoint_record(ques_no: int) -> dict:
+    """An upstream-shaped record carrying one EXCLUDED attribute.
+
+    The excluded key is read from the guard's own list rather than spelled out,
+    so this file carries no prohibited spelling of its own.
+    """
+    import importlib.util
+
+    guard_path = Path(__file__).resolve().parents[2] / "tools" / "guard_no_raw_payloads.py"
+    spec = importlib.util.spec_from_file_location("sansad_guard_ckpt", guard_path)
+    assert spec and spec.loader
+    guard = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(guard)
+    excluded = min(guard.PROHIBITED_ATTRIBUTES["date of birth"], key=len)
+
+    record = dict(_record(ques_no))
+    record[excluded] = "MUST-NEVER-BE-WRITTEN"
+    return record
+
+
+def _paged(handler_pages: int, total: int, *, die_from: int | None = None):
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = int(httpx.URL(str(request.url)).params.get("pageNo", 1))
+        if die_from is not None and page >= die_from:
+            raise httpx.ReadTimeout("simulated drop", request=request)
+        rows = (
+            [_checkpoint_record(n) for n in range(page * 10 - 9, page * 10 + 1)]
+            if page <= handler_pages
+            else []
+        )
+        return httpx.Response(200, json=_envelope(rows, total))
+
+    return handler
+
+
+def test_a_dropped_connection_keeps_the_pages_that_arrived(tmp_path):
+    """The whole point: a late failure must not discard the earlier pages.
+
+    Before this, a dropped connection on the last page of a ~71-minute window
+    fetch threw away every minute of it, because records are held in memory.
+    """
+    from sansad.ingest.questions import IngestionFailed, fetch_question_records
+
+    checkpoint = tmp_path / "questions_ls18.jsonl"
+    client = httpx.Client(transport=httpx.MockTransport(_paged(4, 40, die_from=3)))
+
+    with pytest.raises(IngestionFailed):
+        fetch_question_records(loksabha=18, page_size=10, checkpoint=checkpoint, client=client)
+
+    kept = [line for line in checkpoint.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(kept) == 20, "the two pages that arrived should have survived"
+
+
+def test_a_partial_checkpoint_is_never_resumed_from(tmp_path):
+    """A partial file and a complete one look identical on disk.
+
+    Completeness is recorded out of band and only after the truncation check
+    passes, so a fetch killed on its last page cannot be mistaken for a whole
+    term -- which would publish a short record with nothing saying so.
+    """
+    from sansad.ingest.questions import (
+        CHECKPOINT_COMPLETE_SUFFIX,
+        IngestionFailed,
+        checkpoint_is_complete,
+        fetch_question_records,
+    )
+
+    checkpoint = tmp_path / "questions_ls18.jsonl"
+    client = httpx.Client(transport=httpx.MockTransport(_paged(4, 40, die_from=3)))
+    with pytest.raises(IngestionFailed):
+        fetch_question_records(loksabha=18, page_size=10, checkpoint=checkpoint, client=client)
+
+    assert checkpoint_is_complete(checkpoint) is None
+    assert not (tmp_path / (checkpoint.name + CHECKPOINT_COMPLETE_SUFFIX)).exists()
+
+    # ...and a complete fetch over the same path does mark it resumable.
+    ok = httpx.Client(transport=httpx.MockTransport(_paged(4, 40)))
+    records = fetch_question_records(loksabha=18, page_size=10, checkpoint=checkpoint, client=ok)
+    assert len(records) == 40
+    assert checkpoint_is_complete(checkpoint) == 40
+
+
+def test_a_checkpoint_whose_marker_disagrees_with_it_is_refused(tmp_path):
+    """Treated as incomplete rather than repaired.
+
+    A checkpoint whose own marker does not match it is evidence of something
+    unexplained; resuming would bake that in.
+    """
+    from sansad.ingest.questions import CHECKPOINT_COMPLETE_SUFFIX, checkpoint_is_complete
+
+    checkpoint = tmp_path / "questions_ls18.jsonl"
+    checkpoint.write_text('{"quesNo":1}\n{"quesNo":2}\n', encoding="utf-8")
+    (tmp_path / (checkpoint.name + CHECKPOINT_COMPLETE_SUFFIX)).write_text(
+        '{"records": 99}\n', encoding="utf-8"
+    )
+    assert checkpoint_is_complete(checkpoint) is None
+
+
+def test_the_checkpoint_never_receives_an_excluded_attribute(tmp_path):
+    """Principle V at the write boundary, not after it.
+
+    The filter is applied per page BEFORE the page is written, so an excluded
+    attribute never reaches the file -- not even transiently. A checkpoint is a
+    file like any other and the same rule applies to it.
+    """
+    import importlib.util
+
+    from sansad.ingest.questions import fetch_question_records
+
+    guard_path = Path(__file__).resolve().parents[2] / "tools" / "guard_no_raw_payloads.py"
+    spec = importlib.util.spec_from_file_location("sansad_guard_ckpt2", guard_path)
+    assert spec and spec.loader
+    guard = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(guard)
+    excluded = min(guard.PROHIBITED_ATTRIBUTES["date of birth"], key=len)
+
+    checkpoint = tmp_path / "questions_ls18.jsonl"
+    client = httpx.Client(transport=httpx.MockTransport(_paged(4, 40)))
+    fetch_question_records(loksabha=18, page_size=10, checkpoint=checkpoint, client=client)
+
+    body = checkpoint.read_text(encoding="utf-8")
+    assert excluded not in body
+    assert "MUST-NEVER-BE-WRITTEN" not in body
+    # ...and the permitted fields did survive, or the test would pass vacuously.
+    assert "quesNo" in body and "member" in body
+
+
+def test_a_stale_completion_marker_is_cleared_before_refetching(tmp_path):
+    """An old marker beside a half-written file would resume from a partial term."""
+    from sansad.ingest.questions import (
+        CHECKPOINT_COMPLETE_SUFFIX,
+        IngestionFailed,
+        fetch_question_records,
+    )
+
+    checkpoint = tmp_path / "questions_ls18.jsonl"
+    sidecar = tmp_path / (checkpoint.name + CHECKPOINT_COMPLETE_SUFFIX)
+    checkpoint.write_text('{"quesNo":1}\n', encoding="utf-8")
+    sidecar.write_text('{"records": 1}\n', encoding="utf-8")
+
+    client = httpx.Client(transport=httpx.MockTransport(_paged(4, 40, die_from=1)))
+    with pytest.raises(IngestionFailed):
+        fetch_question_records(loksabha=18, page_size=10, checkpoint=checkpoint, client=client)
+    assert not sidecar.exists(), "the stale marker must not survive a failed refetch"
