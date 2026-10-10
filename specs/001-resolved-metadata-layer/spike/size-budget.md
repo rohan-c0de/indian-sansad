@@ -807,3 +807,116 @@ comparing two refreshes tell a changed definition from a changed dataset.
 - The figures here are **scratch-built**. The live-built dataset measured in T061 above is
   preserved at `$SANSAD_SCRATCH/live-publish-2026-10-10/`. The question records are identical;
   the manifest's `source` differs, plus 813 B of `source_record_ref` ordering.
+
+---
+
+# T072 — the real search index, measured against T018 and T019
+
+**Date**: 2026-10-10 · **Basis**: the index `src/sansad/publish/search_index.py` writes over all
+95,268 published questions, scratch-built from the cached window. **Not a projection.**
+
+## The gate was failed first, then passed. Both figures.
+
+| | Bytes | MiB | B/question | vs T018's 3,279,748 B |
+|---|---:|---:|---:|---:|
+| T018 projection (from the 18th LS at 34.43 B/q) | 3,279,748 | 3.13 | 34.43 | — |
+| **First build** — document list as plain `question_id` strings | **4,607,033** | **4.39** | 48.36 | **+40.5% — OVER** |
+| **After encoding the document list** | **2,484,745** | **2.37** | **26.08** | **−24.2% — WITHIN** |
+
+Against T019's first-load budget for the ministry-profile view **with** subject search
+(page shell 61,440 estimated + coverage 295 + one by-ministry file 842,496 + the index):
+
+| | Bytes | MiB | vs T019's 4,183,979 B | Visitors/month inside 100 GB |
+|---|---:|---:|---:|---:|
+| T019 budget | 4,183,979 | 3.99 | — | 23,901 |
+| with the first build | 5,511,264 | 5.26 | **+31.7% — OVER** | 18,145 |
+| **with the encoded index** | **3,388,976** | **3.23** | **−19.0% — WITHIN** | **29,507** |
+
+## Why the first build was over — and it was not the index
+
+| Component | First build | Share |
+|---|---:|---:|
+| document list, as plain `question_id` strings | 3,018,967 | **65.5%** |
+| terms and postings | 1,588,027 | 34.5% |
+
+**Both of T018's predictions held.** It said distinct terms would grow sub-linearly and postings
+linearly:
+
+- distinct terms: **16,979** measured, where linear scaling from the 18th's 11,145 predicts
+  **30,581**. Sub-linear, as recorded — "parliamentary subject vocabulary repeats heavily".
+- postings per document: **3.70** measured against the 18th's **4.12**. Not merely linear —
+  slightly *better* than linear.
+
+So T018's measurement of the index proper was sound, and its "somewhat smaller than 3.13 MiB"
+caveat was right about the terms. What T018 could not have projected is that **`question_id`
+would get 2.61× longer**: it gained `type` and the term on 2026-10-09 when the 7,431-record
+identity collision was fixed, going from `ls-17-1-500` (11 chars) to
+`lok-sabha/17/1/starred/500` (26). The prototype never carried ids at that length.
+
+## What was narrowed, and what was not
+
+**The scope was NOT narrowed, because it could not be.** `subjects_only` is already the narrower
+of the two variants T018 measured; the wider one costs +58.6% for search over fields the page
+already holds. **The tokeniser was NOT touched** — stemming or a longer stopword list would
+shrink the index further, and T018's reason for declining both stands, but changing it now would
+void the very measurement this gate compares against.
+
+**What was compacted is the document encoding**, for exactly the reason T018 gave for
+delta-encoding postings: "measuring an un-encoded index would overstate the size and make the
+page look less viable than it is." Every `question_id` is
+`{house}/{term}/{session}/{type}/{number}`, and the first four parts take only **41** distinct
+values across the whole window, so the list is stored as a prefix table plus two parallel integer
+arrays:
+
+| | Bytes | Share |
+|---|---:|---:|
+| document list, prefix-encoded | 896,647 | 36.1% |
+| terms and postings | 1,588,027 | 63.9% |
+
+**−2,122,288 B, −46.1%**, and nothing is lost: `question_id_at` rebuilds the exact id with two
+array reads and a concatenation, and `tests/contract/test_search_index.py` asserts every id
+round-trips **against the published question records** rather than against the objects the index
+was built from.
+
+## A second finding: the index format failed `make guard`, and the guard was right
+
+The first two builds stored postings as `{"term": [...]}`, the natural shape for an inverted
+index. `make guard` failed on **six** attribute violations in `search/subject-index.json`:
+
+    key 'address'  / 'children' / 'daughters' / 'email' / 'marital' / 'mobile'
+
+All six are real subject-line words from parliamentary questions — "Mobile Towers", "Children's
+Welfare" — and none is anyone's personal attribute. But the guard treats a prohibited spelling in
+a **structured position** (a JSON key, a CSV header, an assignment target) as a payload while
+allowing the same word in prose, and it explicitly classifies those six as prose-ambiguous. Its
+assumption is that **a JSON key is a field name**. In an inverted index over English subject
+lines, every key is an English word, so that assumption breaks.
+
+**The format was changed, not the guard.** Terms now live in a sorted `terms` array with postings
+in a parallel `postings` array, which puts every token in value position where the guard's
+prose/structured distinction works as designed. Cost: **13 bytes** (2,484,745 → 2,484,758) and a
+binary search instead of an object lookup in the browser.
+
+No protection was given up: the guard still scans the file, and a spelling it classifies as
+unambiguous is still flagged in value position. The index indexes `Question.subject` only, and
+the FR-008 allowlist drops every member attribute at the ingest boundary long before it runs.
+
+**An exemption was considered and rejected.** Adding `data/published/search/` to the guard's
+exempt list would have been one line, and would have made the guard blind to that directory
+permanently. Changing the data's shape fixes the cause; exempting the check hides it.
+
+(A third build then failed the guard on this spike file's sibling — the module docstring had
+listed three of the compound prohibited field names as examples of what *would* still be caught.
+Also correct: a module that documents a prohibition by reproducing it is the hole the guard
+exists to close.)
+
+## What T072 does not establish
+
+- **This is not a browser measurement.** T083 measures the actual first-page-load bytes from a
+  real network log; everything above is file sizes plus T019's 61,440-byte **estimate** for a page
+  shell that does not exist yet.
+- **Nothing is served.** Bandwidth against the 100 GB soft limit is still unexercised, and the
+  visitors/month figures are arithmetic, not observation.
+- **The index is not lazily fetched by anything yet.** `contracts/published-dataset.md` says
+  consumers "should expect the page to fetch it lazily, only on an actual search"; whether the
+  page does that is T079's to honour.

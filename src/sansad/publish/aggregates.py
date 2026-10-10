@@ -19,12 +19,14 @@ from pathlib import Path
 from sansad.publish.formats import write_both
 from sansad.views.basis import basis_rows
 from sansad.views.composition import Composition
+from sansad.views.ministry_profile import MinistryProfile
 from sansad.views.subject_trends import SubjectTrends
 
 __all__ = [
     "AGGREGATES_DIR_NAME",
     "COMPOSITION_STEM",
     "COUNTING_BASIS_STEM",
+    "MINISTRY_PROFILE_STEM",
     "SUBJECT_TRENDS_STEM",
     "AggregateWriteResult",
     "write_aggregates",
@@ -36,6 +38,8 @@ SUBJECT_TRENDS_STEM = "subject-trends"
 #: The counting basis, published ONCE per unit and referenced by every
 #: aggregate row via `counting_basis_unit` + `basis_version`.
 COUNTING_BASIS_STEM = "counting-basis"
+#: T070 -- per-ministry x per-session counts, type mix and link status.
+MINISTRY_PROFILE_STEM = "ministry-profile"
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +53,7 @@ def write_aggregates(
     *,
     compositions: Sequence[Composition],
     trends: SubjectTrends,
+    profiles: Sequence[MinistryProfile] = (),
     unresolved: int | None = None,
     partly_resolved: int | None = None,
     co_asked: int | None = None,
@@ -72,6 +77,10 @@ def write_aggregates(
     trend_rows = trends.as_rows()
     files.extend(write_both(root, SUBJECT_TRENDS_STEM, trend_rows))
     records[SUBJECT_TRENDS_STEM] = len(trend_rows)
+
+    profile_rows = [p.as_row() for p in profiles]
+    files.extend(write_both(root, MINISTRY_PROFILE_STEM, profile_rows))
+    records[MINISTRY_PROFILE_STEM] = len(profile_rows)
 
     # The basis, once per unit. Every row above names the unit that applies to
     # it, so this file is what those references resolve to.

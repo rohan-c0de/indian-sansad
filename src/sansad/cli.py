@@ -66,10 +66,12 @@ from sansad.publish.reference import (
     sessions_from,
     write_reference_sets,
 )
+from sansad.publish.search_index import SEARCH_DIR_NAME, write_search_index
 from sansad.resolve import resolve_questions
 from sansad.resolve.assertions import load_assertions, load_ministry_renames
 from sansad.signals.alerts import SignalLog, ingestion_failure
 from sansad.views.composition import compose
+from sansad.views.ministry_profile import ministry_profiles
 from sansad.views.subject_trends import subject_trends
 
 __all__ = ["main", "run_refresh"]
@@ -89,6 +91,7 @@ PUBLISHED_SETS: tuple[str, ...] = (
     "by-member",
     "reference",
     "aggregates",
+    "search",
     "coverage",
     RESOLUTION_STEM,
 )
@@ -401,10 +404,12 @@ def run_refresh(
         co_asked=co_asked_count,
         max_askers=max_askers,
     )
+    profiles = ministry_profiles(published_questions)
     aggregates = write_aggregates(
         out,
         compositions=compositions,
         trends=trends,
+        profiles=profiles,
         unresolved=unresolved_count,
         partly_resolved=partly_resolved_count,
         co_asked=co_asked_count,
@@ -413,7 +418,17 @@ def run_refresh(
     print(
         f"refresh: aggregates -- composition {aggregates.records['composition']:,} row(s) "
         f"for {len(compositions)} term(s); subject-trends "
-        f"{aggregates.records['subject-trends']:,} row(s)"
+        f"{aggregates.records['subject-trends']:,} row(s); ministry-profile "
+        f"{aggregates.records['ministry-profile']:,} row(s)"
+    )
+
+    # T071 -- the subject-search index. Published so in-browser subject search
+    # needs no server; fetched lazily by the page, only on an actual search.
+    index = write_search_index(out, published_questions)
+    print(
+        f"refresh: search index -- {index.distinct_terms:,} distinct term(s), "
+        f"{index.total_postings:,} posting(s) over {index.documents:,} document(s), "
+        f"{index.bytes_written:,} bytes"
     )
 
     dates = sorted(q.date for q in published_questions if q.date)
@@ -466,6 +481,7 @@ def run_refresh(
         "files": len(aggregates.files),
         "records": sum(aggregates.records.values()),
     }
+    sets[SEARCH_DIR_NAME] = {"files": 1, "records": index.distinct_terms}
     sets[RESOLUTION_STEM] = {
         "files": len(resolution_files),
         "records": len(resolution_records),
