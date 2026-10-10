@@ -1,0 +1,48 @@
+{
+  "_policy": "Maintainer assertions. Hand-authored, owner-confirmed, never generated.",
+  "_why_this_directory_is_outside_data_published": "data/published/ is a build output, git-ignored on main and rewritten wholesale on every refresh. An assertion is an INPUT that must survive that rewrite (plan.md -> Structure Decision; data-model.md: 'A manual assertion MUST survive subsequent refreshes and MUST NOT be overwritten by automatic matching').",
+  "_fields_are_inside_fr_008": "name forms, member identity, constituency and state only. Confirming an identity needs more than a name, and all four attributes sit inside Principle V's permitted set.",
+  "_provenance": "specs/001-resolved-metadata-layer/spike/spike-report.md -> 'Assertions -- four CONFIRMED BY OWNER, one DROPPED BY OWNER (2026-10-09)'. The spike's table is marked PROPOSED; only the rows the owner confirmed appear here. An unconfirmed row is not an assertion.",
+  "_measured_effect": "Automatic rate 94.78% (90,299/95,269). With these four: 96.26% (91,708/95,269) -- SC-002 met with 1.26 points of margin. Recovered 1,409 questions, computed by re-walking all 95,269 records, NOT by summing the per-form figures (naive sum 1,572; a question resolves only when ALL its askers do, FR-003).",
+  "_dropped_by_owner": "Row 4, 'Poonam (Mahajan) Vajendla Rao' (292 questions blocked), was DROPPED BY THE OWNER. No reason was recorded by the owner and none is inferred. The form stays among the residual forms, now 21. It is listed in sansad.resolve.assertions.DROPPED_BY_OWNER so re-adding it cannot happen by accident.",
+  "house": "lok-sabha",
+  "confirmed_on": "2026-10-09",
+  "assertions": [
+    {
+      "name_as_written": "Sunil Dattatray Tatkare",
+      "member_id": "ls-5199",
+      "roster_name_form": "Tatkare Sunil Dattatrey",
+      "constituency": "Raigad",
+      "state": "Maharashtra",
+      "questions_blocked": 513,
+      "basis": "Token reorder plus one spelling variant (Dattatray / Dattatrey); every token corresponds."
+    },
+    {
+      "name_as_written": "Ganesan Selvam",
+      "member_id": "ls-4963",
+      "roster_name_form": "Selvam G",
+      "constituency": "Kancheepuram",
+      "state": "Tamil Nadu",
+      "questions_blocked": 414,
+      "basis": "The roster's G initial expands to Ganesan, reordered. Rests on that expansion, which the roster does not spell out."
+    },
+    {
+      "name_as_written": "D.K. Suresh",
+      "member_id": "ls-4585",
+      "roster_name_form": "Doddalahalli Kempegowda Suresh",
+      "constituency": "Bangalore Rural",
+      "state": "Karnataka",
+      "questions_blocked": 372,
+      "basis": "D.K. = D(oddalahalli) K(empegowda); both initials match and the only Suresh in a Bangalore constituency this term."
+    },
+    {
+      "name_as_written": "V. Kalanidhi",
+      "member_id": "ls-4959",
+      "roster_name_form": "Kalanidhi Veeraswamy",
+      "constituency": "Chennai North",
+      "state": "Tamil Nadu",
+      "questions_blocked": 273,
+      "basis": "V. = V(eeraswamy), reordered; the only Kalanidhi in the term."
+    }
+  ]
+}

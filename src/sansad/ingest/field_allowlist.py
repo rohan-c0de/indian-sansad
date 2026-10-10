@@ -90,12 +90,31 @@ _PERMITTED_KEYS: frozenset[str] = frozenset(
         "membernamehindi",
         "alias",
         "nickname",
+        # Added 2026-10-09 (owner decision): the name-form spellings the two
+        # captured routes actually serve. Every one is a NAME FORM, which is
+        # the first of Principle V's seven permitted classes -- the permitted
+        # SET is unchanged and `PERMITTED_ATTRIBUTES` below is untouched. The
+        # spellings come from `spike/route-capture.md` (the question route's 17
+        # observed field names) and `spike/fetch_slice.py`'s MEMBER_ALLOWED,
+        # which is itself the recorded FR-008 allowlist for member records.
+        #
+        # Why this was needed rather than optional: without `member` the
+        # question route's asking-member array -- "array[len=N] of string,
+        # 98.1% carrying a leading honorific", the field T006 names as the
+        # User Story 1 gate -- was dropped at the boundary, and US1 would have
+        # ingested zero askers while every test about the allowlist passed.
+        "mpfirstlastname",  # roster name form, given-first
+        "mplastfirstname",  # roster name form, surname-first
+        "initial",  # roster name-form component
+        "member",  # question route: the asking-member name forms, as written
         # -- party --
         "party",
         "partyname",
         "partyabbreviation",
         "partyabbr",
         "politicalparty",
+        "partyfname",  # roster: party, full name
+        "partysname",  # roster: party, short name
         # -- state --
         "state",
         "statename",
@@ -108,11 +127,16 @@ _PERMITTED_KEYS: frozenset[str] = frozenset(
         "constituencycode",
         "pcname",
         "pcid",
+        "constname",  # roster: constituency
         # -- House --
         "house",
         "housename",
         "housenumber",
         "sabha",
+        # The question route's own House field. `lokNo` is the Lok Sabha
+        # NUMBER (17, 18) rather than a House name, which is why it reads as a
+        # term field too -- `route-capture.md` maps it to `house`.
+        "lokno",
         # -- term --
         "term",
         "terms",
@@ -126,6 +150,15 @@ _PERMITTED_KEYS: frozenset[str] = frozenset(
         "fromdate",
         "todate",
         "electedyear",
+        "noofterms",  # roster: number of terms served
+        "lastloksabha",  # roster: most recent Lok Sabha served in
+        # `lsExpr` is a comma-separated enumeration of every Lok Sabha a member
+        # served in ("11,12,14,16,17"). `spike/resolve_rate.py` records that
+        # this is EXACT term membership where `lastLoksabha` is only an
+        # approximation of it, and that the difference is a correctness matter
+        # rather than a tuning one: for the 17th Lok Sabha `lsExpr` selects 559
+        # members against `lastLoksabha == 17`'s 343.
+        "lsexpr",
         # -- sitting status --
         "sittingstatus",
         "status",
@@ -156,6 +189,15 @@ _PERMITTED_KEYS: frozenset[str] = frozenset(
         "questiondate",
         "date",
         "answerdate",
+        "mpsno",  # roster record id -> source_record_ref
+        # The question route spells the subject field PLURAL and serves a
+        # single string in it (`route-capture.md`). Recorded so the rename to
+        # the singular `subject` is not mistaken for a list being flattened.
+        "subjects",
+        # Record metadata, not personal attributes: FR-016 requires every
+        # published set carry the date it was last rebuilt.
+        "createdat",
+        "updatedat",
     }
 )
 

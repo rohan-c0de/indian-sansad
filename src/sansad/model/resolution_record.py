@@ -107,7 +107,22 @@ class ResolutionRecord:
     #: "Identity resolved to, or empty."
     member_id: str | None
     status: ResolutionStatus
-    method: ResolutionMethod
+    #: How it was resolved -- one of the six values above, or **None when
+    #: nothing resolved it** (owner decision 2026-10-09).
+    #:
+    #: `data-model.md` gives `method` as "How it was resolved. One of six
+    #: values", and every one of the six names a tier that produced a match.
+    #: None of them means "no tier produced one". But T049 emits a record per
+    #: name form *encountered*, FR-004 requires an unresolvable asker be
+    #: retained rather than dropped, and the validation below already
+    #: contemplates `status == unresolved` -- so an unresolved record was
+    #: constructible only by labelling it with a tier that did not run.
+    #:
+    #: `None` is permitted for `unresolved` ALONE. `resolved` and `ambiguous`
+    #: both had a tier reach them and must say which, or FR-005's "which tier
+    #: produced this join" breakdown -- the one carrying the owner's SC-002
+    #: decision -- is not recoverable from the published record.
+    method: ResolutionMethod | None
     #: "For `ambiguous`, the member identities that matched equally well."
     candidates: tuple[str, ...] = ()
     #: "Where the name form was encountered." A reference, never the record.
@@ -134,6 +149,13 @@ class ResolutionRecord:
                     f"candidate that Edge Cases forbids."
                 )
 
+        # `method` is optional for `unresolved` only -- see the field comment.
+        if self.method is None and self.status is not ResolutionStatus.UNRESOLVED:
+            raise ValueError(
+                f"{self.name_as_written!r}: status {self.status.value!r} requires a "
+                f"method. Only 'unresolved' may carry method=None, because only "
+                f"'unresolved' had no tier produce it."
+            )
         if self.status is ResolutionStatus.RESOLVED and not self.member_id:
             raise ValueError(
                 f"{self.name_as_written!r}: status 'resolved' requires a member_id. "
