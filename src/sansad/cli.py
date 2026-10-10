@@ -46,8 +46,9 @@ from sansad.ingest.questions import (
     load_question_records,
 )
 from sansad.ingest.transport import scratch_path
-from sansad.model._common import House
+from sansad.model._common import House, ResolutionStatus
 from sansad.model.coverage_statement import Freshness
+from sansad.publish.aggregates import AGGREGATES_DIR_NAME, write_aggregates
 from sansad.publish.coverage import (
     CoverageInputs,
     build_coverage_statement,
@@ -68,6 +69,8 @@ from sansad.publish.reference import (
 from sansad.resolve import resolve_questions
 from sansad.resolve.assertions import load_assertions, load_ministry_renames
 from sansad.signals.alerts import SignalLog, ingestion_failure
+from sansad.views.composition import compose
+from sansad.views.subject_trends import subject_trends
 
 __all__ = ["main", "run_refresh"]
 
@@ -76,6 +79,19 @@ WINDOW_TERMS: tuple[int, ...] = (17, 18)
 DEFAULT_PUBLISHED_DIR = "data/published"
 #: Published set name, shared with `tools/verify_joins.py`.
 RESOLUTION_STEM = "resolution-records"
+
+#: Every set the published dataset carries, named in the Coverage Statement so
+#: a consumer need not discover the shape by listing directories -- and so that
+#: a set which stopped being written is missing rather than invisible.
+PUBLISHED_SETS: tuple[str, ...] = (
+    "by-session",
+    "by-ministry",
+    "by-member",
+    "reference",
+    "aggregates",
+    "coverage",
+    RESOLUTION_STEM,
+)
 
 #: One unpaginated 5.0 MiB response, measured at 46.5 s (route-capture.md T005).
 ROSTER_TIMEOUT_SECONDS = 120.0
@@ -357,6 +373,49 @@ def run_refresh(
         constituencies=constituencies_from(members),
     )
 
+    # --- User Story 4 aggregates (T065-T067) --------------------------------
+    #
+    # The basis figures come from THIS refresh, not from the constants in
+    # views/basis.py: a stamp that described a different window would be worse
+    # than no stamp, because it would look authoritative.
+    unresolved_count = sum(
+        1 for q in published_questions if q.resolution_status is not ResolutionStatus.RESOLVED
+    )
+    partly_resolved_count = sum(
+        1
+        for q in published_questions
+        if q.resolution_status is not ResolutionStatus.RESOLVED and q.asking_members
+    )
+    co_asked_count = sum(1 for q in published_questions if len(q.asking_members) > 1)
+    max_askers = max((len(q.asking_members) for q in published_questions), default=0)
+
+    compositions = [
+        compose(members, term=term)
+        for term in WINDOW_TERMS
+        if any(any(t.number == term for t in m.terms) for m in members)
+    ]
+    trends = subject_trends(
+        published_questions,
+        unresolved=unresolved_count,
+        partly_resolved=partly_resolved_count,
+        co_asked=co_asked_count,
+        max_askers=max_askers,
+    )
+    aggregates = write_aggregates(
+        out,
+        compositions=compositions,
+        trends=trends,
+        unresolved=unresolved_count,
+        partly_resolved=partly_resolved_count,
+        co_asked=co_asked_count,
+        max_askers=max_askers,
+    )
+    print(
+        f"refresh: aggregates -- composition {aggregates.records['composition']:,} row(s) "
+        f"for {len(compositions)} term(s); subject-trends "
+        f"{aggregates.records['subject-trends']:,} row(s)"
+    )
+
     dates = sorted(q.date for q in published_questions if q.date)
     sessions_covered = sorted({q.session for q in published_questions})
     coverage_inputs = CoverageInputs(
@@ -378,6 +437,7 @@ def run_refresh(
         ministry_names_in_reference_set_with_no_questions=len(registry.reference_only),
         freshness=Freshness.CURRENT,
         question_source_by_term=provenance,
+        published_sets=PUBLISHED_SETS,
     )
     rajya_sabha = CoverageInputs(
         house=House.RAJYA_SABHA,
@@ -402,6 +462,10 @@ def run_refresh(
         "records": sum(reference.records.values()),
     }
     sets["coverage"] = {"files": len(coverage_files), "records": 2}
+    sets[AGGREGATES_DIR_NAME] = {
+        "files": len(aggregates.files),
+        "records": sum(aggregates.records.values()),
+    }
     sets[RESOLUTION_STEM] = {
         "files": len(resolution_files),
         "records": len(resolution_records),

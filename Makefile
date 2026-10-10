@@ -224,15 +224,21 @@ lookup:
 	 echo "  'make validate' report success on work that has not been done."; \
 	 exit 1
 
+# --------------------------------------------------------------------------
+# composition -- T068 / quickstart.md scenario 8 (US4).
+#
+#   make composition TERM=18
+#
+# Reads the PUBLISHED aggregate rather than recomputing, and prints the
+# reconciliation category by category -- the scenario's assertion is that the
+# categories sum to the term's total membership, so the sum is written out and
+# compared. A tool that printed the breakdown and left the reader to add it up
+# would be testing nothing.
+# --------------------------------------------------------------------------
 composition:
 	@set -eu -o pipefail; \
-	 echo "make composition: NOT IMPLEMENTED YET."; \
-	 echo "  will: produce the composition breakdown whose totals reconcile, e.g. TERM=18"; \
-	 echo "  quickstart.md: scenario 8 (US4)"; \
-	 echo "  implemented by: T068"; \
-	 echo "  Failing deliberately (T035): a stub that exited 0 would let"; \
-	 echo "  'make validate' report success on work that has not been done."; \
-	 exit 1
+	 "$(VENV_PY)" tools/show_composition.py --term "$(TERM)" \
+	   --published "$(REPO_ROOT)/data/published"
 
 # --------------------------------------------------------------------------
 # coverage -- T053 / quickstart.md scenario 11 (FR-013).

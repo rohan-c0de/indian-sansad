@@ -758,3 +758,52 @@ worth its bytes. The compact separators pay for about half of it.
 - **Bandwidth** against the 100 GB/month soft limit is unexercised — nothing has been served.
 - **The orphan branch has never been pushed.** The 1 GiB ceiling is measured against a working
   tree; what GitHub Pages actually accounts for is unobserved.
+
+## T061 addendum — the User Story 4 aggregates (Phase 5, 2026-10-10)
+
+Phase 5 adds `data/published/aggregates/`. Measured, scratch-built from the cached window:
+
+| Set | files | NDJSON | CSV | total |
+|---|---:|---:|---:|---:|
+| `composition` | 2 | 25,237 | 7,463 | 32,700 |
+| `subject-trends` | 2 | 13,178,975 | 5,746,515 | 18,925,490 |
+| `counting-basis` | 2 | 1,805 | 1,747 | 3,552 |
+| **aggregates total** | **6** | | | **18,961,742** |
+
+- aggregates add **18,961,742 B = 18.08 MiB**
+- new total **254,927,427 B = 243.1 MiB**, against the live-built 225.0 MiB — **+8.04%**
+- **23.7% of the 1 GiB Pages ceiling**, up from 22.0%. Still fits, with 76% headroom.
+- largest aggregate file 13,178,975 B (12.57 MiB) — `subject-trends.jsonl`, against the
+  100 MiB per-file limit, 8× headroom. It is now the **largest file in the dataset**, displacing
+  `reference/members.jsonl` at 3.29 MiB.
+
+### A 179 MiB mistake, caught by measuring rather than by reasoning
+
+The first implementation carried the full counting-basis prose **inline on every aggregate row**,
+which is the literal reading of "every aggregate carries the counting basis". Measured:
+
+| | aggregates | dataset total | of the 1 GiB ceiling |
+|---|---:|---:|---:|
+| basis inline on every row | **195.1 MiB** | **420.2 MiB** | **41.0%** |
+| basis published once per unit | **18.08 MiB** | **243.1 MiB** | **23.7%** |
+
+**179 MiB of the 195 — 91% of the aggregates — was one sentence repeated 92,942 times.** It
+would have nearly doubled the dataset.
+
+The basis is now published once per unit in `aggregates/counting-basis.{jsonl,csv}`, and every
+aggregate row carries `counting_basis_unit` and `basis_version`, which name the row that applies
+to it. FR-012's "stated alongside the numbers" is met by a reference in the same directory that
+always resolves — and `tests/contract/test_aggregates.py` asserts the reference **resolves**,
+which is a stronger check than an inline copy could fail.
+
+**`basis_version` stays on every row** deliberately, at two bytes: it is what lets a consumer
+comparing two refreshes tell a changed definition from a changed dataset.
+
+### What this addendum does not change
+
+- T018's **subject-search index is still not built** and its 3.13 MiB figure is still a linear
+  projection. `aggregates/subject-trends` is a per-session frequency series, not a search index;
+  T070–T071 own the index.
+- The figures here are **scratch-built**. The live-built dataset measured in T061 above is
+  preserved at `$SANSAD_SCRATCH/live-publish-2026-10-10/`. The question records are identical;
+  the manifest's `source` differs, plus 813 B of `source_record_ref` ordering.

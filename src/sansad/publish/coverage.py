@@ -127,6 +127,11 @@ class CoverageInputs:
     #: checkpoint was written), or read from the cached window. A resumed term
     #: is OLDER than `last_refreshed`, and a consumer cannot tell unless the
     #: statement says so -- which is the whole reason this field exists.
+    #: The published sets this statement covers, by directory/file stem. T067
+    #: adds `aggregates`. Published because a consumer otherwise has to
+    #: discover the dataset's shape by listing directories, and a set that
+    #: stopped being written would be invisible rather than missing.
+    published_sets: Sequence[str] = ()
     question_source_by_term: Sequence[Mapping[str, object]] = ()
     extra_known_gaps: Sequence[str] = ()
     freshness: Freshness = Freshness.CURRENT
@@ -219,6 +224,7 @@ def coverage_row(statement: CoverageStatement, inputs: CoverageInputs) -> dict[s
             inputs.ministry_names_in_reference_set_with_no_questions
         ),
         "known_gaps": list(statement.known_gaps),
+        "published_sets": list(inputs.published_sets),
         "question_source_by_term": [dict(e) for e in inputs.question_source_by_term],
         "resumed_terms": [
             e.get("term") for e in inputs.question_source_by_term if e.get("mode") == "resumed"
@@ -269,6 +275,7 @@ def render(statement: CoverageStatement, inputs: CoverageInputs) -> str:
         f"{inputs.ministry_names_without_confirmed_mapping} name(s) with no confirmed mapping",
         f"  reference-only names  : "
         f"{inputs.ministry_names_in_reference_set_with_no_questions} (no id, not published)",
+        f"  published sets       : {', '.join(inputs.published_sets) or 'not stated'}",
         f"  freshness             : {statement.last_known_good.value}",
         "  question source       : "
         + (
