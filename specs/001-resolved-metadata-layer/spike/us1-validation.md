@@ -4,6 +4,14 @@
 **Dataset**: produced by `make refresh SOURCE=upstream` — a live fetch of the full window,
 **52m 38s** wall clock, exit 0. Not the cached window: `manifest.json` records
 `"source": "upstream"`.
+
+**There were two live runs, and this dataset is from the second.** The first started at 22:07
+UTC-4 and was **stopped by the owner at about 20 minutes — it did not fail**. It was stopped
+because the fetch persisted nothing as it went: every record was held in memory and the first
+write came only after both terms had been fetched and resolved, so a dropped connection on the
+last page would have discarded the whole ~70 minutes. Per-term checkpointing was added
+(`eb85860`) and the run restarted at 22:27, finishing at 23:20. **Every figure in this file is
+from that second run.** No figure here was carried over from the first, which wrote nothing.
 **Dataset figures**: 95,269 records fetched, 1 declared duplicate, **95,268 published
 questions**, 1,759 files, 235,965,570 bytes.
 **Scope**: `quickstart.md` scenarios 1, 2, 3, 4, 5, 9, 10, 11.
@@ -267,8 +275,13 @@ guard: PASS -- 1894 file(s) scanned under /Users/rohanupalekar/claudecode/indian
 
 `data/published/` — all **1,759** live files, both formats, every partition, the reference sets,
 the coverage statement and the resolution records — carries **no** attribute outside the FR-008
-set. `tests/` is clean on 19 files. `make guard` scans 1,893 files across the whole tree and
-finds no prohibited attribute.
+set. `tests/` is clean on 19 files. `make guard` scans the whole tree and finds no prohibited
+attribute.
+
+**The two guard figures in this file differ by one, and the reason is this file.** The run
+during T059's gates scanned **1,893** files; the run pasted above scanned **1,894**, because
+`us1-validation.md` itself had been created in between. Both passed with zero findings. The
+pasted output is the later run and is the one to read.
 
 **`web/` is EMPTY and is reported `[EMPTY]`, not `[PASS]`.** The tool says so itself: "nothing
 audited -- this is NOT a pass for this scope". No task in T051–T058 writes `web/`; the page is

@@ -66,6 +66,7 @@ import json
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -73,7 +74,11 @@ import httpx
 
 from sansad.ingest.field_allowlist import filter_record, normalise_key
 from sansad.ingest.shape import QUESTION_ROUTE, check_shape
-from sansad.ingest.transport import DEFAULT_TIMEOUT_SECONDS, fetch_json
+from sansad.ingest.transport import (
+    DEFAULT_TIMEOUT_SECONDS,
+    assert_outside_repo,
+    fetch_json,
+)
 from sansad.model._common import NOT_STATED, House, ResolutionStatus
 from sansad.model.question import Question
 from sansad.signals.alerts import Signal, SignalLog, ingestion_failure
@@ -87,6 +92,7 @@ __all__ = [
     "IngestionFailed",
     "QuestionRecord",
     "checkpoint_is_complete",
+    "checkpoint_written_at",
     "fetch_question_records",
     "iso_date",
     "load_question_records",
@@ -424,6 +430,22 @@ def question_record_from(
 CHECKPOINT_COMPLETE_SUFFIX = ".complete.json"
 
 
+def checkpoint_written_at(path: Path) -> str:
+    """When a complete checkpoint was written, from its sidecar.
+
+    Published whenever a term is resumed, so a consumer can see that part of
+    the record is older than `last_refreshed` claims. A resumed term carrying
+    no date would be the stale-data-labelled-live defect with extra steps.
+    """
+    sidecar = Path(path).with_name(Path(path).name + CHECKPOINT_COMPLETE_SUFFIX)
+    if not sidecar.is_file():
+        return NOT_STATED
+    try:
+        return str(json.loads(sidecar.read_text(encoding="utf-8")).get("written_at") or NOT_STATED)
+    except json.JSONDecodeError:
+        return NOT_STATED
+
+
 def checkpoint_is_complete(path: Path) -> int | None:
     """The record count a complete checkpoint holds, or None.
 
@@ -623,9 +645,9 @@ def fetch_question_records(
     `checkpoint` is a path **under `$SANSAD_SCRATCH`** -- outside the repository
     tree -- to which each page's **allowlist-filtered** records are appended as
     they arrive, flushed per page. It exists because this fetch is otherwise
-    all-or-nothing: the measured full window takes ~71 minutes, records are held
-    in memory, and a dropped connection on the last page discarded every
-    minute of it. With a checkpoint per term, a late failure costs the current
+    all-or-nothing: the one complete live run took 52m 38s end to end (measured
+    2026-10-10), records are held in memory, and a dropped connection on the last
+    page discarded every minute of it. With a checkpoint per term, a late failure costs the current
     term rather than the whole window.
 
     **What is written is post-allowlist, never a raw body.** The filter is
@@ -668,6 +690,10 @@ def fetch_question_records(
 
     handle = None
     if checkpoint is not None:
+        # An argument that takes any Path can take an in-tree one. The upstream
+        # body is what lands here, so this refuses rather than trusting the
+        # caller -- the same rule `scratch_path` applies to paths it builds.
+        assert_outside_repo(checkpoint, what="checkpoint")
         checkpoint = Path(checkpoint)
         checkpoint.parent.mkdir(parents=True, exist_ok=True)
         # Any stale sidecar must go FIRST: if this fetch dies early, an old
@@ -766,6 +792,10 @@ def fetch_question_records(
                     "session": session,
                     "page_size": page_size,
                     "route": QUESTION_PATH,
+                    # So a resumed term can say HOW OLD it is. Without this the
+                    # published record would carry today's `last_refreshed`
+                    # over data fetched days earlier and nothing would say so.
+                    "written_at": datetime.now(UTC).isoformat(timespec="seconds"),
                 },
                 indent=1,
                 sort_keys=True,

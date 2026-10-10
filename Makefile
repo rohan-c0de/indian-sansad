@@ -151,6 +151,10 @@ audit-fields:
 # --------------------------------------------------------------------------
 SOURCE ?= scratch
 PREVIOUS ?=
+# RESUME=1 reuses a COMPLETE checkpoint instead of refetching that term.
+# OFF by default and never set in CI: a resumed term is older than the refresh
+# date, and reusing one silently publishes stale data labelled live.
+RESUME ?=
 
 refresh: scratch
 	@set -eu -o pipefail; \
@@ -161,7 +165,8 @@ refresh: scratch
 	 SANSAD_SCRATCH="$(SANSAD_SCRATCH)" "$(VENV_PY)" -m sansad.cli \
 	   --source "$(SOURCE)" \
 	   --published-dir "$(REPO_ROOT)/data/published" \
-	   $(if $(PREVIOUS),--previous "$(PREVIOUS)",)
+	   $(if $(PREVIOUS),--previous "$(PREVIOUS)",) \
+	   $(if $(RESUME),--resume,)
 
 # --------------------------------------------------------------------------
 # verify-joins -- T056 / quickstart.md scenario 4 (FR-005).

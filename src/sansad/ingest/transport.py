@@ -42,6 +42,7 @@ from sansad.ingest.field_allowlist import filter_record
 __all__ = [
     "DEFAULT_TIMEOUT_SECONDS",
     "ScratchPathInsideRepoError",
+    "assert_outside_repo",
     "fetch_json",
     "fetch_records",
     "repo_root",
@@ -104,6 +105,28 @@ def resolve_scratch_root(scratch: str | os.PathLike[str] | None = None) -> Path:
             f"Constitution Principle V: no raw upstream payload is ever written "
             f"inside this tree. Set SANSAD_SCRATCH outside it. This is not "
             f"recoverable in-process and there is deliberately no fallback."
+        )
+    return resolved
+
+
+def assert_outside_repo(path: str | os.PathLike[str], *, what: str = "path") -> Path:
+    """Resolve `path` and raise if it lies inside the repository tree.
+
+    Public because more than one writer needs it now. `scratch_path` applies it
+    to paths it builds; this applies it to a path a **caller** supplies, which
+    is the case `fetch_question_records`'s `checkpoint` argument introduced --
+    an argument that takes any Path is an argument that can take an in-tree one.
+    """
+    resolved = Path(path).expanduser().resolve()
+    root = repo_root()
+    if resolved == root or root in resolved.parents:
+        raise ScratchPathInsideRepoError(
+            f"{what} resolves INSIDE the repository tree.\n"
+            f"  requested : {path}\n"
+            f"  resolved  : {resolved}\n"
+            f"  repo root : {root}\n"
+            f"Constitution Principle V: no raw upstream payload is ever written "
+            f"inside this tree. There is deliberately no fallback."
         )
     return resolved
 

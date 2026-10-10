@@ -38,9 +38,11 @@ from typing import Any
 
 from sansad.ingest.members import load_members
 from sansad.ingest.questions import (
+    CHECKPOINT_COMPLETE_SUFFIX,
     DuplicateRecord,
     QuestionRecord,
     checkpoint_is_complete,
+    checkpoint_written_at,
     load_question_records,
 )
 from sansad.ingest.transport import scratch_path
@@ -130,8 +132,30 @@ def _load_from_scratch(
     return roster, records
 
 
-def _load_from_upstream(last_refreshed: str, duplicates: list[DuplicateRecord], signals: SignalLog):
-    """Fetch the window. The only path here that touches the network."""
+def _load_from_upstream(
+    last_refreshed: str,
+    duplicates: list[DuplicateRecord],
+    signals: SignalLog,
+    *,
+    resume: bool = False,
+):
+    """Fetch the window. The only path here that touches the network.
+
+    **Resume is OFF by default, and that default is the point.** A complete
+    checkpoint is otherwise indistinguishable from a fresh fetch: the run would
+    re-read a window fetched days ago, then stamp the manifest with today's
+    `last_refreshed` and `"source": "upstream"`. Stale data labelled live is a
+    worse failure than a slow refresh, because nothing in the published record
+    would contradict it.
+
+    So by default a complete checkpoint is **ignored and overwritten**. Resuming
+    is an explicit act (`--resume`, `make refresh RESUME=1`), it is never passed
+    in CI, and when it is used every resumed term is named in the manifest and
+    in the Coverage Statement together with the date its checkpoint was written.
+
+    Returns (members, records, provenance) where provenance records, per term,
+    whether it was fetched or resumed.
+    """
     from sansad.ingest.members import fetch_members
     from sansad.ingest.questions import fetch_question_records
 
@@ -155,9 +179,11 @@ def _load_from_upstream(last_refreshed: str, duplicates: list[DuplicateRecord], 
 
     # --- per-term checkpoints, under $SANSAD_SCRATCH ------------------------
     #
-    # The measured full window takes ~71 minutes and the records are held in
-    # memory, so before this the fetch was all-or-nothing: a dropped connection
-    # on the last page discarded every minute of it. Each term is now persisted
+    # The one complete live run took 52m 38s end to end (measured 2026-10-10;
+    # the earlier ~71 min is a sum of separately-timed slices, not an
+    # end-to-end figure). Records are held in memory, so before this the fetch
+    # was all-or-nothing: a dropped connection on the last page discarded every
+    # minute of it. Each term is now persisted
     # as it is fetched, post-allowlist, OUTSIDE the repository tree -- and a
     # term whose checkpoint is marked complete is re-read instead of re-fetched.
     #
@@ -165,16 +191,18 @@ def _load_from_upstream(last_refreshed: str, duplicates: list[DuplicateRecord], 
     # with symlinks and `..` collapsed and raises rather than falling back if it
     # lands inside the repository.
     #
-    # The 17th is fetched FIRST and is the expensive one -- ~58 of the ~71
-    # minutes -- so the checkpoint that matters most is written earliest.
+    # The 17th is fetched FIRST and is the expensive one -- 43 of the 52m 38s
+    # measured -- so the checkpoint that matters most is written earliest.
     records: list[QuestionRecord] = []
+    provenance: list[dict[str, object]] = []
     for term in WINDOW_TERMS:
         checkpoint = scratch_path("live-refresh", f"questions_ls{term}.jsonl")
         already = checkpoint_is_complete(checkpoint)
-        if already is not None:
+        if already is not None and resume:
+            written = checkpoint_written_at(checkpoint)
             print(
-                f"refresh: term {term} already complete at {checkpoint} "
-                f"({already:,} records) -- re-reading, not re-fetching",
+                f"refresh: term {term} RESUMED from {checkpoint} "
+                f"({already:,} records, checkpoint written {written}) -- NOT re-fetched",
                 flush=True,
             )
             records.extend(
@@ -185,7 +213,15 @@ def _load_from_upstream(last_refreshed: str, duplicates: list[DuplicateRecord], 
                     already_filtered=True,
                 )
             )
+            provenance.append({"term": term, "mode": "resumed", "checkpoint_written_at": written})
             continue
+        if already is not None:
+            print(
+                f"refresh: term {term} has a complete checkpoint from "
+                f"{checkpoint_written_at(checkpoint)} -- IGNORING it and refetching "
+                f"(pass --resume to reuse it)",
+                flush=True,
+            )
         print(f"refresh: fetching term {term} -> {checkpoint}", flush=True)
         records.extend(
             fetch_question_records(
@@ -197,8 +233,9 @@ def _load_from_upstream(last_refreshed: str, duplicates: list[DuplicateRecord], 
                 checkpoint=checkpoint,
             )
         )
+        provenance.append({"term": term, "mode": "fetched", "checkpoint_written_at": None})
         print(f"refresh: term {term} complete ({len(records):,} records so far)", flush=True)
-    return members, records
+    return members, records, provenance
 
 
 def run_refresh(
@@ -207,6 +244,7 @@ def run_refresh(
     published_dir: Path | None = None,
     previous_dir: Path | None = None,
     pool_by_term: bool = True,
+    resume: bool = False,
 ) -> int:
     """One full ingestion and publish. Returns a process exit code."""
     started = datetime.now(UTC)
@@ -221,8 +259,14 @@ def run_refresh(
                 _scratch_root(), last_refreshed, duplicates
             )
             members = load_members(roster_records, last_refreshed=last_refreshed)
+            provenance = [
+                {"term": t, "mode": "cached-window", "checkpoint_written_at": None}
+                for t in WINDOW_TERMS
+            ]
         elif source == "upstream":
-            members, question_records = _load_from_upstream(last_refreshed, duplicates, signals)
+            members, question_records, provenance = _load_from_upstream(
+                last_refreshed, duplicates, signals, resume=resume
+            )
         else:  # pragma: no cover - argparse constrains this
             raise SystemExit(f"unknown --source {source!r}")
     except SystemExit:
@@ -333,6 +377,7 @@ def run_refresh(
         ministry_name_groups_merged_by_normalisation=registry.fold_groups,
         ministry_names_in_reference_set_with_no_questions=len(registry.reference_only),
         freshness=Freshness.CURRENT,
+        question_source_by_term=provenance,
     )
     rajya_sabha = CoverageInputs(
         house=House.RAJYA_SABHA,
@@ -371,8 +416,30 @@ def run_refresh(
             "resolution_rate_including_assertions": round(totals["assisted"] / totals["total"], 6),
             "duplicate_records_declared": [d.question_id for d in duplicates],
             "source": source,
+            # Per term: fetched, resumed (with the checkpoint's date), or read
+            # from the cached window. A resumed term is older than
+            # `last_refreshed` and the record has to say so.
+            "question_source_by_term": provenance,
+            "resumed_terms": [p["term"] for p in provenance if p["mode"] == "resumed"],
         },
     )
+
+    # --- clear this run's checkpoints, now that the publish succeeded -------
+    #
+    # A checkpoint exists to survive a FAILED run. Leaving it after a successful
+    # one is what made the next run silently re-read a stale window. A failed
+    # run leaves them in place, which is the whole point of having them.
+    if source == "upstream":
+        cleared = []
+        for term in WINDOW_TERMS:
+            path = scratch_path("live-refresh", f"questions_ls{term}.jsonl")
+            sidecar = path.with_name(path.name + CHECKPOINT_COMPLETE_SUFFIX)
+            for target in (path, sidecar):
+                if target.exists():
+                    target.unlink()
+                    cleared.append(target.name)
+        if cleared:
+            print(f"refresh: cleared {len(cleared)} checkpoint file(s) after a successful publish")
 
     print()
     print(render(build_coverage_statement(coverage_inputs), coverage_inputs))
@@ -412,6 +479,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help=(
+            "reuse a COMPLETE checkpoint from an earlier run instead of refetching "
+            "that term. OFF by default: a resumed term is older than the refresh "
+            "date, and reusing one silently would publish stale data labelled live. "
+            "Never passed in CI. Every resumed term is named in the manifest and "
+            "the coverage statement with the date its checkpoint was written."
+        ),
+    )
+    parser.add_argument(
         "--full-pool",
         action="store_true",
         help=(
@@ -425,6 +503,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         published_dir=args.published_dir,
         previous_dir=args.previous,
         pool_by_term=not args.full_pool,
+        resume=args.resume,
     )
 
 

@@ -123,6 +123,11 @@ class CoverageInputs:
     ministry_names_without_confirmed_mapping: int = 0
     ministry_name_groups_merged_by_normalisation: Sequence[Sequence[str]] = ()
     ministry_names_in_reference_set_with_no_questions: int = 0
+    #: Per term: fetched live, resumed from a checkpoint (with the date that
+    #: checkpoint was written), or read from the cached window. A resumed term
+    #: is OLDER than `last_refreshed`, and a consumer cannot tell unless the
+    #: statement says so -- which is the whole reason this field exists.
+    question_source_by_term: Sequence[Mapping[str, object]] = ()
     extra_known_gaps: Sequence[str] = ()
     freshness: Freshness = Freshness.CURRENT
     unobtainable_reason: str | None = None
@@ -146,6 +151,14 @@ def build_coverage_statement(inputs: CoverageInputs) -> CoverageStatement:
             f"by the upstream; identical copies were reduced to one and this is "
             f"the declaration (FR-013)."
         )
+    for entry in inputs.question_source_by_term:
+        if entry.get("mode") == "resumed":
+            gaps.append(
+                f"resumed-term: Lok Sabha {entry.get('term')}'s questions were NOT "
+                f"fetched in this refresh. They were reused from a checkpoint "
+                f"written {entry.get('checkpoint_written_at')}, so that part of the "
+                f"record is older than last_refreshed (FR-016)."
+            )
     gaps.extend(inputs.extra_known_gaps)
 
     return CoverageStatement(
@@ -206,6 +219,10 @@ def coverage_row(statement: CoverageStatement, inputs: CoverageInputs) -> dict[s
             inputs.ministry_names_in_reference_set_with_no_questions
         ),
         "known_gaps": list(statement.known_gaps),
+        "question_source_by_term": [dict(e) for e in inputs.question_source_by_term],
+        "resumed_terms": [
+            e.get("term") for e in inputs.question_source_by_term if e.get("mode") == "resumed"
+        ],
         "last_refreshed": statement.last_refreshed,
         "last_known_good": statement.last_known_good.value,
         "unobtainable_reason": statement.unobtainable_reason,
@@ -253,6 +270,15 @@ def render(statement: CoverageStatement, inputs: CoverageInputs) -> str:
         f"  reference-only names  : "
         f"{inputs.ministry_names_in_reference_set_with_no_questions} (no id, not published)",
         f"  freshness             : {statement.last_known_good.value}",
+        "  question source       : "
+        + (
+            ", ".join(
+                f"LS{e.get('term')}={e.get('mode')}"
+                + (f"@{e.get('checkpoint_written_at')}" if e.get("mode") == "resumed" else "")
+                for e in inputs.question_source_by_term
+            )
+            or "not stated"
+        ),
     ]
     for group in inputs.ministry_name_groups_merged_by_normalisation:
         lines.append(f"  normalisation merged  : {json.dumps(list(group), ensure_ascii=False)}")

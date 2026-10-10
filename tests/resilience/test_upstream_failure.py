@@ -343,7 +343,7 @@ def test_the_visitor_never_sees_an_error_state(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Per-term checkpoints -- a 71-minute fetch must not be all-or-nothing
+# Per-term checkpoints -- a ~50-minute fetch must not be all-or-nothing
 # ---------------------------------------------------------------------------
 def _checkpoint_record(ques_no: int) -> dict:
     """An upstream-shaped record carrying one EXCLUDED attribute.
@@ -383,8 +383,9 @@ def _paged(handler_pages: int, total: int, *, die_from: int | None = None):
 def test_a_dropped_connection_keeps_the_pages_that_arrived(tmp_path):
     """The whole point: a late failure must not discard the earlier pages.
 
-    Before this, a dropped connection on the last page of a ~71-minute window
-    fetch threw away every minute of it, because records are held in memory.
+    Before this, a dropped connection on the last page threw away every minute
+    of the fetch, because records are held in memory. The one complete live run
+    took 52m 38s (measured 2026-10-10).
     """
     from sansad.ingest.questions import IngestionFailed, fetch_question_records
 

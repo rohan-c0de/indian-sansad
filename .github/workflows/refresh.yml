@@ -10,16 +10,21 @@
 #
 # Sized against measured reality (spike/free-tiers.md T008):
 #   - job ceiling 6 hours, and "the job is terminated and fails" at it;
-#   - a FULL re-ingest is ~71 min MEASURED, plus a 46.5 s roster fetch -- about
-#     20% of the ceiling (spike/free-tiers.md -> "Ingest duration -- final
-#     measured figures": 18th LS 797 s = 13.3 min, 17th LS sessions 1-10
-#     ~45 min, 17th LS sessions 11-15 765 s = 12.8 min, summing to ~71 min).
-#     That figure supersedes T008's ~46 min projection from ~29 ms/record and
-#     ci-reachability.md's 20-50 min range, "both low by roughly 1.5-2x". The
-#     same file's earlier ADDENDUM says ~75-80 min, but its full-window row
-#     projected the 17th's whole term from its own median rather than measuring
-#     it; ~71 min is the only all-measured figure. timeout-minutes below is set
-#     well under the 6-hour ceiling so an overrun fails fast rather than
+#   - A FULL re-ingest took **52m 38s END TO END, MEASURED** on 2026-10-10 --
+#     the first and so far only complete live run (T059, fetch + resolve +
+#     publish of all 95,269 records, from a laptop). That is **~15% of the
+#     6-hour per-job ceiling**. It is the only end-to-end figure that exists.
+#   - The earlier ~71 min figure is a SLICE-BASED ESTIMATE, not an end-to-end
+#     measurement: spike/free-tiers.md -> "Ingest duration -- final measured
+#     figures" sums three separately-timed fetches (18th LS 797 s = 13.3 min,
+#     17th LS sessions 1-10 ~45 min, 17th LS sessions 11-15 765 s = 12.8 min).
+#     It is kept here because it superseded T008's ~46 min projection and
+#     ci-reachability.md's 20-50 min range, and because a sum of slices is a
+#     reasonable upper bound: the one real run came in 26% under it.
+#   - NEITHER figure was measured on a GitHub-hosted runner. Both are from this
+#     laptop; ci-reachability.md records the runner as faster on bulk transfer,
+#     so the runner's time is UNVERIFIED in both directions. timeout-minutes
+#     below is set well under the ceiling so an overrun fails fast rather than
 #     burning hours.
 #   - ONE PAGE TOOK 271.6 s during the 17th's whole-term fetch, against a
 #     66.5 s median. Per-request timeouts must be generous, and
@@ -205,7 +210,7 @@ jobs:
             commit -q -m "Refresh keep-alive $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]" \
             || { echo "no change to commit"; exit 0; }
 
-          # The run takes ~71 minutes, so `main` may well have moved since the
+          # The run took 52m 38s measured, so `main` may well have moved since the
           # checkout. A rejected push means exactly that -- so rebase onto the
           # new tip and retry ONCE.
           #
