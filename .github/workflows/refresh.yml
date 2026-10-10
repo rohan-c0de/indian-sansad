@@ -10,10 +10,21 @@
 #
 # Sized against measured reality (spike/free-tiers.md T008):
 #   - job ceiling 6 hours, and "the job is terminated and fails" at it;
-#   - a FULL re-ingest is ~46 min (95,269 questions x ~29 ms) plus a 46.5 s
-#     roster fetch -- about a seventh of the ceiling, which is not as
-#     comfortable as "~10^5 records" sounds. timeout-minutes below is set well
-#     under the ceiling so an overrun fails fast rather than burning hours.
+#   - a FULL re-ingest is ~71 min MEASURED, plus a 46.5 s roster fetch -- about
+#     20% of the ceiling (spike/free-tiers.md -> "Ingest duration -- final
+#     measured figures": 18th LS 797 s = 13.3 min, 17th LS sessions 1-10
+#     ~45 min, 17th LS sessions 11-15 765 s = 12.8 min, summing to ~71 min).
+#     That figure supersedes T008's ~46 min projection from ~29 ms/record and
+#     ci-reachability.md's 20-50 min range, "both low by roughly 1.5-2x". The
+#     same file's earlier ADDENDUM says ~75-80 min, but its full-window row
+#     projected the 17th's whole term from its own median rather than measuring
+#     it; ~71 min is the only all-measured figure. timeout-minutes below is set
+#     well under the 6-hour ceiling so an overrun fails fast rather than
+#     burning hours.
+#   - ONE PAGE TOOK 271.6 s during the 17th's whole-term fetch, against a
+#     66.5 s median. Per-request timeouts must be generous, and
+#     "a refresh that retries aggressively on slow responses will make the
+#     problem worse rather than better".
 #   - "Scheduled workflows will only run on the default branch", which is why
 #     this file lives on main and publishes to `published` rather than running
 #     from it.
@@ -193,7 +204,26 @@ jobs:
           git -c user.name="$GIT_AUTHOR_NAME" -c user.email="$GIT_AUTHOR_EMAIL" \
             commit -q -m "Refresh keep-alive $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]" \
             || { echo "no change to commit"; exit 0; }
-          git push origin HEAD:main
+
+          # The run takes ~71 minutes, so `main` may well have moved since the
+          # checkout. A rejected push means exactly that -- so rebase onto the
+          # new tip and retry ONCE.
+          #
+          # NEVER --force. This is the default branch: a force-push here would
+          # discard whatever moved it, and the keep-alive is the least important
+          # commit in the repository. Losing one keep-alive costs nothing (the
+          # next run writes another, and the 60-day window is wide); discarding
+          # someone's commit costs something that cannot be recovered.
+          #
+          # Retry ONCE, not in a loop: if it is rejected twice, something other
+          # than an ordinary race is happening and a loop would hammer the
+          # remote while hiding it.
+          if ! git push origin HEAD:main; then
+            echo "keep-alive push rejected -- main moved during the run; rebasing once"
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
 
       # The maintainer's half of the FR-010/FR-011 split: loud here, quiet for
       # the visitor. The job's own failure is the delivery mechanism, which

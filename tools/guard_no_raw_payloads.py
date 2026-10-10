@@ -211,7 +211,31 @@ PAYLOAD_SIZE_CEILING_BYTES = 64 * 1024  # 64 KB, per T002
 # SC-010 requires. A guard that is permanently red after every refresh is a
 # guard that gets switched off, which is worse than no guard because it looks
 # like one.
-SIZE_CEILING_EXEMPT_PREFIXES: tuple[str, ...] = ("data/published/",)
+SIZE_CEILING_EXEMPT_PREFIXES: tuple[str, ...] = (
+    "data/published/",
+    # `.previous-snapshot/` -- added 2026-10-09 after review found a defect that
+    # would have broken every CI run after the first.
+    #
+    # The refresh workflow checks the PREVIOUS published snapshot out to
+    # `.previous-snapshot/` inside the repository tree, because FR-010's
+    # last-known-good and FR-011's signal for a question leaving `resolved` both
+    # need the prior record to compare against. On the first run there is no
+    # `published` branch, so the directory is absent and `make guard` passes.
+    # From the second run on it holds ~1,759 previously published files, 759 of
+    # which the first dry run measured as over 64 KB -- so the workflow's FIRST
+    # `make guard` step would have gone red, the refresh would never have
+    # started, nothing would have been published, and only the keep-alive commit
+    # would still have run. A silent, permanent publication outage.
+    #
+    # Exactly the same reasoning as `data/published/`: this is a checkout of a
+    # build output, not a committed fixture, so the 64 KB *fixture* ceiling does
+    # not apply. It is deliberately NOT in SKIP_DIRS -- the ATTRIBUTE scan must
+    # still cover it, because a prohibited attribute in a previously published
+    # file is still a prohibited attribute reaching this tree, and finding it in
+    # the previous snapshot is how we would learn that an earlier refresh had
+    # published one.
+    ".previous-snapshot/",
+)
 
 # Binary and generated files are not scanned for text. They are still size-checked
 # when payload-shaped.

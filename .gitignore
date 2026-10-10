@@ -32,6 +32,20 @@ data/raw/
 # ---------------------------------------------------------------------------
 data/published/
 
+# ---------------------------------------------------------------------------
+# Previous published snapshot, checked out by the refresh workflow.
+#
+# The workflow checks the `published` branch out to `.previous-snapshot/` BEFORE
+# overwriting anything, because FR-010's last-known-good and FR-011's signal for
+# a question leaving `resolved` both need the prior record to compare against.
+# It is a checkout of a build output and must never be committed on `main` --
+# the same reasoning as data/published/, and the same size (~216 MiB).
+#
+# tools/guard_no_raw_payloads.py exempts it from the 64 KB fixture ceiling but
+# STILL scans it for prohibited attributes. Neither half is sufficient alone.
+# ---------------------------------------------------------------------------
+.previous-snapshot/
+
 # Scratch space for fetched bodies lives OUTSIDE the repo ($SANSAD_SCRATCH).
 # This entry exists only to catch a scratch dir created inside the tree by
 # mistake; `make scratch` asserts against that case.

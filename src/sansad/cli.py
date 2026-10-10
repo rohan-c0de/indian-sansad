@@ -73,6 +73,12 @@ DEFAULT_PUBLISHED_DIR = "data/published"
 #: Published set name, shared with `tools/verify_joins.py`.
 RESOLUTION_STEM = "resolution-records"
 
+#: One unpaginated 5.0 MiB response, measured at 46.5 s (route-capture.md T005).
+ROSTER_TIMEOUT_SECONDS = 120.0
+#: 2.2x the 271.6 s worst page measured in spike/free-tiers.md. Bounded, not
+#: unbounded: a hung request must fail and signal, not sit for six hours.
+QUESTION_PAGE_TIMEOUT_SECONDS = 600.0
+
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -127,7 +133,23 @@ def _load_from_upstream(last_refreshed: str, duplicates: list[DuplicateRecord], 
     from sansad.ingest.members import fetch_members
     from sansad.ingest.questions import fetch_question_records
 
-    members = fetch_members(timeout=120.0, last_refreshed=last_refreshed)
+    # Timeouts sized from MEASURED worst cases, not from medians.
+    #
+    # The roster is one unpaginated 5.0 MiB response measured at **46.5 s**
+    # (route-capture.md T005), so the transport's 30 s default is already below
+    # it -- 120 s gives headroom without being open-ended.
+    #
+    # A question page's median was 66.5 s on the 17th's whole-term fetch, and
+    # **one page took 271.6 s** (spike/free-tiers.md). The transport's 30 s
+    # default would therefore have failed the live run on the first slow page,
+    # after as much as 45 minutes of fetching, with nothing resumable -- found
+    # by review on 2026-10-09 before the first live run, by reading the recorded
+    # measurement rather than by discovering it in production.
+    #
+    # 600 s is 2.2x the measured maximum. It is deliberately NOT unbounded: a
+    # hung request must still fail and raise a maintainer signal (FR-011)
+    # rather than sit until the job's 6-hour ceiling kills it.
+    members = fetch_members(timeout=ROSTER_TIMEOUT_SECONDS, last_refreshed=last_refreshed)
     records: list[QuestionRecord] = []
     for term in WINDOW_TERMS:
         records.extend(
@@ -136,6 +158,7 @@ def _load_from_upstream(last_refreshed: str, duplicates: list[DuplicateRecord], 
                 last_refreshed=last_refreshed,
                 signals=signals,
                 duplicates=duplicates,
+                timeout=QUESTION_PAGE_TIMEOUT_SECONDS,
             )
         )
     return members, records
