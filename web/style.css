@@ -10,20 +10,39 @@
  * page must never scroll horizontally, so anything that cannot shrink -- the
  * session table -- scrolls inside its own container instead.
  *
- * Contrast, against the --surface and --ground grounds, measured with the
- * WCAG relative-luminance formula:
- *   --ink    #14213D on #FFFFFF = 14.07:1   body text
- *   --ink    #14213D on #F3F4F6 = 12.98:1
+ * Contrast, against the --surface and --ground grounds, computed with the
+ * WCAG relative-luminance formula. RECOMPUTED 2026-10-10 -- three of the
+ * figures previously recorded here were wrong, all of them understated:
+ * --ink on white was given as 14.07:1 and is 15.97:1, --ink on the ground as
+ * 12.98:1 and is 14.51:1, --accent as 7.33:1 and is 8.03:1. They were
+ * conservative rather than dangerous, but a recorded measurement that nobody
+ * can reproduce is not a measurement.
+ *
+ *   TEXT, floor 4.5:1
+ *   --ink    #14213D on #FFFFFF = 15.97:1   body text
+ *   --ink    #14213D on #F3F4F6 = 14.51:1
+ *   --ink    #14213D on #FFF9EE = 15.24:1   text on a flagged row
  *   --muted  #4B5563 on #FFFFFF =  7.56:1   notes and captions
- *   --muted  #4B5563 on #F3F4F6 =  6.97:1
- *   --accent #8C3325 on #FFFFFF =  7.33:1   links and focus ring
- *   --flag-text #7A3B06 on #FFF4E0 = 7.25:1 flagged text on flagged ground
- * All are above the 4.5:1 required for text. The non-text marks that carry
- * meaning -- the flag border and the focus ring -- are above 3:1:
+ *   --muted  #4B5563 on #F3F4F6 =  6.87:1
+ *   --accent #8C3325 on #FFFFFF =  8.03:1   links and focus ring
+ *   --flag-text #7A3B06 on #FFF4E0 = 7.85:1 flagged text, flagged ground
+ *   --flag-text #7A3B06 on #FFF9EE = 8.16:1
+ *
+ *   NON-TEXT marks that carry meaning, floor 3:1
+ *   --accent        #8C3325 on #FFFFFF = 8.03:1  focus ring, starred bars
+ *   --bar-unstarred #6F88BD on #FFFFFF = 3.54:1  unstarred bars
+ *   --control-border #767F8F on #FFFFFF = 4.04:1 select boundary
+ *   --control-border #767F8F on #F3F4F6 = 3.67:1
+ *
+ *   The two bar fills are only 2.27:1 against EACH OTHER, which is below the
+ *   3:1 adjacent-mark floor. They are never adjacent: every segment is
+ *   stroked with --surface, and at 1280 px that separator is about 3.8 px of
+ *   white between them. The numbers are also in the table beside the chart,
+ *   which is the authoritative form.
+ *
  *   --flag-border #D9A441 on #FFF4E0 = 1.63:1  <-- decorative only; the flag
- *     is also carried by a word ("Not built yet", "not stated") and never by
- *     colour alone, so the border is not the signal.
- *   --accent #8C3325 outline on #FFFFFF = 7.33:1 focus ring.
+ *     is also carried by a word ("flagged", "Not built yet", "not stated")
+ *     and never by colour alone, so the border is not the signal.
  *
  * Nothing on this page carries meaning by colour alone. "not stated" is a
  * word. A gap is a list item. A region that is not built says so in text.
@@ -39,6 +58,19 @@
   --flag-bg: #fff4e0;
   --flag-border: #d9a441;
   --flag-text: #7a3b06;
+  /* A flagged TABLE ROW: lighter than --flag-bg so a flagged cell inside a
+     flagged row is still distinguishable. */
+  --flag-row: #fff9ee;
+  /* The second chart series. Previously named by chart.js and DEFINED
+     NOWHERE, so every unstarred bar rendered black and the legend swatch
+     rendered blank -- an undefined var() falls back to the property's initial
+     value and reports nothing. */
+  --bar-unstarred: #6f88bd;
+  /* The boundary of a <select>. #8A93A3 was the fallback hiding in a var()
+     default; it is 3.10:1 on white but only 2.81:1 on --ground, i.e. below
+     the 3:1 non-text floor exactly where a control sits on the page ground.
+     #767F8F clears it on both. */
+  --control-border: #767f8f;
 
   --font-head: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -674,6 +706,29 @@ details.sessions > summary:focus-visible {
   color: var(--muted);
 }
 
+/* (b) The table caption used the class `visually-hidden`, which style.css
+   never defined -- so it rendered visibly and, inside a nowrap table, clipped
+   at "Questions per session for the selecte". It is useful text, so it is
+   shown properly rather than hidden properly: left-aligned, wrapping, outside
+   the cells' white-space rule. */
+caption.table-caption {
+  caption-side: top;
+  text-align: left;
+  white-space: normal;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: var(--ground);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Named by the comparison table so it can be addressed; the shared table
+   rules above already carry its layout. */
+table.table-compare th[scope="row"] {
+  white-space: normal;
+  min-width: 14ch;
+}
+
 select {
   font: inherit;
   font-size: 1rem;
@@ -1051,4 +1106,11 @@ tr.tr-flag {
   .status-list {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+}
+
+/* A pre-selection, or the lack of one, explained in words. */
+.picker-note {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
 }

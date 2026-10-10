@@ -169,8 +169,11 @@ function renderCoverage(container, { coverage, sessions, basis }) {
       "Ministries",
       count(lok.ministry_ids),
       `from ${count(lok.ministry_names_observed)} distinct names in the source. ` +
-        `${count(lok.ministry_names_without_confirmed_mapping)} names are awaiting a ` +
-        "maintainer decision on whether they are renames of one another.",
+        `No confirmed rename mapping covers ${count(lok.ministry_names_without_confirmed_mapping)} ` +
+        `of those names, so UP TO ${count(lok.ministry_names_without_confirmed_mapping)} of them ` +
+        "could turn out to be renames of one another — the record does not claim that any of " +
+        "them is. A rename cannot be detected automatically here, so each one waits on a " +
+        "maintainer decision.",
     ),
   );
 
@@ -634,7 +637,8 @@ function mixTable(span, types, totals) {
       "helper",
       "ALL questions, whether or not the asking member was identified. The " +
         "ministry and the question type are read off the question record, not " +
-        "off resolution — so this is not a resolved-only figure.",
+        "off resolution — so this is not a resolved-only figure. Session dates " +
+        "are not stated in the published record.",
     ),
   );
 
@@ -643,10 +647,12 @@ function mixTable(span, types, totals) {
   wrap.setAttribute("aria-label", "Questions per session by type, scrollable");
   wrap.tabIndex = 0;
   const table = el("table");
-  const caption = el("caption", "visually-hidden");
-  caption.textContent =
-    "Questions per session for the selected ministry, by question type and by how " +
-    "completely each question is linked to a member.";
+  // The caption stays SHORT. It lives inside the table, and the table lives
+  // inside a horizontal scroller -- so a long caption is 974 px wide at a
+  // 390 px viewport and a reader has to scroll sideways to read prose. The
+  // long description is the page-width paragraph above, which wraps.
+  const caption = el("caption", "table-caption");
+  caption.textContent = "Questions per session, by type and by link status";
   table.append(caption);
 
   const thead = el("thead");
@@ -953,6 +959,18 @@ function buildProfileView(doc) {
   const form = el("div", "picker");
   form.append(ministry.wrap, from.wrap, to.wrap);
   replaceChildren(picker, form);
+  // (d) A pre-selection is a choice the page made, not one the reader made.
+  // Say so, or the first ministry reads as a recommendation.
+  picker.append(
+    el(
+      "p",
+      "picker-note",
+      "A ministry is pre-selected so the view has something to show: it is the " +
+        "first of " +
+        `${count(ministries.length)} by name, and the span is every published session. ` +
+        "It is not a recommendation and nothing is ranked. Change any of the three above.",
+    ),
+  );
 
   const draw = () => {
     const chosen = views.ministries.find((m) => m.ministryId === ministry.select.value);
@@ -991,16 +1009,42 @@ function buildCompareView(doc) {
   const first = sessions[0]?.[0];
   const last = sessions[sessions.length - 1]?.[0];
 
-  const a = labelledSelect("compare-a", "First ministry", ministries, ministries[0]?.[0]);
-  const b = labelledSelect("compare-b", "Second ministry", ministries, ministries[1]?.[0]);
+  // (d) No pre-selection here: a comparison the page chose would put two
+  // ministries side by side as though someone had asked the question.
+  const NONE = "";
+  const choices = [[NONE, "Choose a ministry…"], ...ministries];
+  const a = labelledSelect("compare-a", "First ministry", choices, NONE);
+  const b = labelledSelect("compare-b", "Second ministry", choices, NONE);
   const from = labelledSelect("compare-from", "From session", sessions, first);
   const to = labelledSelect("compare-to", "To session", sessions, last);
 
   const form = el("div", "picker");
   form.append(a.wrap, b.wrap, from.wrap, to.wrap);
   replaceChildren(picker, form);
+  picker.append(
+    el(
+      "p",
+      "picker-note",
+      "Choose two ministries to compare. Nothing is pre-selected: a pair the page " +
+        "picked would read as a comparison someone had asked for.",
+    ),
+  );
 
   const draw = () => {
+    if (!a.select.value || !b.select.value) {
+      const waiting = el("p", "status", "Choose two ministries above to compare them.");
+      replaceChildren(result, waiting);
+      result.dataset.state = "empty";
+      return;
+    }
+    if (a.select.value === b.select.value) {
+      replaceChildren(
+        result,
+        el("p", "status", "Those are the same ministry. Choose a different second one."),
+      );
+      result.dataset.state = "empty";
+      return;
+    }
     try {
       const comparison = compare(views.rows, {
         ministryIds: [a.select.value, b.select.value],

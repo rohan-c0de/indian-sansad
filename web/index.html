@@ -11,6 +11,13 @@
   web/lib/fetch.js -> requestUrl, which refuses any URL whose origin differs
   from this page's.
 -->
+<!--
+  An inline, empty favicon. Without it a browser requests /favicon.ico on
+  every load -- a request this page did not make and cannot control, which
+  would show up in T082's network log as traffic to the static host that the
+  page is not accounting for. A data: URI is not a request.
+-->
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
 <script type="module" src="app.js"></script>
 </head>

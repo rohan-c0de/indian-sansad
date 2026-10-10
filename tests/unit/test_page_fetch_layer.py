@@ -331,3 +331,59 @@ def test_the_search_index_is_not_fetched_on_load() -> None:
     app = (WEB / "app.js").read_text(encoding="utf-8")
     assert "loadSearchIndex" not in app, "app.js must not load the index in this part"
     assert "searchIndexRequested()" in app, "boot must assert the index is unrequested"
+
+
+# ---------------------------------------------------------------------------
+# Every custom property and every class the page names must actually exist.
+# ---------------------------------------------------------------------------
+
+_VAR_REF = re.compile(r"var\(\s*(--[A-Za-z0-9-]+)")
+_VAR_DEF = re.compile(r"^\s*(--[A-Za-z0-9-]+)\s*:", re.M)
+
+
+def test_every_custom_property_the_page_uses_is_defined() -> None:
+    """An undefined `var(--x)` fails SILENTLY — a CSS property with an invalid
+    value falls back to its initial value, so a fill becomes black and a swatch
+    becomes transparent with no error anywhere. That is how `--bar-unstarred`
+    shipped: `chart.js` named it, `style.css` never defined it, every unstarred
+    bar rendered black and the legend swatch rendered blank.
+
+    A fallback (`var(--x, #fff)`) is not a definition either: it is a second,
+    undocumented palette hiding behind the first.
+    """
+    css = (WEB / "style.css").read_text(encoding="utf-8")
+    defined = set(_VAR_DEF.findall(css))
+
+    referenced: dict[str, list[str]] = {}
+    for path in sorted(WEB.rglob("*")):
+        if not path.is_file() or path.suffix not in {".css", ".js", ".html"}:
+            continue
+        for name in _VAR_REF.findall(path.read_text(encoding="utf-8")):
+            referenced.setdefault(name, []).append(str(path.relative_to(WEB)))
+
+    missing = {name: files for name, files in sorted(referenced.items()) if name not in defined}
+    assert missing == {}, f"used but never defined in style.css: {missing}"
+
+
+def test_every_class_the_page_sets_has_a_rule_or_is_a_known_hook() -> None:
+    """`.visually-hidden` was named by app.js and defined nowhere, so a caption
+    meant to be off-screen rendered visibly and clipped. Classes used purely as
+    state hooks are listed, so adding one is a decision rather than an
+    accident."""
+    css = (WEB / "style.css").read_text(encoding="utf-8")
+    styled = set(re.findall(r"\.([A-Za-z][A-Za-z0-9_-]*)", css))
+    hooks = {"card", "container"}  # structural, always paired with another class
+
+    used: set[str] = set()
+    for path in (WEB / "app.js", WEB / "lib" / "chart.js"):
+        text = path.read_text(encoding="utf-8")
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        for match in re.finditer(r'el\(\s*"[a-z]+"\s*,\s*"([^"]+)"', text):
+            used.update(match.group(1).split())
+        for match in re.finditer(r'\.className\s*=\s*"([^"]+)"', text):
+            used.update(match.group(1).split())
+        for match in re.finditer(r'classList\.add\(\s*"([^"]+)"', text):
+            used.update(match.group(1).split())
+
+    missing = sorted(name for name in used - styled - hooks)
+    assert missing == [], f"classes the page sets but style.css never styles: {missing}"
