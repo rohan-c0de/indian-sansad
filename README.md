@@ -39,12 +39,96 @@ for the specification, plan, data model, dataset contract and task list, and
 [`.specify/memory/constitution.md`](.specify/memory/constitution.md) for the
 five principles that gate the work.
 
+## Using the published dataset
+
+This section is for a consumer — someone taking the files rather than building
+them. [`contracts/published-dataset.md`](specs/001-resolved-metadata-layer/contracts/published-dataset.md)
+is the contract and the authority: it lists every published set, the ten
+guarantees, and what this project explicitly does **not** promise. What follows
+is the short form, plus the two rules a consumer will get wrong if they are
+left in the contract alone.
+
+**Where it is.** The dataset lives on the orphan branch **`published`**, which
+every successful refresh force-pushes as a **single commit** — so its history
+is one commit deep at all times and you cannot fetch a previous snapshot from
+it. Keep your own copy if you need one. The layout on that branch:
+
+```
+/                        the reader page
+/data/published/...      the dataset
+/LICENSE                 the code licence, MIT
+/DATA-LICENSE.md         the dataset licence, CC BY 4.0 on the added work
+/.nojekyll
+```
+
+So a set the contract names `reference/members.jsonl` is fetched at
+`/data/published/reference/members.jsonl`. **Start at
+`/data/published/manifest.json`**: it carries the rebuild date, the licence and
+source-terms fields, and the file and record count of every set, so you can
+tell a complete snapshot from a truncated one before parsing anything.
+
+**What it holds.** Questions partitioned three ways — by session, by ministry
+and by member; the member, ministry, session and constituency reference sets;
+one resolution record per name form encountered; precomputed aggregates;
+the subject-search index, per-session search digest and asker-name lookup under
+`search/`; and one Coverage Statement per House. Every set is published in both
+newline-delimited JSON and CSV — the same records, neither authoritative over
+the other — **except the three under `search/`**, which are JSON only and
+carry nothing that is not already published in both formats elsewhere.
+
+**Rule 1 — de-duplicate on `question_id` before totalling anything across
+partitions** (guarantee 6). The three question partitions republish the *same*
+records under different keys, so a `question_id` appearing in several files is
+**one** question, not several. Adding the `by-member` files up gives a larger
+number than there are questions, because a question co-asked by 47 members
+appears in 47 files. A `question_id` is the composite
+`(House, session, type, quesNo)` — **`type` included**, because `quesNo` is
+numbered per (session, type) and a starred and an unstarred question in one
+session share one. Dropping `type` from the composite collides on 7,431 of the
+window's records and merges a starred question with an unstarred one.
+
+**Rule 2 — `resolution_status` is not a filter you can ignore** (guarantee 2).
+A question whose asker could not be resolved to one identity is still
+published, carrying `resolution_status` of `unresolved` or `ambiguous`.
+Filtering on `resolution_status == "resolved"` is an explicit choice to drop
+them, not a default: **3,472 questions of the covered window are in that
+state**, 1,231 of them *partly* resolved — some askers identified, some not —
+so they appear in the identified askers' `by-member` files **and** count as
+unresolved. A per-member total and the unresolved total deliberately overlap;
+adding them is wrong. The published counting basis in
+`aggregates/counting-basis.jsonl` states this beside the figures.
+
+**Breaking changes.** A change is breaking if it **removes a published field,
+changes the meaning of `resolution_status`, or reassigns an existing
+`member_id`**. Breaking changes are **announced in the Coverage Statement
+before they take effect** — so a consumer who reads `coverage.jsonl` on each
+fetch gets the notice without watching this repository. Adding a field, adding
+a partition, and improving a canonical name are **not** breaking, and will
+happen without notice. Two identifiers are promised stable and never reused:
+`member_id` and `ministry_id`. Canonical names, party names, ministry names and
+constituency names are reproduced as the source records them and may be
+revised.
+
+**What is not here.** No server and no query endpoint — filtering happens in
+your code or in the page's browser (FR-014, zero running cost). No question or
+answer text: it is served only behind document files, which this project never
+opens (Principle III). No Rajya Sabha data yet. Read the Coverage Statement as
+the authority on which Houses are present rather than assuming both.
+
+**Licence and source terms.** CC BY 4.0 on this project's added work only; the
+underlying parliamentary records are **not** covered, and their terms have
+never been determined — see the top of this file,
+[`DATA-LICENSE.md`](./DATA-LICENSE.md), and the `license`, `attribution`,
+`license_scope`, `source_terms` and `corrections_url` fields that travel on
+`manifest.json` and every Coverage Statement.
+
 ## Current status
 
 **The ticked boxes in [`tasks.md`](specs/001-resolved-metadata-layer/tasks.md) are the count** —
-no total is typed here, because the one that was went stale by seven tasks. The pipeline is built
-and the dataset is built. **The reader page is built except subject search, and nothing has been
-published to GitHub.**
+no total is typed here, because the one that was went stale by seven tasks. The pipeline is built,
+the dataset is built, all four reader-page views are built, and **the workflow has now run green on
+GitHub and published the `published` branch** — by hand, not on its schedule. **GitHub Pages has
+not been observed serving the site**, and no unattended run has happened.
 
 ### Done
 
@@ -100,10 +184,18 @@ published to GitHub.**
 
 ### Not done
 
-- **The refresh workflow has never run on GitHub.** `.github/workflows/refresh.yml` is written
-  and statically checked (`make yamllint`, 0 findings) but unproven: the daily schedule, the
-  force-push to the `published` branch and the 60-day keep-alive are all unobservable locally.
-  **The `published` branch does not exist**, so GitHub Pages cannot be pointed at it yet.
+- **The workflow has run on GitHub, but never on its schedule.** Two manual runs, owner-observed:
+  run #1 **failed at `verify-joins`** because the runner had no `.venv` — fixed in the workflow —
+  and run #2 (2026-10-10) finished **green in 55m 0s**, with `verify-joins` passing on the runner.
+  **The publish step is proven**: the `published` branch exists, one commit deep, *"Published
+  dataset 2026-10-10T19:12:01Z"*, carrying `index.html`, `app.js`, `style.css`, `lib/`,
+  `data/published/`, `LICENSE`, `DATA-LICENSE.md` and `.nojekyll`. Run #2 was built **before
+  Phase 7**; run #3, from `main` with Phase 7 in it, is in progress.
+  **Three things are still unobserved**, and none of them follows from the above:
+  **GitHub Pages serving the site** (so the real *compressed* first-load figure is still
+  unreadable), the **daily schedule firing unattended**, and the **60-day keep-alive**. Until a
+  scheduled run happens, FR-009 and SC-003 are UNVERIFIED — see
+  [`gate-evidence.md`](specs/001-resolved-metadata-layer/gate-evidence.md).
 - **`main` must stay unprotected.** The workflow pushes a keep-alive commit directly to `main` on
   every run, against GitHub's rule that a public repository's scheduled workflows are disabled
   after 60 days without repository activity. Branch protection blocking direct pushes would make
@@ -113,9 +205,12 @@ published to GitHub.**
   *`main` must stay unprotected*.
 - **Lok Sabha only.** No Rajya Sabha data is published — see *What is still unknown* below. The
   coverage statement declares this rather than implying both Houses.
-- **Phases 8 and 9 have not started** — polish and gate evidence (T091–T097) and the Rajya
-  Sabha route investigation (T098–T100). `make validate` is still a deliberately-failing stub,
-  owned by T091. **Phase 7 (T086–T090) is done.**
+- **T095 is deliberately not done, and Phase 9 has not started.** T095 records the *measured*
+  upkeep figure after the refresh has run unattended for two cycles; the owner chose not to wait
+  for two unattended scheduled runs, so the Upkeep gate carries **PENDING** rather than an
+  estimate dressed as a measurement. Phase 9 is the Rajya Sabha route investigation
+  (T098–T100), which investigates and stops. **Phases 7 and 8 are otherwise done** — `make
+  validate` is implemented (T091) and the gate evidence is written (T094).
 
 ### What the spike established
 
@@ -148,6 +243,39 @@ published to GitHub.**
 - **Three session-level coverage anomalies**, all causes unverified: the 18th Lok Sabha's session
   1 has 7 sitting days and no questions; its session 8 has no sitting days and 4,500 questions;
   the 17th's session 13 has 4 sitting days and no questions.
+
+## Validating this release
+
+```
+make validate   # quickstart.md scenarios 1–12, then the full test suite
+```
+
+18 checks: the three identity-resolution scenarios, join auditability, all five
+FR-007 subset axes, count reproducibility, the constituency entry point,
+composition reconciliation, the three upstream-failure modes, the field-scope
+audit across all three scopes, coverage honesty, the URL-to-file mapping, the
+real page driven in a real browser with every hostname but loopback
+unresolvable, and `pytest` over `tests/`. It **refuses to run** against an
+unbuilt `data/published/` rather than reporting an absent dataset as a pass,
+runs every check even after one fails, and prints the captured output of each
+failure. Each scenario is described in
+[`quickstart.md`](specs/001-resolved-metadata-layer/quickstart.md).
+
+**What `make validate` does not cover.** Four of the success criteria are
+observable only in operation, and a green run is not evidence for any of them:
+
+| | Why a local run cannot show it |
+|---|---|
+| **SC-003** — newly published material appears with no manual step | Needs a **scheduled** run that nobody started. Every run so far was triggered by hand. |
+| **SC-004** — upkeep stays within about 2 hours a week | Needs weeks of operation to measure. The figure that exists is an estimate, not an observation. |
+| **SC-005** — running cost stays at zero per month | Needs a billing period to elapse. What is evidenced is that every component sits on a named free tier. |
+| **SC-009** — the record is used by at least one person other than the maintainer | Needs another person. No target level has been set for it either. |
+
+`make validate` prints this same list on success, because immediately after a
+green run is exactly when the claim is most likely to be overstated. The gate
+evidence for all five Constitution principles, including which gates are
+**UNVERIFIED** or **PENDING** and why, is in
+[`gate-evidence.md`](specs/001-resolved-metadata-layer/gate-evidence.md).
 
 ## Constraints that shape every decision here
 
@@ -188,7 +316,7 @@ data/published/    the dataset consumers take
 data/assertions/   maintainer resolution corrections, surviving refreshes
 tests/             resolution, resilience, contract, unit
 tools/             maintainer-facing checks
-spike/             throwaway spike code (Phase 2); not production
+spike/             one surviving spike fetcher (fetch_slice.py); not production
 specs/             specification artefacts
 ```
 

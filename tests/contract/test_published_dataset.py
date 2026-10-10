@@ -13,6 +13,8 @@ the implementation is that the gap stays visible.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from sansad.model._common import ResolutionStatus
@@ -415,6 +417,213 @@ def test_guarantee_7_every_published_set_carries_its_rebuild_date(
         sets={p.axis: {"files": p.files, "records": p.records} for p in partitions},
     )
     assert path.read_bytes() == first
+
+
+# ---------------------------------------------------------------------------
+# 7, end to end on the dataset that was actually built  -- T093
+# ---------------------------------------------------------------------------
+#
+# The two tests above assert guarantee 7 through the writers, on fixtures. These
+# assert it on `data/published/` -- the tree a consumer takes -- because FR-016
+# is a property of the published record, and a writer that stamps what it is
+# handed proves nothing about a set some later task added beside it.
+#
+# **The stamp has two halves, and the second is the load-bearing one.** Per
+# record, for the sets whose rows are per-entity; per set, in `manifest.json`,
+# for all ten. `sansad.publish.partitions` records the design verbatim: "Each
+# record carries `last_refreshed`; this carries it for the **set**." The
+# aggregates, the reference sets other than members, the resolution records and
+# everything under `search/` carry **no** per-row date -- deliberately, for the
+# reason guarantee 10 gives for not putting the licence fields on a row either:
+# a date on each of the 92,942 subject-trend rows and each of the 95,268 digest
+# rows buys a consumer nothing the manifest has not already told them, on files
+# whose entire purpose is to be the cheapest possible fetch.
+#
+# So "every published set carries the date" is true via the manifest, and the
+# check that makes it mean something is that **nothing is published outside a
+# stamped set** -- which is the second test here. Without it, the manifest is a
+# hand-maintained list and a new set is invisible rather than missing.
+
+PUBLISHED = Path(__file__).resolve().parents[2] / "data" / "published"
+
+#: Published sets whose EVERY record carries its own `last_refreshed`, as
+#: built. Not a wish-list: the other seven carry it at set level only, and this
+#: tuple is what distinguishes the two groups for the per-record check below.
+PER_RECORD_DATED_SETS = ("by-session", "by-ministry", "by-member")
+
+#: The two per-record-dated files inside sets whose other files are not. The
+#: `reference` set publishes members (dated, one row per person) beside
+#: ministries, sessions and constituencies (not dated); `coverage` publishes
+#: one dated statement per House.
+PER_RECORD_DATED_FILES = ("reference/members.jsonl", "coverage.jsonl")
+
+
+def _published_or_skip() -> Path:
+    if not (PUBLISHED / "manifest.json").is_file():
+        pytest.skip("data/published/ is not built -- NOT AUDITED, not a pass. Run `make refresh`.")
+    return PUBLISHED
+
+
+def _declared_set_for(relative: Path, declared: frozenset[str]) -> str | None:
+    """Which declared set a published file belongs to, or None.
+
+    Longest match first, so `search/asker-names.jsonl` lands on
+    `search/asker-names` rather than on `search`.
+    """
+    parent = relative.parent.as_posix()
+    candidates = (relative.stem,) if parent == "." else (f"{parent}/{relative.stem}", parent)
+    for name in candidates:
+        if name in declared:
+            return name
+    return None
+
+
+def test_guarantee_7_every_published_set_in_the_built_dataset_carries_a_rebuild_date():
+    """FR-016 on the built tree: ten declared sets, one date, no set unstamped.
+
+    Asserted against `sansad.cli.PUBLISHED_SETS` rather than a list retyped
+    here, so a set added to the pipeline without a manifest entry fails this
+    test instead of agreeing with a copy of the old answer.
+    """
+    import json
+    from datetime import date
+
+    from sansad.cli import PUBLISHED_SETS
+    from sansad.model._common import NOT_STATED
+
+    root = _published_or_skip()
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+
+    stamp = manifest.get("last_refreshed")
+    assert stamp and stamp != NOT_STATED, (
+        f"manifest.json carries no rebuild date (got {stamp!r}). NOT_STATED is "
+        f"truthy, so FR-016 is about a date, not about the key being present."
+    )
+    # A date, not a string that looks like one.
+    date.fromisoformat(stamp)
+
+    assert set(manifest["sets"]) == set(PUBLISHED_SETS), (
+        f"the manifest's stamped sets and the pipeline's declared sets disagree: "
+        f"only in manifest {sorted(set(manifest['sets']) - set(PUBLISHED_SETS))}, "
+        f"only declared {sorted(set(PUBLISHED_SETS) - set(manifest['sets']))}"
+    )
+    for name, counts in manifest["sets"].items():
+        assert counts["files"] > 0, f"{name}: stamped with no files"
+        assert counts["records"] > 0, f"{name}: stamped with no records"
+
+    # The same list, and the same date, on the Coverage Statement -- which is
+    # where FR-013 makes a consumer look, and the only one of the two a reader
+    # of the page sees. Two places may carry it; they may not disagree.
+    from sansad.publish.formats import read_ndjson
+
+    rows = {r["house"]: r for r in read_ndjson(root / "coverage.jsonl")}
+    covered = rows["lok-sabha"]
+    assert covered["published_sets"] == list(PUBLISHED_SETS)
+    for house, row in rows.items():
+        assert row["last_refreshed"] == stamp, (
+            f"{house}: coverage says {row['last_refreshed']!r}, manifest says {stamp!r}"
+        )
+
+
+def test_guarantee_7_no_published_file_falls_outside_a_stamped_set():
+    """The check that makes the per-set stamp mean something.
+
+    Every file under `data/published/` must belong to a set the manifest
+    stamps, and each set's file count must be the count on disk. Without this
+    the manifest is a hand-maintained list: a set published without an entry
+    would be *invisible* rather than missing, and a half-written set would be
+    stamped as whole.
+    """
+    import collections
+    import json
+
+    root = _published_or_skip()
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    declared = frozenset(manifest["sets"])
+
+    counted: collections.Counter[str] = collections.Counter()
+    orphans: list[str] = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root)
+        if relative.as_posix() == "manifest.json":
+            continue  # the stamp itself, not one of the sets it stamps
+        name = _declared_set_for(relative, declared)
+        if name is None:
+            orphans.append(relative.as_posix())
+        else:
+            counted[name] += 1
+
+    assert not orphans, (
+        f"{len(orphans)} published file(s) belong to no stamped set, so they carry "
+        f"no rebuild date at all (FR-016): {orphans[:10]}"
+    )
+    on_disk = {name: counted[name] for name in sorted(declared)}
+    stamped = {name: manifest["sets"][name]["files"] for name in sorted(declared)}
+    assert on_disk == stamped, (
+        "the manifest's file counts and the files on disk disagree -- a set was "
+        "stamped as whole while being written, or a file was added after the "
+        f"stamp: on disk {on_disk}, stamped {stamped}"
+    )
+
+
+def test_guarantee_7_every_record_of_a_per_record_dated_set_carries_the_manifest_date():
+    """Every record, not a sample: all 350,967 of them, in about two seconds.
+
+    A sampled check would report "the records I looked at were dated", which is
+    not what guarantee 7 promises. The per-set record totals are compared
+    against the manifest's, so a truncated file fails here rather than passing
+    with every record it still has correctly dated. The CSV copy is checked at
+    its header only, since `test_both_formats_carry_the_same_records` already
+    pins the two writers to each other row by row.
+    """
+    import collections
+    import json
+
+    root = _published_or_skip()
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    stamp = manifest["last_refreshed"]
+
+    paths = [
+        (name, p) for name in PER_RECORD_DATED_SETS for p in sorted((root / name).glob("*.jsonl"))
+    ]
+    paths += [(name, root / name) for name in PER_RECORD_DATED_FILES]
+
+    counted: collections.Counter[str] = collections.Counter()
+    undated: list[str] = []
+    stale: list[str] = []
+    for name, path in paths:
+        with path.open(encoding="utf-8") as handle:
+            for number, line in enumerate(handle, start=1):
+                if not line.strip():
+                    continue
+                counted[name] += 1
+                value = json.loads(line).get("last_refreshed")
+                where = f"{path.relative_to(root).as_posix()}:{number}"
+                if not value:
+                    undated.append(where)
+                elif value != stamp:
+                    stale.append(f"{where} ({value})")
+
+        header = path.with_suffix(".csv").read_text(encoding="utf-8").split("\n", 1)[0]
+        assert "last_refreshed" in header.split(","), (
+            f"{path.name}: the CSV copy of a dated set has no last_refreshed column, "
+            f"so the two published formats do not carry the same promise"
+        )
+
+    assert not undated, f"{len(undated)} record(s) carry no rebuild date: {undated[:10]}"
+    assert not stale, (
+        f"{len(stale)} record(s) are dated differently from the manifest's {stamp!r} "
+        f"-- a snapshot mixing two refreshes: {stale[:10]}"
+    )
+    for name in PER_RECORD_DATED_SETS:
+        assert counted[name] == manifest["sets"][name]["records"], (
+            f"{name}: {counted[name]:,} dated record(s) read against "
+            f"{manifest['sets'][name]['records']:,} stamped"
+        )
+    for name in PER_RECORD_DATED_FILES:
+        assert counted[name] > 0, f"{name}: no records to date"
 
 
 # ---------------------------------------------------------------------------
