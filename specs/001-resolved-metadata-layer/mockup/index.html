@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indian Sansad — ministry profile (mockup)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="banner">
+  <p class="container">
+    <svg class="warn" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg>
+    <span><strong>MOCKUP.</strong> Layout only. Every figure outside the coverage statement is a made-up placeholder, not data.</span>
+  </p>
+</div>
+
+<header class="site-header">
+  <div class="container">
+    <h1 class="site-name">Indian Sansad</h1>
+    <p class="tagline">Lok Sabha questions, joined to the members who asked them</p>
+    <nav aria-label="Views">
+      <div class="tabs">
+        <a href="index.html" aria-current="page">Ministry profile</a>
+        <a href="search.html">Subject search</a>
+        <a href="#compare">Compare ministries</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <!--
+    COVERAGE STATEMENT — the only block on this page carrying real figures.
+    Source file: data/published/coverage.jsonl, the row where house =
+    "lok-sabha". last_refreshed in that file: 2026-10-10.
+    Fields read: houses_covered, period_start, period_end,
+    sessions_covered_count, total_questions, duplicate_records_declared,
+    resolution_rate_automatic, resolution_rate_including_assertions,
+    assertions_in_effect, sc_002_target, last_refreshed.
+    Everything else on this page is a placeholder.
+  -->
+  <section class="card coverage" id="coverage" aria-labelledby="coverage-h">
+    <div class="section-head">
+      <p class="eyebrow">Real figures, read from the published record</p>
+      <h2 id="coverage-h">Coverage</h2>
+      <p>What this record claims to cover, and where it is known to be incomplete.</p>
+    </div>
+
+    <div class="coverage-grid">
+      <div class="coverage-fact">
+        <p class="coverage-label">House</p>
+        <p class="coverage-value">Lok Sabha only</p>
+        <p class="coverage-note">Rajya Sabha is not covered. No route to its data has been found.</p>
+      </div>
+      <div class="coverage-fact">
+        <p class="coverage-label">Period</p>
+        <p class="coverage-value">21 Jun 2019 – 12 Aug 2026</p>
+        <p class="coverage-note">21 sessions across the 17th and 18th Lok Sabha</p>
+      </div>
+      <div class="coverage-fact">
+        <p class="coverage-label">Questions published</p>
+        <p class="coverage-value">95,268</p>
+        <p class="coverage-note">One record the source served twice is kept once.</p>
+      </div>
+      <div class="coverage-fact">
+        <p class="coverage-label">Every asking member identified</p>
+        <p class="coverage-value">94.78% automatically</p>
+        <p class="coverage-note">96.36% with 4 maintainer-confirmed corrections. Target is 95%; the automatic figure is below it, and both are shown.</p>
+      </div>
+    </div>
+
+    <p class="refreshed">Last refreshed <span>10 Oct 2026</span></p>
+  </section>
+
+  <section aria-labelledby="profile-h">
+    <div class="section-head">
+      <h2 id="profile-h">Ministry profile</h2>
+      <p>Pick a ministry and a span of sessions.</p>
+    </div>
+
+    <div class="card">
+      <div class="picker">
+        <label class="field" for="ministry">
+          <span>Ministry</span>
+          <select id="ministry" name="ministry">
+            <option selected>Sample Ministry A</option>
+            <option>Sample Ministry B</option>
+          </select>
+        </label>
+        <label class="field" for="from-session">
+          <span>From session</span>
+          <select id="from-session" name="from-session">
+            <option selected>17th LS · Session 5</option>
+          </select>
+        </label>
+        <label class="field" for="to-session">
+          <span>To session</span>
+          <select id="to-session" name="to-session">
+            <option selected>17th LS · Session 8</option>
+          </select>
+        </label>
+        <div class="field">
+          <button class="btn" type="button">Show profile</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-head">
+      <p class="eyebrow">Placeholder result</p>
+      <h3>Sample Ministry A</h3>
+      <p>Sessions 5 to 8 of the 17th Lok Sabha. Formerly “Sample Former Name” (renamed [date]); questions under both names are counted together.</p>
+    </div>
+
+    <div class="stats">
+      <div class="card">
+        <p class="stat-label">Questions asked</p>
+        <p class="stat-value">1,234</p>
+        <p class="stat-note">across 4 sessions</p>
+      </div>
+      <div class="card">
+        <p class="stat-label">Starred share</p>
+        <p class="stat-value">12.2%</p>
+        <p class="stat-note">150 starred · 1,084 unstarred</p>
+      </div>
+      <div class="card flagged">
+        <div class="flag-head">
+          <svg class="warn" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg>
+          <p class="stat-label">Not fully linked to a member</p>
+        </div>
+        <p class="stat-value">54</p>
+        <p class="stat-note">4.4% of questions: 31 partly, 23 not at all. Counted in every figure, never dropped.</p>
+      </div>
+    </div>
+
+    <div class="card basis">
+      <p><strong>Counting basis.</strong> Each question counts once, even when several members asked it. Starred and unstarred questions are numbered separately by the Lok Sabha and are counted separately here. A question whose asking members could not all be matched is included in every figure and flagged, not filtered out.</p>
+    </div>
+
+    <figure class="card chart">
+      <div class="chart-head">
+        <h4>Questions per session, by type</h4>
+      </div>
+      <ul class="legend">
+        <li><span class="swatch swatch-starred" aria-hidden="true"></span>Starred</li>
+        <li><span class="swatch swatch-unstarred" aria-hidden="true"></span>Unstarred</li>
+      </ul>
+
+      <div class="plot">
+        <div class="col">
+          <p class="col-total">312</p>
+          <div class="stack">
+            <div class="seg seg-starred" style="height:25px"><span class="seg-n">38</span></div>
+            <div class="seg seg-unstarred" style="height:176px"><span class="seg-n">274</span></div>
+          </div>
+        </div>
+        <div class="col">
+          <p class="col-total">288</p>
+          <div class="stack">
+            <div class="seg seg-starred" style="height:23px"><span class="seg-n">35</span></div>
+            <div class="seg seg-unstarred" style="height:163px"><span class="seg-n">253</span></div>
+          </div>
+        </div>
+        <div class="col">
+          <p class="col-total">341</p>
+          <div class="stack">
+            <div class="seg seg-starred" style="height:27px"><span class="seg-n">41</span></div>
+            <div class="seg seg-unstarred" style="height:193px"><span class="seg-n">300</span></div>
+          </div>
+        </div>
+        <div class="col">
+          <p class="col-total">293</p>
+          <div class="stack">
+            <div class="seg seg-starred" style="height:23px"><span class="seg-n">36</span></div>
+            <div class="seg seg-unstarred" style="height:166px"><span class="seg-n">257</span></div>
+          </div>
+        </div>
+      </div>
+      <ul class="plot-labels">
+        <li>Session 5</li>
+        <li>Session 6</li>
+        <li>Session 7</li>
+        <li>Session 8</li>
+      </ul>
+
+      <figcaption class="chart-foot">Each bar is one session. The number above it is that session’s total; the numbers inside are the starred and unstarred parts.</figcaption>
+    </figure>
+
+    <div class="table-block">
+      <h4>The same figures as a table</h4>
+      <p class="helper">So you can check them by hand against the published question files.</p>
+
+      <p class="flag-key"><svg class="warn" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg><span>The two amber columns are flagged. A flagged question is one whose asking members were not all identified. It is counted in every figure on this page and is never dropped.</span></p>
+
+      <div class="table-wrap table-wrap-sessions" role="region" aria-label="Questions per session, scrollable" tabindex="0">
+        <table>
+          <caption class="visually-hidden">Questions per session for Sample Ministry A, by type and by how completely each question is linked to a member.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Session</th>
+              <th scope="col">Dates</th>
+              <th scope="col">Questions</th>
+              <th scope="col">Starred</th>
+              <th scope="col">Unstarred</th>
+              <th scope="col">Fully linked</th>
+              <th scope="col" class="th-flag">
+                <span class="flag-head"><svg class="warn" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg>Partly linked</span>
+              </th>
+              <th scope="col" class="th-flag">
+                <span class="flag-head"><svg class="warn" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg>Not linked</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Session 5</th>
+              <td class="placeholder">[dd Mon yyyy – dd Mon yyyy]</td>
+              <td>312</td><td>38</td><td>274</td><td>297</td>
+              <td class="td-flag">9</td><td class="td-flag">6</td>
+            </tr>
+            <tr>
+              <th scope="row">Session 6</th>
+              <td class="placeholder">[dd Mon yyyy – dd Mon yyyy]</td>
+              <td>288</td><td>35</td><td>253</td><td>276</td>
+              <td class="td-flag">7</td><td class="td-flag">5</td>
+            </tr>
+            <tr>
+              <th scope="row">Session 7</th>
+              <td class="placeholder">[dd Mon yyyy – dd Mon yyyy]</td>
+              <td>341</td><td>41</td><td>300</td><td>326</td>
+              <td class="td-flag">8</td><td class="td-flag">7</td>
+            </tr>
+            <tr>
+              <th scope="row">Session 8</th>
+              <td class="placeholder">[dd Mon yyyy – dd Mon yyyy]</td>
+              <td>293</td><td>36</td><td>257</td><td>281</td>
+              <td class="td-flag">7</td><td class="td-flag">5</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Total</th>
+              <td class="placeholder">[dd Mon yyyy – dd Mon yyyy]</td>
+              <td>1,234</td><td>150</td><td>1,084</td><td>1,180</td>
+              <td class="td-flag">31</td><td class="td-flag">23</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <ul class="session-cards">
+        <li class="card">
+          <p class="sc-head"><span class="sc-name">Session 5</span> <span class="sc-total">312</span></p>
+          <p class="sc-mix">38 starred · 274 unstarred</p>
+          <p class="chip"><svg class="warn" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg><span>15 not fully linked: 9 partly, 6 not at all</span></p>
+        </li>
+        <li class="card">
+          <p class="sc-head"><span class="sc-name">Session 6</span> <span class="sc-total">288</span></p>
+          <p class="sc-mix">35 starred · 253 unstarred</p>
+          <p class="chip"><svg class="warn" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg><span>12 not fully linked: 7 partly, 5 not at all</span></p>
+        </li>
+        <li class="card">
+          <p class="sc-head"><span class="sc-name">Session 7</span> <span class="sc-total">341</span></p>
+          <p class="sc-mix">41 starred · 300 unstarred</p>
+          <p class="chip"><svg class="warn" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg><span>15 not fully linked: 8 partly, 7 not at all</span></p>
+        </li>
+        <li class="card">
+          <p class="sc-head"><span class="sc-name">Session 8</span> <span class="sc-total">293</span></p>
+          <p class="sc-mix">36 starred · 257 unstarred</p>
+          <p class="chip"><svg class="warn" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg><span>12 not fully linked: 7 partly, 5 not at all</span></p>
+        </li>
+      </ul>
+
+      <p class="footnote">“Partly linked”: at least one asking member was identified, at least one was not. “Not linked”: none were. Both are still counted as questions above.</p>
+    </div>
+  </section>
+
+  <section id="compare" aria-labelledby="compare-h">
+    <div class="section-head">
+      <h2 id="compare-h">Compare with another ministry</h2>
+      <p>Same sessions, same counting basis for both.</p>
+    </div>
+
+    <div class="card">
+      <label class="field field-narrow" for="second-ministry">
+        <span>Second ministry</span>
+        <select id="second-ministry" name="second-ministry">
+          <option selected>Sample Ministry B</option>
+          <option>Sample Ministry A</option>
+        </select>
+      </label>
+
+      <div class="table-wrap table-wrap-compare" role="region" aria-label="Two-ministry comparison, scrollable" tabindex="0">
+        <table class="table-compare">
+          <caption class="visually-hidden">Sample Ministry A compared with Sample Ministry B over sessions 5 to 8 of the 17th Lok Sabha.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Figure</th>
+              <th scope="col">Sample Ministry A</th>
+              <th scope="col">Sample Ministry B</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Questions asked</th>
+              <td>1,234</td><td>905</td>
+            </tr>
+            <tr>
+              <th scope="row">Starred share</th>
+              <td>12.2%</td><td>9.4%</td>
+            </tr>
+            <tr class="tr-flag">
+              <th scope="row">
+                <span class="flag-head"><svg class="warn" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg>Not fully linked to a member</span>
+              </th>
+              <td>4.4%</td><td>3.1%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="footnote">Both columns count questions once each, count starred and unstarred separately, and keep questions that are not fully linked to a member inside every figure.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>Indian Sansad joins Lok Sabha questions published on sansad.in to a stable member identity. This page reads only this project’s own published files; your browser never contacts sansad.in.</p>
+    <ul class="foot-links">
+      <li><a href="#coverage">Full coverage statement</a></li>
+      <li><a href="#download">Download the dataset</a></li>
+      <li><a href="#counting">How questions are counted</a></li>
+    </ul>
+  </div>
+</footer>
+
+</body>
+</html>

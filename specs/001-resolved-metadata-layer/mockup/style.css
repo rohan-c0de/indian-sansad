@@ -1,0 +1,927 @@
+/* Indian Sansad -- question explorer MOCKUP stylesheet.
+   Hand-written. No framework, no build step, no web font, and no reference
+   of any kind to another file or another host: no imported stylesheet, no
+   fetched asset, nothing but the declarations below. Every colour is a custom
+   property so the whole palette can be audited in one place. */
+
+:root {
+  /* Palette ------------------------------------------------------------- */
+  --ground: #F3F4F6;
+  --surface: #FFFFFF;
+  --ink: #14213D;
+  --muted: #4B5563;
+  --rule: #D5D9E0;
+  --control-border: #8A93A3;
+  --accent: #8C3325;
+  --bar-unstarred: #6F88BD;
+  --flag-bg: #FFF4E0;
+  --flag-row: #FFF9EE;
+  --flag-border: #D9A441;
+  --flag-text: #7A3B06;
+  --match-teal: #0F5E50;
+
+  /* Type ---------------------------------------------------------------- */
+  --font-head: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Metrics ------------------------------------------------------------- */
+  --container: 1120px;
+  --gutter: 24px;
+  --radius: 6px;
+  --tap: 44px;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-head);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+}
+
+/* Every figure on the page reads as a figure. */
+.num,
+table,
+.stat-value,
+.col-total,
+.seg-n,
+.coverage-value {
+  font-variant-numeric: tabular-nums;
+}
+
+a { color: var(--accent); }
+
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.container {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Mockup banner                                                          */
+/* ---------------------------------------------------------------------- */
+
+.banner {
+  background: var(--flag-bg);
+  color: var(--flag-text);
+  border-bottom: 1px solid var(--flag-border);
+  box-shadow: inset 0 -3px 0 var(--flag-text);
+}
+
+.banner .container {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding-top: 10px;
+  padding-bottom: 12px;
+  font-size: 13px;
+}
+
+.banner strong { letter-spacing: 0.04em; }
+
+.warn {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Header and tabs                                                        */
+/* ---------------------------------------------------------------------- */
+
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+}
+
+.site-header .container {
+  padding-top: 26px;
+}
+
+.site-name {
+  font-size: 30px;
+  letter-spacing: -0.01em;
+}
+
+.tagline {
+  margin: 6px 0 18px;
+  color: var(--muted);
+  font-size: 15px;
+  max-width: 54ch;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 0 var(--gutter);
+}
+
+.tabs a {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 14px;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 15px;
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+}
+
+.tabs a:hover {
+  color: var(--ink);
+  border-bottom-color: var(--rule);
+}
+
+.tabs a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Shared blocks                                                          */
+/* ---------------------------------------------------------------------- */
+
+main { padding: 28px 0 8px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+section { margin-bottom: 28px; }
+
+.section-head { margin-bottom: 14px; }
+
+.section-head h2 { font-size: 22px; }
+
+.section-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 72ch;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Coverage statement -- the only block on these pages carrying real data  */
+/* ---------------------------------------------------------------------- */
+
+.coverage {
+  border-top: 3px solid var(--accent);
+}
+
+.coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.coverage-fact {
+  background: var(--surface);
+  padding: 16px 18px;
+}
+
+.coverage-label {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.coverage-value {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 21px;
+  line-height: 1.25;
+}
+
+.coverage-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.refreshed {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.refreshed span { color: var(--ink); font-weight: 600; }
+
+/* A single-line restatement of the same block, for the search view. */
+.coverage-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 12px 18px;
+  font-size: 13px;
+  color: var(--muted);
+  border-left: 3px solid var(--accent);
+}
+
+.coverage-strip b { color: var(--ink); font-weight: 600; }
+
+/* ---------------------------------------------------------------------- */
+/* Controls                                                               */
+/* ---------------------------------------------------------------------- */
+
+.picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+.field { display: block; }
+
+.field > span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+select,
+input[type="text"] {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 12px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+}
+
+.btn {
+  min-height: var(--tap);
+  padding: 0 20px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.btn-quiet {
+  color: var(--accent);
+  background: var(--surface);
+  border-color: var(--control-border);
+}
+
+.helper {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 76ch;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Result head and stat cards                                             */
+/* ---------------------------------------------------------------------- */
+
+.result-head h3 {
+  font-size: 26px;
+  margin-top: 4px;
+}
+
+.result-head p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 78ch;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.stat-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.stat-value {
+  margin: 6px 0 0;
+  font-family: var(--font-head);
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.stat-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* A flagged card is amber, carries the warning mark, AND says so in words. */
+.flagged {
+  background: var(--flag-bg);
+  border-color: var(--flag-border);
+  border-left: 4px solid var(--flag-text);
+  color: var(--flag-text);
+}
+
+.flagged .stat-label,
+.flagged .stat-note { color: var(--flag-text); }
+
+.flag-head {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Counting-basis note                                                    */
+/* ---------------------------------------------------------------------- */
+
+.basis {
+  border-left: 4px solid var(--ink);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 16px 20px;
+}
+
+.basis h3,
+.basis p:first-child strong { font-size: 15px; }
+
+.basis p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 88ch;
+}
+
+.basis p + p { margin-top: 8px; }
+
+.basis strong { color: var(--ink); }
+
+/* ---------------------------------------------------------------------- */
+/* Chart                                                                  */
+/* ---------------------------------------------------------------------- */
+
+figure { margin: 0; }
+
+.chart-head h4 { font-size: 17px; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 10px 0 22px;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.legend li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.swatch-starred { background: var(--accent); }
+
+.swatch-unstarred { background: var(--bar-unstarred); }
+
+.plot {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.col {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.col-total {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stack {
+  width: 100%;
+  max-width: 76px;
+  display: flex;
+  flex-direction: column;
+}
+
+.seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* A 1px surface hairline between the two segments. Drawn as a shadow so it
+   takes no height: the bar heights are the data and must stay exact. */
+.seg-starred {
+  background: var(--accent);
+  color: var(--surface);
+  border-radius: 2px 2px 0 0;
+  box-shadow: 0 1px 0 var(--surface);
+}
+
+/* Ink on this blue measures 4.51:1, white on it only 3.54:1, so the label
+   inside the unstarred segment is ink. */
+.seg-unstarred {
+  background: var(--bar-unstarred);
+  color: var(--ink);
+}
+
+.plot-labels {
+  display: flex;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plot-labels li {
+  flex: 1 1 0;
+  text-align: center;
+  padding-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.chart-foot {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Table                                                                  */
+/* ---------------------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 740px;
+  font-size: 14px;
+}
+
+caption { text-align: left; }
+
+th, td {
+  padding: 10px 14px;
+  text-align: right;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+thead th {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  vertical-align: bottom;
+  border-bottom: 2px solid var(--rule);
+}
+
+th[scope="row"],
+thead th:first-child,
+thead th:nth-child(2),
+tbody td:nth-child(2) {
+  text-align: left;
+}
+
+tbody th[scope="row"] { font-weight: 600; }
+
+tfoot th, tfoot td {
+  font-weight: 700;
+  border-top: 2px solid var(--ink);
+  border-bottom: 0;
+}
+
+/* The two flagged columns. Amber alone would be colour-only signalling, so
+   each header also carries the warning mark and the footnote says why. */
+.th-flag {
+  background: var(--flag-bg);
+  color: var(--flag-text);
+}
+
+.td-flag {
+  background: var(--flag-row);
+  color: var(--flag-text);
+  font-weight: 600;
+}
+
+.th-flag .flag-head { justify-content: flex-end; }
+
+.tr-flag th[scope="row"],
+.tr-flag td {
+  background: var(--flag-row);
+  color: var(--flag-text);
+}
+
+.placeholder { color: var(--muted); font-weight: 400; }
+
+.footnote {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 88ch;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Narrow-screen session cards -- the same rows, one card each             */
+/* ---------------------------------------------------------------------- */
+
+.session-cards {
+  display: none;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session-cards .card { padding: 14px 16px; }
+
+.sc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.sc-name { font-family: var(--font-head); font-size: 17px; font-weight: 600; }
+
+.sc-total { font-size: 20px; font-weight: 700; }
+
+.sc-mix {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.chip {
+  display: inline-flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 10px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--flag-text);
+  background: var(--flag-bg);
+  border: 1px solid var(--flag-border);
+  border-left: 4px solid var(--flag-text);
+  border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Search results                                                         */
+/* ---------------------------------------------------------------------- */
+
+.results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: hit;
+  display: grid;
+  gap: 14px;
+}
+
+.results > li { counter-increment: hit; }
+
+.hit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+  gap: 20px;
+}
+
+.hit-main { min-width: 0; }
+
+.hit h4 {
+  font-size: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.hit h4::before {
+  content: counter(hit) ".";
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.badge {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--control-border);
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.badge-match {
+  color: var(--match-teal);
+  border-color: var(--match-teal);
+}
+
+.badge-type {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.badge-flag {
+  color: var(--flag-text);
+  background: var(--flag-bg);
+  border-color: var(--flag-text);
+}
+
+.hit-meta {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hit-source {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.askers {
+  border-left: 1px solid var(--rule);
+  padding-left: 20px;
+  min-width: 0;
+}
+
+.flagged .askers { border-left-color: var(--flag-border); }
+
+.askers-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.asker-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.asker-list li + li { margin-top: 6px; }
+
+.asker-list b { font-weight: 600; }
+
+.asker-list span { color: var(--muted); font-size: 13px; }
+
+.more {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.askers-none {
+  margin: 0;
+  font-size: 13px;
+}
+
+.paging {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Footer                                                                 */
+/* ---------------------------------------------------------------------- */
+
+.site-footer {
+  margin-top: 32px;
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+}
+
+.site-footer .container {
+  padding-top: 22px;
+  padding-bottom: 28px;
+}
+
+.site-footer p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 84ch;
+}
+
+.foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 22px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.foot-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-size: 14px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Narrow screens. One stylesheet, one set of markup: the table gives way  */
+/* to the per-session cards and nothing scrolls sideways but the tab strip. */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  :root { --gutter: 16px; }
+
+  .site-name { font-size: 25px; }
+
+  .section-head h2 { font-size: 20px; }
+
+  .result-head h3 { font-size: 22px; }
+
+  .stat-value { font-size: 30px; }
+
+  .coverage-value { font-size: 19px; }
+
+  .plot, .plot-labels { gap: 8px; }
+
+  /* Only the eight-column session table gives way to the cards. The
+     three-column comparison table fits, and keeps its own scroll box. */
+  .table-wrap-sessions { display: none; }
+
+  .session-cards { display: grid; }
+
+  .hit { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+
+  .askers {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+    padding-left: 0;
+    padding-top: 14px;
+  }
+
+  .flagged .askers { border-top-color: var(--flag-border); }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Spacing and width helpers, so no element carries an inline style except  */
+/* the bar segments, whose height IS the datum being drawn.                */
+/* ---------------------------------------------------------------------- */
+
+.result-head { margin-top: 26px; }
+
+.basis,
+.chart,
+.table-block { margin-top: 16px; }
+
+.field-narrow { max-width: 360px; }
+
+.table-wrap-compare { margin-top: 18px; }
+
+.table-compare { min-width: 520px; }
+
+/* The flag key: the words that stop amber being the only signal. */
+.flag-key {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--flag-text);
+  background: var(--flag-bg);
+  border: 1px solid var(--flag-border);
+  border-left: 4px solid var(--flag-text);
+  border-radius: var(--radius);
+  max-width: 88ch;
+}
+
+/* The search card: one wide field and the button beside it, stacking when
+   there is no room for both. */
+.picker-search {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+@media (max-width: 640px) {
+  .picker-search { grid-template-columns: minmax(0, 1fr); }
+}
+
+.results { margin-top: 16px; }

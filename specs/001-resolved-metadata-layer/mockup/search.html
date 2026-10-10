@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indian Sansad — subject search (mockup)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="banner">
+  <p class="container">
+    <svg class="warn" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg>
+    <span><strong>MOCKUP.</strong> Layout only. Every figure outside the coverage statement is a made-up placeholder, not data.</span>
+  </p>
+</div>
+
+<header class="site-header">
+  <div class="container">
+    <h1 class="site-name">Indian Sansad</h1>
+    <p class="tagline">Lok Sabha questions, joined to the members who asked them</p>
+    <nav aria-label="Views">
+      <div class="tabs">
+        <a href="index.html">Ministry profile</a>
+        <a href="search.html" aria-current="page">Subject search</a>
+        <a href="index.html#compare">Compare ministries</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <!--
+    COVERAGE STRIP — the only real figures on this page, the same row the
+    ministry-profile page reads. Source file: data/published/coverage.jsonl,
+    the row where house = "lok-sabha". last_refreshed in that file: 2026-10-10.
+    Everything below this strip is a placeholder.
+  -->
+  <p class="card coverage-strip">
+    <b>Lok Sabha only</b>
+    <span>·</span>
+    <b>21 Jun 2019 – 12 Aug 2026</b>
+    <span>·</span>
+    <b>95,268</b> questions
+    <span>·</span>
+    asking members identified <b>94.78%</b> automatically, <b>96.36%</b> with 4 maintainer-confirmed corrections
+    <span>·</span>
+    <a href="index.html#coverage">Full coverage statement</a>
+  </p>
+
+  <section aria-labelledby="search-h">
+    <div class="section-head">
+      <h2 id="search-h">Subject search</h2>
+      <p>Has this been asked before?</p>
+    </div>
+
+    <div class="card">
+      <div class="picker picker-search">
+        <label class="field" for="subject">
+          <span>Question subject</span>
+          <input type="text" id="subject" name="subject" value="drinking water in rural areas">
+        </label>
+        <div class="field">
+          <button class="btn" type="button">Search</button>
+        </div>
+      </div>
+      <p class="helper">Finds earlier questions with the same or a near-identical subject line, with their dates, ministries and asking members.</p>
+    </div>
+
+    <div class="result-head">
+      <p class="eyebrow">Placeholder results</p>
+      <h3>14 earlier questions on this subject</h3>
+      <p>5 sessions · 3 ministries · newest first</p>
+    </div>
+
+    <div class="card basis">
+      <p><strong>Counting basis.</strong> Each question is listed once, even when several members asked it. A question whose asker could not be identified is listed and flagged, not left out.</p>
+    </div>
+
+    <ol class="results">
+
+      <li>
+        <article class="card hit">
+          <div class="hit-main">
+            <h4>Supply of drinking water to rural households</h4>
+            <ul class="badges">
+              <li class="badge badge-match">Near-identical</li>
+              <li class="badge badge-type">Unstarred</li>
+            </ul>
+            <p class="hit-meta">[dd Mon yyyy] · 17th LS · Session 8 · Sample Ministry A</p>
+            <p class="hit-source">Source record: <code>lok-sabha/17/8/unstarred/[no.]</code></p>
+          </div>
+          <div class="askers">
+            <p class="askers-title">Asked by 3 members</p>
+            <ul class="asker-list">
+              <li><b>Member A</b><br><span>Party X · State Y</span></li>
+              <li><b>Member B</b><br><span>Party X · State Z</span></li>
+            </ul>
+            <p class="more">and 1 more</p>
+          </div>
+        </article>
+      </li>
+
+      <li>
+        <article class="card hit">
+          <div class="hit-main">
+            <h4>Drinking water supply in rural areas</h4>
+            <ul class="badges">
+              <li class="badge badge-match">Near-identical</li>
+              <li class="badge badge-type">Starred</li>
+            </ul>
+            <p class="hit-meta">[dd Mon yyyy] · 17th LS · Session 6 · Sample Ministry A</p>
+            <p class="hit-source">Source record: <code>lok-sabha/17/6/starred/[no.]</code></p>
+          </div>
+          <div class="askers">
+            <p class="askers-title">Asked by 1 member</p>
+            <ul class="asker-list">
+              <li><b>Member C</b><br><span>Party X · State Y</span></li>
+            </ul>
+          </div>
+        </article>
+      </li>
+
+      <li>
+        <article class="card hit">
+          <div class="hit-main">
+            <h4>Tap water connections for rural households</h4>
+            <ul class="badges">
+              <li class="badge">Similar</li>
+              <li class="badge badge-type">Unstarred</li>
+            </ul>
+            <p class="hit-meta">[dd Mon yyyy] · 17th LS · Session 5 · Sample Ministry B</p>
+            <p class="hit-source">Source record: <code>lok-sabha/17/5/unstarred/[no.]</code></p>
+          </div>
+          <div class="askers">
+            <p class="askers-title">Asked by 5 members</p>
+            <ul class="asker-list">
+              <li><b>Member A</b><br><span>Party X · State Y</span></li>
+              <li><b>Member C</b><br><span>Party X · State Y</span></li>
+            </ul>
+            <p class="more">and 3 more</p>
+          </div>
+        </article>
+      </li>
+
+      <li>
+        <article class="card hit flagged">
+          <div class="hit-main">
+            <h4>Testing the quality of rural drinking water</h4>
+            <ul class="badges">
+              <li class="badge">Similar</li>
+              <li class="badge badge-type">Unstarred</li>
+              <li class="badge badge-flag"><svg class="warn" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false"><path d="M8 1.6 15.2 14H0.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5.9v3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.95" fill="currentColor"/></svg>Asker not identified</li>
+            </ul>
+            <p class="hit-meta">[dd Mon yyyy] · 17th LS · Session 2 · Sample Ministry A</p>
+            <p class="hit-source">Source record: <code>lok-sabha/17/2/unstarred/[no.]</code></p>
+          </div>
+          <div class="askers">
+            <p class="askers-title">Asked by no identified member</p>
+            <p class="askers-none">The source writes the name as “S. Example”. It matched no member, so none is shown. The question is still counted.</p>
+          </div>
+        </article>
+      </li>
+
+    </ol>
+
+    <p class="paging">
+      <span>Showing 4 of 14.</span>
+      <button class="btn btn-quiet" type="button">Show the other 10</button>
+    </p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>Indian Sansad joins Lok Sabha questions published on sansad.in to a stable member identity. This page reads only this project’s own published files; your browser never contacts sansad.in.</p>
+    <ul class="foot-links">
+      <li><a href="index.html#coverage">Full coverage statement</a></li>
+      <li><a href="#download">Download the dataset</a></li>
+      <li><a href="#counting">How questions are counted</a></li>
+    </ul>
+  </div>
+</footer>
+
+</body>
+</html>
