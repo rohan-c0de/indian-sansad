@@ -339,6 +339,8 @@ def test_the_search_index_is_not_fetched_on_load() -> None:
 
 _VAR_REF = re.compile(r"var\(\s*(--[A-Za-z0-9-]+)")
 _VAR_DEF = re.compile(r"^\s*(--[A-Za-z0-9-]+)\s*:", re.M)
+#: `var(--x, <anything>)` -- a reference carrying a fallback value.
+_VAR_FALLBACK = re.compile(r"var\(\s*(--[A-Za-z0-9-]+)\s*,")
 
 
 def test_every_custom_property_the_page_uses_is_defined() -> None:
@@ -363,6 +365,28 @@ def test_every_custom_property_the_page_uses_is_defined() -> None:
 
     missing = {name: files for name, files in sorted(referenced.items()) if name not in defined}
     assert missing == {}, f"used but never defined in style.css: {missing}"
+
+
+def test_no_var_reference_carries_a_fallback() -> None:
+    """Owner decision 2026-10-10: every custom property is defined, so no
+    `var(--x, …)` may carry a fallback.
+
+    A fallback is a SECOND palette. It is invisible in `:root`, it never shows
+    up when the defined palette is audited, and it is reached in exactly the
+    case nobody is watching — when the real definition is missing or
+    misspelled. One of the three removed here, `#8A93A3`, was below the 3:1
+    non-text floor on `--ground`, so the fallback was not merely a duplicate:
+    it was a worse value waiting for a typo.
+    """
+    offenders: list[str] = []
+    for path in sorted(WEB.rglob("*")):
+        if not path.is_file() or path.suffix not in {".css", ".js", ".html"}:
+            continue
+        text = path.read_text(encoding="utf-8")
+        for number, line in enumerate(text.splitlines(), start=1):
+            for match in _VAR_FALLBACK.finditer(line):
+                offenders.append(f"{path.relative_to(WEB)}:{number} var({match.group(1)}, …)")
+    assert offenders == [], "var() references carrying a fallback: " + "; ".join(offenders)
 
 
 def test_every_class_the_page_sets_has_a_rule_or_is_a_known_hook() -> None:

@@ -734,7 +734,7 @@ select {
   font-size: 1rem;
   color: var(--ink);
   background: var(--surface);
-  border: 1px solid var(--control-border, #8a93a3);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
   padding: 10px 12px;
   min-height: var(--tap);
@@ -991,7 +991,7 @@ figure.chart figcaption {
 /* ---------------------------------------------------------------------- */
 
 .td-flag {
-  background: var(--flag-row, #fff9ee);
+  background: var(--flag-row);
 }
 
 tr.row-absent th {
@@ -1008,7 +1008,7 @@ tr.row-absent th {
 }
 
 tr.tr-flag {
-  background: var(--flag-row, #fff9ee);
+  background: var(--flag-row);
 }
 
 /* ---------------------------------------------------------------------- */
