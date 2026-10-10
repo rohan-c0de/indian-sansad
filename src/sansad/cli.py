@@ -66,7 +66,11 @@ from sansad.publish.reference import (
     sessions_from,
     write_reference_sets,
 )
-from sansad.publish.search_digest import DIGEST_DIR_NAME, write_search_digest
+from sansad.publish.search_digest import (
+    DIGEST_DIR_NAME,
+    SEARCH_SETS_NOTE,
+    write_search_digest,
+)
 from sansad.publish.search_index import SEARCH_DIR_NAME, write_search_index
 from sansad.resolve import resolve_questions
 from sansad.resolve.assertions import load_assertions, load_ministry_renames
@@ -512,6 +516,7 @@ def run_refresh(
             # Per term: fetched, resumed (with the checkpoint's date), or read
             # from the cached window. A resumed term is older than
             # `last_refreshed` and the record has to say so.
+            "search_sets_note": SEARCH_SETS_NOTE,
             "question_source_by_term": provenance,
             "resumed_terms": [p["term"] for p in provenance if p["mode"] == "resumed"],
         },

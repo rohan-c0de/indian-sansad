@@ -1041,3 +1041,93 @@ cheapest possible fetch.
 - **The 25-per-page rule drives the two-session case.** A page size that stopped
   at the newest session would fetch one digest every time. It was not changed,
   because 25 is the owner's number.
+
+---
+
+# Compressed-basis estimate (owner decision 2026-10-10)
+
+**This is an ESTIMATE, and the label is not a hedge.** Every figure below is
+`gzip -6` computed offline over the built files. **`make serve-local` serves
+nothing compressed**, so no measurement here comes from a response. The real
+compressed figure can only be read from the **live site's response headers**
+once Pages is up — `Content-Encoding` and `Content-Length` on an actual
+response — and GitHub Pages does not publish which encoder or level it uses, so
+even the algorithm is an assumption. `gzip -6` was chosen because it is the
+default level and the conservative choice: Brotli, which most hosts prefer for
+text, would be smaller.
+
+## Per file
+
+| File | raw B | gzip -6 B | ratio |
+|---|---:|---:|---:|
+| page shell, 8 files | 102,168 | 32,112 | 31.4% |
+| 6 on-load published files | 304,242 | 23,048 | 7.6% |
+| `search/subject-index.json` | 2,484,758 | **770,343** | 31.0% |
+| `search/asker-names.jsonl` | 92,713 | 14,016 | 15.1% |
+| **all 21 digest files** | **20,782,206** | **2,630,924** | **12.7%** |
+| largest digest, `lok-sabha-18-7` | 1,573,939 | 210,054 | 13.3% |
+| median digest, `lok-sabha-17-2` | 1,007,721 | 122,594 | 12.2% |
+| smallest digest, `lok-sabha-17-15` | 328,138 | 40,943 | 12.5% |
+
+The digest compresses to **12.7%** — NDJSON with the same six field names on
+every line is close to the best case for a dictionary coder. That is the
+measured reason the positional encoding was not adopted: it removes the 41% of
+raw bytes that are field names, and a compressor removes nearly all of them
+anyway.
+
+## First-search totals, both bases
+
+| query | raw total | gzip -6 total |
+|---|---:|---:|
+| `under` / `scheme` / `water` / rare `06243` | 4,000,167 | **974,773** |
+| `rural employment scheme` (2 digests) | 5,032,930 | 1,096,907 |
+| `drinking water` (2 digests) | 5,574,106 | **1,184,827** |
+
+## The comparison that would be wrong, stated so nobody makes it
+
+**T019's 4,183,979 B budget is a RAW figure.** It was built from uncompressed
+file sizes, so putting a compressed total beside it compares two different
+things and flatters the result: `drinking water` at 1,184,827 B looks like
+−71.7% against that number, and it is not a real −71.7%.
+
+A like-for-like compressed budget has to be recomputed from the same four
+components T019 used, with today's files:
+
+| component | T019, 2026-10-09 | raw today | gzip -6 today |
+|---|---:|---:|---:|
+| page shell | 61,440 *(estimate)* | 102,168 *(measured)* | 32,112 |
+| coverage statement | 295 | 4,654 | 1,584 |
+| one by-ministry file (median) | 842,496 | 607,842 | 43,285 |
+| subject index | 3,279,748 | 2,484,758 | 770,343 |
+| **TOTAL** | **4,183,979** | **3,199,422** | **847,324** |
+
+So the three honest comparisons, and they do not agree:
+
+| basis | budget | common word | two sessions |
+|---|---:|---:|---:|
+| **T019 as published (raw)** — what the gate was set against | 4,183,979 | **−4.4%** | +33.2% |
+| same four components, raw today | 3,199,422 | +25.0% | +74.2% |
+| same four components, gzip -6 | 847,324 | **+15.0%** | +39.8% |
+
+**The gate was defined against T019's published number and on that basis it
+passes.** On a like-for-like compressed basis it does not. Both are true, and
+which one matters is a question for the owner rather than something to resolve
+by picking the flattering row. Two things drive the difference: the index came
+in **24% smaller** than T019 projected, and the page now fetches a 284,685 B
+precomputed aggregate instead of the 842,496 B by-ministry file T019 budgeted —
+so the composition changed as well as the arithmetic.
+
+Bandwidth at the 100 GB/month soft limit, on the same four components:
+**31,255** visitors raw, **118,018** compressed, against T019's own 23,901.
+
+## What T083 must do
+
+**Two columns, always.** Raw bytes from the browser's network log — the T019
+basis, and the only one the gate's history is expressed in — **and** this
+offline `gzip -6` estimate beside it. Reporting one without the other produces
+exactly the wrong comparison above.
+
+And it must record, in the same place, that **neither column is the real
+compressed figure**. That can only be read from the live site's response
+headers after Pages is serving the `published` branch. Until then the encoder,
+the level, and whether a given file is compressed at all are assumptions.

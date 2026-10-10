@@ -68,6 +68,21 @@ __all__ = [
 DIGEST_DIR_NAME = "digest"
 ASKER_NAMES_NAME = "asker-names.jsonl"
 
+#: Published on `manifest.json` (owner decision 2026-10-10). Both sets stay
+#: under `search/` and are NOT promoted to the top level: `asker-names.jsonl`
+#: is a strictly smaller projection of `reference/members.jsonl`, no consumer
+#: has asked for it, and promoting it would create a stability promise about a
+#: file that exists to make one page cheap.
+SEARCH_SETS_NOTE = (
+    "Everything under search/ -- subject-index.json, digest/ and "
+    "asker-names.jsonl -- is an aid for this project's own page, not a "
+    "separate claim about the record. A consumer can skip it entirely: every "
+    "field in digest/ is a copy of a by-session field and every name in "
+    "asker-names.jsonl is a copy of a reference/members field, both of which "
+    "are published in NDJSON and CSV. These three are the only published sets "
+    "not in both formats."
+)
+
 #: Exactly the fields a result card shows. Adding one here adds bytes to every
 #: search, so it is a decision rather than a convenience.
 DIGEST_FIELDS: tuple[str, ...] = (
