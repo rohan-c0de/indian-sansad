@@ -56,8 +56,8 @@ so none is missed.** One row is done; the rest are not.
 | `spike/free-tiers.md` lines ~258-259 | `https://rohan-c0de.github.io/indian-sansad/...` is written there as a **prediction**; T015's verdict is "VERIFIED by construction, not by execution" and becomes observed |
 | `spike/free-tiers.md` line ~287 | records that the URL is derived from the maintainer's handle — the live Attribution deviation; the decision to transfer to an organisation would change the URL again |
 | `specs/001-resolved-metadata-layer/mockup/README.md` lines ~224-225 | the same predicted URLs |
-| `data/published/coverage.jsonl`/`.csv` and `manifest.json` | **DONE 2026-10-10.** Both now carry `license`, `attribution`, `project_url`, `license_file` and `license_scope`, so a consumer who takes a single file has the terms and the link in hand. **The update site is now one module — `src/sansad/publish/attribution.py`** — which both writers spread and which `tests/contract/test_attribution.py` asserts is character-for-character the attribution line above, so the file and the data cannot drift. Changing the URL means changing that module; the published files follow on the next refresh. Cost: **+2,549 bytes**, 0.001% of the dataset |
-| `web/index.html`, `web/app.js` (T074, T076) | not built; the page should display the attribution rather than leave a visitor to find this file |
+| `data/published/coverage.jsonl`/`.csv` and `manifest.json` | **DONE 2026-10-10.** Both now carry `license`, `attribution`, `project_url`, `license_file` and `license_scope` — and, since the source-terms decision of the same date, `source_terms` and `corrections_url` — so a consumer who takes a single file has the terms, the gap in them, the link and the corrections channel in hand. **The update site is now one module — `src/sansad/publish/attribution.py`** — which both writers spread and which `tests/contract/test_attribution.py` asserts is character-for-character the attribution line above, so the file and the data cannot drift. Changing the URL means changing that module; the published files follow on the next refresh. Cost: **+2,549 bytes**, 0.001% of the dataset; the two source-terms fields added **+1,155 bytes** more (manifest +281, `coverage.jsonl` +369, `coverage.csv` +505), **0.000414%** of the 278,684,386-byte dataset, measured by re-emitting the three files without them |
+| `web/index.html`, `web/app.js`, `web/lib/licence.js` (T074, T076) | **DONE 2026-10-10.** The footer renders the licence, the attribution, the `source_terms` line and the corrections link, every one of them read from `manifest.json` at runtime rather than typed into the page — so the URL changes in `attribution.py` and the page follows on the next refresh |
 
 Changing the URL later does not invalidate anything already distributed under
 CC BY 4.0 — the licence does not expire — but a stale link is a broken
@@ -92,6 +92,40 @@ to the resolution, joins and aggregates layered over them — satisfying CC BY
 4.0 is not sufficient, because this project has no standing to grant you
 anything over material it does not own. Establishing the source's terms is
 your responsibility and ours; neither has been done.
+
+## Source terms: not determined
+
+**Owner decision 2026-10-10: publish without determining the source's terms,
+with this disclosure and a corrections path.** The decision is to publish, not
+a finding that publishing is permitted. Nothing below is a legal conclusion in
+either direction, and **none of it is legal advice.**
+
+- **What is licensed here is the added work only.** CC BY 4.0 above covers the
+  identity resolution, the joins, the ministry identity layer, the aggregates,
+  the indexes, the schemas and this prose. **No rights are granted over the
+  underlying parliamentary records** — this project does not hold any to grant.
+- **The terms the Lok Sabha publishes those records under have never been
+  established.** They were excluded from the assessment by owner instruction
+  and were never researched; that exclusion is recorded in the five places
+  listed in the section above. So the terms are not "permissive", not
+  "restrictive", and not "unclear after review" — they are **undetermined**,
+  because nobody looked.
+- **Check the source's terms yourself before relying on the records.**
+  Satisfying CC BY 4.0 is not sufficient for the source layer, and this
+  project's silence about those terms is not permission.
+- **Corrections and removal requests go through the issue tracker**:
+  <https://github.com/rohan-c0de/indian-sansad/issues>. That includes a
+  rightsholder who believes material here should not be published, a Member
+  whose record is wrong, and anyone who has established what the source's terms
+  actually are. It is the only channel: no address is published here, because
+  the work is published under a project name rather than a maintainer's name.
+
+The same two statements travel inside the dataset, so a consumer who takes a
+single file is told as well: `manifest.json` and every Coverage Statement carry
+`source_terms` and `corrections_url`, defined once in
+`src/sansad/publish/attribution.py` and asserted against this file by
+`tests/contract/test_attribution.py`. The page footer renders both from the
+manifest at runtime rather than from anything typed into the page.
 
 ## Where the line falls, concretely
 

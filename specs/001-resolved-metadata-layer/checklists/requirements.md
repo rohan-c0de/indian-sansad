@@ -47,4 +47,5 @@ All items pass after one validation iteration. Two spec changes were required to
 **Unresolved risk carried into planning, not a checklist failure:**
 
 6. The assessment's `decision.md` rates **risk posture `weak`** — the personal-data position is an accepted risk rather than a mitigated one, and licensing was excluded from the assessment by owner decision. Both are recorded in Assumptions. Planning should treat FR-008 as a deliberate, consciously implemented decision rather than a default.
+   **Owner decision 2026-10-10**: still not researched, and the dataset is published without that determination — with the gap disclosed as `source_terms` on `manifest.json` and every Coverage Statement, in the page footer, and in `DATA-LICENSE.md` → *Source terms: not determined*, and with corrections and removal requests taken through the issue tracker (`corrections_url`). No legal conclusion either way.
 7. **FR-001's Rajya Sabha half may not be deliverable.** The route to Rajya Sabha member data was never identified across two research passes. This is the one carried open question that limits delivered scope rather than only confidence.

@@ -60,7 +60,7 @@ from sansad.model.coverage_statement import (
     Freshness,
     ResolutionRate,
 )
-from sansad.publish.attribution import LICENCE_FIELDS
+from sansad.publish.attribution import WHOLE_DATASET_FIELDS
 from sansad.publish.formats import write_both
 
 __all__ = [
@@ -194,10 +194,12 @@ def coverage_row(statement: CoverageStatement, inputs: CoverageInputs) -> dict[s
     """
     rate = statement.resolution_rate
     return {
-        # Every House's statement carries it, including a House with no route:
-        # an unobtainable-House statement is still part of the dataset, and a
-        # consumer reading only it must still be told the terms.
-        **LICENCE_FIELDS,
+        # Every House's statement carries them, including a House with no
+        # route: an unobtainable-House statement is still part of the dataset,
+        # and a consumer reading only it must still be told the terms of the
+        # added work, that the source's own terms were never determined, and
+        # where to send a correction.
+        **WHOLE_DATASET_FIELDS,
         "house": statement.house.value,
         "houses_covered": statement.house.value,
         "period_start": statement.period_start,

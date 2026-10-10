@@ -38,6 +38,7 @@ import {
   spanChange,
   spanTotals,
 } from "./lib/profile.js";
+import { renderDisclosure } from "./lib/licence.js";
 import {
   coveredRows,
   housesClaim,
@@ -362,7 +363,7 @@ function renderSessions(lok, sessions) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* Footer — licence, attribution and scope, from the manifest             */
+/* Footer — licence, scope, source terms, corrections, attribution        */
 /* ---------------------------------------------------------------------- */
 
 function renderLicence(container, manifest) {
@@ -378,6 +379,11 @@ function renderLicence(container, manifest) {
     ),
   );
   box.append(el("p", "licence-scope", stated(manifest.license_scope)));
+
+  // The source-terms disclosure sits directly under the licence scope: the
+  // scope says what IS licensed, and this says what was never determined. A
+  // reader who stops after the grant has read half of it.
+  box.append(renderDisclosure(container.ownerDocument, manifest));
 
   box.append(el("p", "licence-head", "How to attribute this data"));
   const quote = el("blockquote", "attribution");

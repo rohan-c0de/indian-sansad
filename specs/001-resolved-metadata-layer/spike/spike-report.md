@@ -509,6 +509,7 @@ Stated so Phase 3 does not inherit these as settled.
 7. **The 60-day inactivity rule is documented, not demonstrated.** No 60-day silence was tested.
 8. **The project-wide upkeep total** (Principle II) and **licensing** (`plan.md` Risk 5) are both
    untouched. Licensing was scoped out by owner decision: **deferred, not cleared.**
+   **Owner decision 2026-10-10**: still not researched, and the dataset is published without that determination — with the gap disclosed as `source_terms` on `manifest.json` and every Coverage Statement, in the page footer, and in `DATA-LICENSE.md` → *Source terms: not determined*, and with corrections and removal requests taken through the issue tracker (`corrections_url`). No legal conclusion either way.
 
 ---
 

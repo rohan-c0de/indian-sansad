@@ -62,6 +62,7 @@ Ordered by strength of evidence in `research.md`, **not** by owner priority — 
 - **Comparing uncorrected against final-edited debates** — not of interest to the owner; recorded as not to be pursued rather than prohibited. [research.md: Capability Gaps #2, owner note]
 - **Any reliance on `eparlib.sansad.in` or `eparlib.nic.in`** — treated as unavailable by owner decision. [research.md: Gaps, two CLOSED items]
 - **Terms of use, licensing and copyright analysis** — scoped out by the owner. This defers a risk; it does not establish that none exists. [intake.md: licensing answer]
+  - **Owner decision 2026-10-10**: still not researched, and the dataset is published without that determination — with the gap disclosed as `source_terms` on `manifest.json` and every Coverage Statement, in the page footer, and in `DATA-LICENSE.md` → *Source terms: not determined*, and with corrections and removal requests taken through the issue tracker (`corrections_url`). No legal conclusion either way.
 - **Revenue or commercialisation.** [intake.md: self-sustaining answer]
 - **A team.** [intake.md: solo answer]
 

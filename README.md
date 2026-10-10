@@ -5,6 +5,23 @@ A resolved metadata layer over the Indian parliamentary record.
 Published under a project name rather than a maintainer's name, per the project
 constitution (Scope of Authority → Attribution).
 
+## Source terms: not determined
+
+**The terms under which the Lok Sabha publishes the underlying records have
+never been established, and this dataset is published without that
+determination** (owner decision, 2026-10-10). The CC BY 4.0 licence here covers
+this project's added work only — the identity resolution, the joins, the
+aggregates and the indexes; **no rights are granted over the parliamentary
+records themselves**, so check the source's terms before relying on them. None
+of this is a legal conclusion in either direction and none of it is legal
+advice. **Corrections and removal requests — including from a rightsholder —
+go through the issue tracker:**
+[github.com/rohan-c0de/indian-sansad/issues](https://github.com/rohan-c0de/indian-sansad/issues).
+[`DATA-LICENSE.md` → *Source terms: not determined*](./DATA-LICENSE.md#source-terms-not-determined)
+is the full statement, and the same two lines travel inside the dataset as
+`source_terms` and `corrections_url` on `manifest.json` and every Coverage
+Statement.
+
 ## What this is meant to be
 
 The Indian parliamentary question record for the covered period, with each
@@ -170,3 +187,8 @@ section above records, that defers the question rather than clearing it.
 `DATA-LICENSE.md` says where the line falls field by field, so a consumer can
 see which parts of a published row this project can license and which it
 cannot.
+
+**The dataset is published without that determination, with the gap disclosed
+and a corrections path** — owner decision 2026-10-10, stated at the top of this
+file and in full in
+[`DATA-LICENSE.md` → *Source terms: not determined*](./DATA-LICENSE.md#source-terms-not-determined).

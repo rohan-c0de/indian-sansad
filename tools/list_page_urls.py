@@ -127,6 +127,10 @@ def main() -> int:
     print()
     print("Outbound LINKS (not requests -- nothing is fetched unless clicked):")
     print("  manifest.project_url, rendered in the footer from the published manifest")
+    print(
+        "  manifest.corrections_url, same -- the corrections and removal channel;"
+        " linked ONLY if the published value starts with https:// (web/lib/licence.js)"
+    )
     print()
 
     print("Scan for any other host named in page code")

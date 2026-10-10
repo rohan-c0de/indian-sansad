@@ -31,6 +31,7 @@ The owner wants to identify candidate uses — not yet chosen — for the parlia
 - [NEEDS CLARIFICATION: how that material is technically accessible — any API, bulk download, or sitemap, versus HTML/PDF/scanned images only; URL stability; rate limits; whether scanned material needs OCR]
 - [NEEDS CLARIFICATION: terms of use, licensing, and copyright status for sansad.in and eLibrary content — what may be re-hosted, redistributed, or derived from, and whether automated collection is permitted]
   - Answer: Out of scope for this assessment. Do not research terms of use, licensing or copyright.
+  - **Owner decision 2026-10-10**: still not researched, and the dataset is published without that determination — with the gap disclosed as `source_terms` on `manifest.json` and every Coverage Statement, in the page footer, and in `DATA-LICENSE.md` → *Source terms: not determined*, and with corrections and removal requests taken through the issue tracker (`corrections_url`). No legal conclusion either way.
 - [NEEDS CLARIFICATION: historical depth required — current Lok Sabha/Rajya Sabha session only, a few terms, or the full archive since 1952]
   - Answer: The current term and the one before it.
 - [NEEDS CLARIFICATION: language coverage expectations — English and Hindi content, other languages, transliteration, and whether cross-language search or translation is in or out of scope]

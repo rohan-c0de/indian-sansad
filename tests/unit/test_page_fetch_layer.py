@@ -35,6 +35,7 @@ PAGE_FILES = (
     "lib/coverage.js",
     "lib/profile.js",
     "lib/chart.js",
+    "lib/licence.js",
 )
 
 
@@ -175,6 +176,12 @@ _RUNTIME_FIELDS = (
             "project_url",
             "license_file",
             "license_scope",
+            # Owner decision 2026-10-10: the source-terms disclosure. Listed
+            # here so the hardcoding test below covers it -- if either value
+            # were typed into the page there would be two definitions, and the
+            # one a visitor reads would be the one nobody re-measures.
+            "source_terms",
+            "corrections_url",
             "last_refreshed",
         ),
     ),
@@ -326,6 +333,44 @@ def test_the_page_reads_the_basis_and_the_licence_from_the_published_files() -> 
         assert field in app, f"app.js never reads manifest.{field}"
 
 
+def test_the_page_reads_the_source_terms_disclosure_from_the_manifest() -> None:
+    """Owner decision 2026-10-10. Both statements are rendered, and both are
+    read from `manifest.json` rather than typed into the page.
+
+    The negative half is `test_the_page_hardcodes_nothing_the_record_supplies`
+    above, which now carries `source_terms` and `corrections_url` and so fails
+    if either published value appears as a literal in any page file.
+    """
+    licence = (WEB / "lib" / "licence.js").read_text(encoding="utf-8")
+    for field in ("source_terms", "corrections_url"):
+        assert f"manifest.{field}" in licence, f"licence.js never reads manifest.{field}"
+    # The footer has to call it, or the module renders for nobody.
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    assert 'from "./lib/licence.js"' in app
+    assert "renderDisclosure(" in app
+
+
+def test_the_corrections_link_is_https_only_and_opened_safely() -> None:
+    """The one link on this page a reader is directed to ACT on, and the one
+    place a published string reaches `href`. `javascript:` in an href executes
+    on click, so the scheme is checked rather than trusted.
+
+    `tests/page/licence-footer.test.mjs` proves the refusal by executing it --
+    including that NO node acquires an href when the value is not https. This
+    asserts the rule is still written down where that test can reach it.
+    """
+    licence = (WEB / "lib" / "licence.js").read_text(encoding="utf-8")
+    body = re.sub(r"/\*.*?\*/", "", licence, flags=re.S)
+    assert 'startsWith("https://")' in body, "the scheme check is gone"
+    assert 'link.rel = "noopener noreferrer"' in body
+    assert 'link.target = "_blank"' in body
+    # The href is set from the CHECKED value and from nothing else. The raw
+    # field may be read (and displayed), but it may not reach an href.
+    assert "link.href = href;" in body
+    assert ".href = manifest." not in body, "a raw manifest field reaches an href"
+    assert ".href = url" not in body, "the unchecked value reaches an href"
+
+
 def test_the_search_index_is_not_fetched_on_load() -> None:
     """The laziness is asserted by the page itself at boot, not just intended."""
     app = (WEB / "app.js").read_text(encoding="utf-8")
@@ -399,10 +444,12 @@ def test_every_class_the_page_sets_has_a_rule_or_is_a_known_hook() -> None:
     hooks = {"card", "container"}  # structural, always paired with another class
 
     used: set[str] = set()
-    for path in (WEB / "app.js", WEB / "lib" / "chart.js"):
+    for path in (WEB / "app.js", WEB / "lib" / "chart.js", WEB / "lib" / "licence.js"):
         text = path.read_text(encoding="utf-8")
         text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-        for match in re.finditer(r'el\(\s*"[a-z]+"\s*,\s*"([^"]+)"', text):
+        # `licence.js` names its local helper `node` rather than `el`; the
+        # argument shape is the same, so one pattern covers both.
+        for match in re.finditer(r'(?:el|node)\(\s*"[a-z]+"\s*,\s*"([^"]+)"', text):
             used.update(match.group(1).split())
         for match in re.finditer(r'\.className\s*=\s*"([^"]+)"', text):
             used.update(match.group(1).split())

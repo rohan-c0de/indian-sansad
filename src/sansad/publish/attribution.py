@@ -1,10 +1,18 @@
-"""The one definition of the dataset's licence, attribution and project URL.
+"""The one definition of the dataset's licence, attribution, project URL, and
+the source-terms disclosure that sits beside them.
 
 **Owner decision 2026-10-10.** CC BY 4.0 obliges a consumer to attribute, and
 until now nothing *inside* the dataset said what to attribute or where to link.
 `DATA-LICENSE.md` reaches a consumer who takes the whole `published` branch; it
 does not reach one who takes a single partition file. So the licence travels
 with the data.
+
+**Owner decision 2026-10-10** adds two fields to the same two files:
+`source_terms`, which states that the terms under which the Lok Sabha publishes
+these records have never been determined, and `corrections_url`, the channel
+for a correction or a removal request. They are disclosure, not licence, so
+they live in their own mapping -- but they travel exactly as far, and no
+further.
 
 **These fields go on `manifest.json` and the Coverage Statement and NOWHERE
 else** -- not on question rows, not on aggregate rows, not in the search index.
@@ -65,6 +73,30 @@ LICENSE_SCOPE: str = (
     f"{LICENSE_FILE}."
 )
 
+#: **Owner decision 2026-10-10: publish without determining the source's terms,
+#: with disclosure and a corrections path.** Terms of use, licensing and
+#: copyright were scoped out of the assessment by owner instruction and have
+#: never been researched -- so this says so, in the dataset, rather than
+#: leaving a consumer to infer permission from silence. It makes NO legal claim
+#: in either direction: not that reuse is permitted, not that it is barred.
+#:
+#: One line, for the same reason as `LICENSE_SCOPE`: it has to survive a CSV
+#: cell and a terminal without wrapping.
+SOURCE_TERMS: str = (
+    "Not determined. The maintainer has not established the terms under which "
+    "the Lok Sabha publishes these records and publishes this dataset without "
+    f"that determination. See {LICENSE_FILE}."
+)
+
+#: Where a correction or a removal request goes. The issue tracker, because it
+#: is the only channel this project actually has: there is no email address
+#: published here (the work is published under a project name, not a
+#: maintainer's, per the constitution) and no form, which would be a service.
+#:
+#: Published as an absolute `https://` URL. The page that renders it refuses to
+#: link anything else -- see `web/lib/licence.js`.
+CORRECTIONS_URL: str = f"{PROJECT_URL}/issues"
+
 #: The published field names and their values, in the order they are written.
 #: Both writers spread this mapping rather than listing fields themselves, and
 #: the contract test iterates it -- so adding a sixth field here adds it to the
@@ -77,11 +109,31 @@ LICENCE_FIELDS: dict[str, str] = {
     "license_scope": LICENSE_SCOPE,
 }
 
+#: The disclosure fields, kept in their own mapping rather than folded into
+#: `LICENCE_FIELDS`, because they are not a licence: `source_terms` is the
+#: ABSENCE of a determination and `corrections_url` is a channel. Calling
+#: either one a licence field would be the overclaim this whole disclosure
+#: exists to avoid.
+DISCLOSURE_FIELDS: dict[str, str] = {
+    "source_terms": SOURCE_TERMS,
+    "corrections_url": CORRECTIONS_URL,
+}
+
+#: What the two whole-dataset files carry. Both writers spread THIS mapping, so
+#: a field added to either half above reaches `manifest.json` and the Coverage
+#: Statement at once -- and reaches nothing else, which is the point: these are
+#: claims about the dataset, false of any single row.
+WHOLE_DATASET_FIELDS: dict[str, str] = {**LICENCE_FIELDS, **DISCLOSURE_FIELDS}
+
 __all__ = [
     "ATTRIBUTION",
+    "CORRECTIONS_URL",
+    "DISCLOSURE_FIELDS",
     "LICENCE_FIELDS",
     "LICENSE_FILE",
     "LICENSE_SCOPE",
     "LICENSE_SPDX",
     "PROJECT_URL",
+    "SOURCE_TERMS",
+    "WHOLE_DATASET_FIELDS",
 ]

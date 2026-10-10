@@ -7,6 +7,15 @@ does not reach one who takes a single file. So five fields now travel with the
 dataset -- `license`, `attribution`, `project_url`, `license_file` and
 `license_scope`.
 
+**Owner decision 2026-10-10** adds two more to the same two files and nowhere
+else: `source_terms`, which states that the terms under which the Lok Sabha
+publishes these records have never been determined, and `corrections_url`, the
+channel for a correction or a removal request. They are disclosure rather than
+licence -- `source_terms` is the ABSENCE of a determination -- so they live in
+their own mapping, `DISCLOSURE_FIELDS`, and both halves are published through
+`WHOLE_DATASET_FIELDS`. The scan below iterates that combined mapping, so each
+new field is scanned for in every row-level file without being listed twice.
+
 **They go on `manifest.json` and `coverage.jsonl`/`.csv` and NOWHERE else.** Not
 on question rows, not on aggregate rows, not in the search index. Two reasons,
 and the second is the load-bearing one:
@@ -37,7 +46,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_LICENCE = REPO_ROOT / "DATA-LICENSE.md"
 
-#: The files permitted to carry the licence fields. Everything else must not.
+#: The files permitted to carry the licence and disclosure fields.
+#: Everything else must not.
 WHOLE_DATASET_FILES = ("manifest.json", "coverage.jsonl", "coverage.csv")
 
 
@@ -94,12 +104,18 @@ def manifest_path(tmp_path):
 
 
 def _expected() -> dict[str, str]:
-    from sansad.publish.attribution import LICENCE_FIELDS
+    """Every field the two whole-dataset files carry -- licence AND disclosure.
 
-    return dict(LICENCE_FIELDS)
+    The scan at the bottom of this file uses the same mapping, so a field added
+    to `attribution.py` is asserted present on the manifest and the coverage
+    statement and asserted ABSENT from every row-level file, in one change.
+    """
+    from sansad.publish.attribution import WHOLE_DATASET_FIELDS
+
+    return dict(WHOLE_DATASET_FIELDS)
 
 
-def test_the_constant_module_defines_exactly_the_five_fields() -> None:
+def test_the_constant_module_defines_exactly_the_five_licence_fields() -> None:
     from sansad.publish import attribution
 
     assert set(attribution.LICENCE_FIELDS) == {
@@ -118,6 +134,65 @@ def test_the_constant_module_defines_exactly_the_five_fields() -> None:
     assert "added work" in scope
     assert "DATA-LICENSE.md" in scope
     assert len(scope.splitlines()) == 1, "one line, so it survives a CSV cell"
+
+
+def test_the_disclosure_fields_are_exactly_two_and_are_not_licence_fields() -> None:
+    """Owner decision 2026-10-10. Separate mapping, deliberately.
+
+    `source_terms` is the absence of a determination and `corrections_url` is a
+    channel. Folding either into `LICENCE_FIELDS` would file them under a grant
+    this project cannot make, which is the exact overclaim the disclosure
+    exists to avoid.
+    """
+    from sansad.publish import attribution
+
+    assert set(attribution.DISCLOSURE_FIELDS) == {"source_terms", "corrections_url"}
+    assert set(attribution.DISCLOSURE_FIELDS) & set(attribution.LICENCE_FIELDS) == set()
+    assert attribution.WHOLE_DATASET_FIELDS == {
+        **attribution.LICENCE_FIELDS,
+        **attribution.DISCLOSURE_FIELDS,
+    }
+
+
+def test_source_terms_states_the_gap_and_claims_nothing() -> None:
+    """It must say the determination was never made, point at the file that
+    explains it, and reach no legal conclusion in either direction.
+
+    The negative half is the load-bearing half. A disclosure that drifted into
+    "permitted", "licensed", "public domain" or "prohibited" would be the
+    determination nobody made.
+    """
+    from sansad.publish.attribution import LICENSE_FILE, SOURCE_TERMS
+
+    assert SOURCE_TERMS.startswith("Not determined.")
+    assert "has not established the terms" in SOURCE_TERMS
+    assert "without that determination" in SOURCE_TERMS
+    assert LICENSE_FILE in SOURCE_TERMS
+    assert len(SOURCE_TERMS.splitlines()) == 1, "one line, so it survives a CSV cell"
+    lowered = SOURCE_TERMS.lower()
+    for conclusion in (
+        "permitted",
+        "prohibited",
+        "public domain",
+        "fair use",
+        "lawful",
+        "unlawful",
+        "copyright-free",
+        "we are allowed",
+    ):
+        assert conclusion not in lowered, f"a legal conclusion reached: {conclusion!r}"
+
+
+def test_corrections_url_is_an_https_url_under_the_project() -> None:
+    """The page refuses to link anything that is not https, so a value that was
+    not https would publish a dead disclosure rather than a broken link."""
+    from sansad.publish.attribution import CORRECTIONS_URL, PROJECT_URL
+
+    assert CORRECTIONS_URL.startswith("https://")
+    assert CORRECTIONS_URL.endswith("/issues")
+    assert CORRECTIONS_URL.startswith(PROJECT_URL)
+    assert len(CORRECTIONS_URL.splitlines()) == 1
+    assert " " not in CORRECTIONS_URL
 
 
 def test_the_manifest_carries_every_licence_field(manifest_path) -> None:
@@ -200,6 +275,27 @@ def test_the_project_url_and_licence_file_appear_in_data_licence() -> None:
     text = DATA_LICENCE.read_text(encoding="utf-8")
     assert PROJECT_URL in text
     assert DATA_LICENCE.name == LICENSE_FILE
+
+
+def test_data_licence_carries_the_source_terms_section_and_the_corrections_url() -> None:
+    """The disclosure's human-readable half, pinned to its machine-readable half.
+
+    `source_terms` points a consumer at `DATA-LICENSE.md`. If the file had no
+    section explaining the gap, that pointer would lead nowhere -- so the
+    section's existence is asserted, and so is the corrections URL, which must
+    be the same one the dataset publishes rather than a second address.
+    """
+    from sansad.publish.attribution import CORRECTIONS_URL
+
+    text = DATA_LICENCE.read_text(encoding="utf-8")
+    assert "## Source terms: not determined" in text, (
+        "`source_terms` tells a consumer to see this file; the file must say it"
+    )
+    assert CORRECTIONS_URL in text, "the corrections channel differs from the published one"
+    # The two statements the decision requires, and the disclaimer.
+    assert "No rights are granted over the" in text
+    assert "Check the source's terms yourself" in text
+    assert "none of it is legal advice" in text
 
 
 def test_the_spdx_id_matches_the_licence_the_file_grants() -> None:
@@ -314,18 +410,39 @@ def test_no_row_level_file_carries_a_licence_field(row_level_tree) -> None:
     assert offenders == {}, f"licence fields leaked into row-level files: {offenders}"
 
 
-def test_the_scan_would_catch_a_leak(row_level_tree) -> None:
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("license", "CC-BY-4.0"),
+        # The two disclosure fields, each planted on its own. Parametrised
+        # rather than planted together so a scan that noticed only one of them
+        # fails here instead of passing on the other's evidence.
+        ("source_terms", "Not determined."),
+        ("corrections_url", "https://example.invalid/issues"),
+    ],
+)
+def test_the_scan_would_catch_a_leak(row_level_tree, field: str, value: str) -> None:
     """The scan above must be able to fail. Plant one field in one row file."""
     victim = next(iter(sorted((row_level_tree / "by-session").glob("*.jsonl"))))
     rows = [json.loads(ln) for ln in victim.read_text(encoding="utf-8").splitlines() if ln.strip()]
-    rows[0]["license"] = "CC-BY-4.0"
+    rows[0][field] = value
     victim.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
 
     _, offenders = _scan_row_level(row_level_tree)
-    assert offenders, "the scan did not notice a planted licence field"
+    assert offenders, f"the scan did not notice a planted {field} field"
     assert offenders[
         victim.name if victim.parent == row_level_tree else f"by-session/{victim.name}"
-    ] == ["license"]
+    ] == [field]
+
+
+def test_every_whole_dataset_field_is_one_the_scan_looks_for() -> None:
+    """The scan is only as wide as `_expected()`. This pins the two together:
+    a field added to `attribution.py` and forgotten here would be published and
+    never scanned for, which is how a row-level leak would go unnoticed."""
+    from sansad.publish.attribution import WHOLE_DATASET_FIELDS
+
+    assert set(_expected()) == set(WHOLE_DATASET_FIELDS)
+    assert len(_expected()) == 7, "five licence fields plus two disclosure fields"
 
 
 def test_the_question_row_schema_does_not_declare_them(members, question_records) -> None:

@@ -119,6 +119,7 @@ Per the working agreement, a conclusion revised this many times warrants outside
 ## Out of Scope (for the recommended option)
 
 Inherited from `problem.md` Non-Goals: anything before the 17th Lok Sabha; **Hindi** and all other languages; uncorrected-vs-final debate comparison (owner-excluded); `eparlib.sansad.in` and `eparlib.nic.in`; terms-of-use, licensing and copyright analysis; revenue or commercialisation; a team.
+- **Owner decision 2026-10-10**: still not researched, and the dataset is published without that determination — with the gap disclosed as `source_terms` on `manifest.json` and every Coverage Statement, in the page footer, and in `DATA-LICENSE.md` → *Source terms: not determined*, and with corrections and removal requests taken through the issue tracker (`corrections_url`). No legal conclusion either way.
 
 Newly excluded by choosing Option A:
 

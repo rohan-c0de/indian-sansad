@@ -51,7 +51,7 @@ from pathlib import Path
 
 from sansad.model._common import ResolutionStatus
 from sansad.model.question import Question
-from sansad.publish.attribution import LICENCE_FIELDS
+from sansad.publish.attribution import WHOLE_DATASET_FIELDS
 from sansad.publish.formats import CSV_SUFFIX, NDJSON_SUFFIX, rows_for, write_both
 
 __all__ = [
@@ -168,18 +168,21 @@ def write_manifest(
     path = Path(directory) / PARTITION_MANIFEST_NAME
     path.parent.mkdir(parents=True, exist_ok=True)
     body: dict[str, object] = {
-        # The licence is applied HERE rather than passed in by the caller, so a
-        # refresh cannot publish a manifest without it by forgetting an
-        # argument. `extra` is applied after, and deliberately cannot override
-        # these -- see the guard below.
-        **LICENCE_FIELDS,
+        # The licence and the source-terms disclosure are applied HERE rather
+        # than passed in by the caller, so a refresh cannot publish a manifest
+        # without them by forgetting an argument. `extra` is applied after, and
+        # deliberately cannot override these -- see the guard below.
+        **WHOLE_DATASET_FIELDS,
         "last_refreshed": last_refreshed,
         "sets": {name: dict(counts) for name, counts in sorted(sets.items())},
     }
     if extra:
-        overridden = sorted(set(extra) & set(LICENCE_FIELDS))
+        overridden = sorted(set(extra) & set(WHOLE_DATASET_FIELDS))
         if overridden:
-            raise ValueError(f"manifest `extra` may not override the licence fields: {overridden}")
+            raise ValueError(
+                "manifest `extra` may not override the licence or source-terms "
+                f"fields: {overridden}"
+            )
         body.update(extra)
     path.write_text(
         json.dumps(body, indent=1, sort_keys=True, ensure_ascii=False) + "\n",
