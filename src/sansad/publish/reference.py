@@ -3,9 +3,16 @@
 `data/published/reference/` carries members, ministries, sessions and
 constituencies as **whole sets**. State and constituency are member attributes,
 so `contracts/published-dataset.md` publishes no per-state or per-constituency
-question partition: those subsets are reached in two fetches -- the member
-reference set, then the matching members' files -- which is only possible if the
-member set carries the state and constituency a consumer filters on. It does.
+question partition: those subsets are reached in two fetches -- a reference set,
+then the matching members' files -- which is only possible if the reference set
+carries the state and constituency a consumer filters on.
+
+**Two reference sets can start that walk, and they are not interchangeable.**
+`members` carries every attribute but is 3.4 MB over all 5,426 members the
+roster has ever recorded. `constituencies` is the window's 545 seats with their
+representations, and T086 made it the cheaper entry point for the state and
+constituency axes -- but it carries `member_id` and term only, so a page that
+starts there still needs a name and a party from somewhere.
 
 ----
 
@@ -72,7 +79,7 @@ from pathlib import Path
 
 from sansad.ingest.questions import ministry_fold_key, ministry_id_for
 from sansad.model._common import NOT_STATED, House
-from sansad.model.constituency import Constituency, Representation
+from sansad.model.constituency import Constituency, Representation, constituency_id_for
 from sansad.model.member import Member
 from sansad.model.ministry import Ministry
 from sansad.model.question import Question
@@ -340,56 +347,107 @@ def sessions_from(
     )
 
 
-def constituencies_from(members: Iterable[Member]) -> tuple[Constituency, ...]:
-    """The Constituency reference set, with every representation listed.
+def constituencies_from(
+    members: Iterable[Member], *, window: Sequence[int]
+) -> tuple[Constituency, ...]:
+    """The Constituency reference set: one row per seat, in the covered window.
 
     "A constituency represented by different members across the two covered
     terms MUST list both with their periods, not merged." Periods come from
     `Member.terms`, whose dates are `NOT_STATED` until the session enumeration
-    supplies them -- so a representation carries the term number, which is
+    supplies them -- so a representation carries the **term number**, which is
     known, rather than a guessed date.
+
+    T086 corrected three things here, each of which had reached the published
+    set. All three are MEASURED against the dataset built on 2026-10-10.
+
+    1. **The id merged two different seats.** It was `ministry_id_for(name)` --
+       the seat name alone -- and three names in this window name a different
+       seat in each of two states. The `aurangabad` row carried
+       `state: "Hyderabad"` and 22 representations from both seats. The id is
+       now `constituency_id_for(name, state)`; see its docstring.
+
+    2. **A member serving both covered terms lost one.** The dedup below
+       matched `Constituency.__post_init__`'s key, `(member_id, start_date)`,
+       and every `start_date` is NOT_STATED -- so it reduced to `member_id` and
+       admitted one representation per member. The published set carried 558
+       in-window representations where the roster records **1,103** (member,
+       term) pairs. Representations are now keyed on `(member_id, term_number)`
+       by the grouping itself, not by a dedup pass afterwards, so the rule is
+       structural: a second term cannot be dropped by a loop that stops
+       matching.
+
+    3. **Out-of-window terms were published as the covered record.** Every term
+       on a member's record was listed -- 5,361 representations across terms 1
+       to 18 -- so the set claimed representations from the 1st Lok Sabha as
+       part of a window covering the 17th and 18th. `window` now bounds it, and
+       a seat with no representation inside the window gets no row at all,
+       because there is nothing this record can say about it. 897 rows become
+       the **545** seats the window actually covers.
+
+    `window` is REQUIRED and keyword-only, with no default. A default would let
+    a caller fall back to the unbounded behaviour silently, which is the defect
+    in item 3 -- and this project's rule is that a step refuses rather than
+    guesses which window it is publishing.
+
+    **An upstream limitation, recorded not worked around**: the roster gives one
+    constituency per member, and `Term.constituency` is a copy of it -- verified,
+    0 of 9,986 member-terms differ. So a member who moved seats between terms
+    would be recorded by the upstream against one seat only, and this function
+    cannot see the move. The term's own value is read first anyway, so the set
+    improves by itself if the roster ever carries per-term seats.
     """
+    terms_in_window = frozenset(int(number) for number in window)
+    if not terms_in_window:
+        raise ValueError(
+            "constituencies_from: `window` MUST name at least one term. "
+            "An empty window would publish every term on every member's record "
+            "as part of the covered window, which is the defect T086 fixed."
+        )
+
+    #: id -> {name, state, reps: {(member_id, term_number): Representation}}
     grouped: dict[str, dict[str, object]] = {}
     for member in members:
-        name = member.constituency
-        if not name or name == NOT_STATED:
-            continue
-        key = ministry_id_for(name)  # same slug rule; a stable, readable id
-        entry = grouped.setdefault(key, {"name": name, "state": member.state, "reps": []})
-        reps: list[Representation] = entry["reps"]  # type: ignore[assignment]
-        terms = member.terms or ()
-        if not terms:
-            reps.append(Representation(member_id=member.member_id, start_date=NOT_STATED))
-            continue
-        for term in terms:
-            if any(r.member_id == member.member_id and r.term_number == term.number for r in reps):
+        for term in member.terms or ():
+            if term.number not in terms_in_window:
                 continue
-            reps.append(
-                Representation(
-                    member_id=member.member_id,
-                    start_date=term.start_date,
-                    end_date=term.end_date,
-                    term_number=term.number,
+            # The term's own seat and state first, the member's as the fallback.
+            seat = (term.constituency or member.constituency or "").strip()
+            if not seat or seat == NOT_STATED:
+                continue
+            state = term.state if term.state and term.state != NOT_STATED else member.state
+            state = (state or NOT_STATED).strip() or NOT_STATED
+            key = constituency_id_for(seat, state)
+            entry = grouped.setdefault(key, {"name": seat, "state": state, "reps": {}})
+            if entry["state"] != state:
+                # Two states under one id means the id rule collided. Refusing
+                # beats publishing the merge this function exists to prevent.
+                raise ValueError(
+                    f"constituency_id {key!r} covers two states: "
+                    f"{entry['state']!r} and {state!r}. The id is built from both, "
+                    "so this is a slug collision, not a repeated name."
                 )
+            reps: dict[tuple[str, int], Representation] = entry["reps"]  # type: ignore[assignment]
+            reps[(member.member_id, term.number)] = Representation(
+                member_id=member.member_id,
+                start_date=term.start_date,
+                end_date=term.end_date,
+                term_number=term.number,
             )
+
     out: list[Constituency] = []
     for key in sorted(grouped):
         entry = grouped[key]
-        reps: list[Representation] = entry["reps"]  # type: ignore[assignment]
-        # Representation equality is (member_id, start_date); every start_date
-        # is NOT_STATED until the enumeration lands, so one entry per member.
-        deduped: list[Representation] = []
-        for rep in reps:
-            if not any(
-                r.member_id == rep.member_id and r.start_date == rep.start_date for r in deduped
-            ):
-                deduped.append(rep)
+        reps: dict[tuple[str, int], Representation] = entry["reps"]  # type: ignore[assignment]
+        # Term first, then member id: a seat reads chronologically, and the
+        # order does not depend on the order `members` arrived in.
+        ordered = tuple(reps[pair] for pair in sorted(reps, key=lambda p: (p[1], p[0])))
         out.append(
             Constituency(
                 constituency_id=key,
                 name=str(entry["name"]),
                 state=str(entry["state"]),
-                representations=tuple(deduped),
+                representations=ordered,
             )
         )
     return tuple(out)

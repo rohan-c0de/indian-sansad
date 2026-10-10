@@ -347,7 +347,7 @@ def row_level_tree(tmp_path, members, question_records):
             for q in {q.ministry_id: q for q in resolved.questions}.values()
         ],
         sessions=sessions_from(resolved.questions),
-        constituencies=constituencies_from(members),
+        constituencies=constituencies_from(members, window=(18,)),
     )
     write_aggregates(
         tmp_path,

@@ -15,11 +15,63 @@ owed.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from sansad.model._common import NOT_STATED
 
 PUBLISHED_FIELDS: tuple[str, ...] = ("constituency_id", "name", "state", "representations")
+
+#: The slug rule. Deliberately the SAME rule as
+#: `sansad.ingest.questions.ministry_id_for` -- lowercase, every run of
+#: non-alphanumerics to one hyphen, no leading or trailing hyphen -- and
+#: deliberately NOT imported from it: `sansad.model` does not depend on
+#: `sansad.ingest`, and an entity's identity rule belongs with the entity.
+#: `tests/contract/test_constituency_reference.py` asserts the two agree, so
+#: the copy cannot drift silently.
+_SLUG = re.compile(r"[^a-z0-9]+")
+
+
+def _slug(value: str) -> str:
+    return _SLUG.sub("-", (value or "").strip().lower()).strip("-")
+
+
+def constituency_id_for(name: str, state: str) -> str:
+    """The published `constituency_id`: the state's slug, then the seat's.
+
+    **The state is part of the identity, not decoration.** Three constituency
+    names in the covered window name a *different seat* in each of two states --
+    `Aurangabad` (Bihar / Maharashtra), `Hamirpur` (Himachal Pradesh / Uttar
+    Pradesh) and `Maharajganj` (Bihar / Uttar Pradesh). Keyed on the name alone
+    they merge, and the merge was not cosmetic. MEASURED against the dataset
+    built on 2026-10-10, before this fix: the published `aurangabad` row carried
+    `state: "Hyderabad"` and **22** representations drawn from both seats, so a
+    visitor in Maharashtra looking up their own constituency was shown Bihar's
+    members as their representatives. That is the failure US3 exists to prevent,
+    arriving through the id rather than through the merge rule.
+
+    **State first**, because the view's own order is state then constituency
+    (owner decision 2026-10-10: "constituency names repeat across states, so a
+    typed name must always show its state"), and because it sorts the whole set
+    into state blocks.
+
+    A seat whose state the source does not record gets `not-stated` as the state
+    half rather than a bare name slug. Uniform on purpose: a reader sees the gap
+    in the id, and two no-state seats sharing a name still merge -- which cannot
+    be helped without a state, and is stated here rather than hidden.
+
+    The one place the two halves collapse to one is where they are the **same
+    slug**: a single-seat state or union territory whose seat carries the
+    territory's own name would otherwise read `sikkim-sikkim`. **8 of the
+    window's 545 seats** are like that (Andaman and Nicobar Islands, Chandigarh,
+    Ladakh, Lakshadweep, Mizoram, Nagaland, Puducherry, Sikkim). Nothing is
+    disambiguated by repeating an identical slug, so it is not repeated.
+    """
+    seat = _slug(name)
+    if not seat:
+        return NOT_STATED
+    region = _slug(state) or _slug(NOT_STATED)
+    return seat if region == seat else f"{region}-{seat}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +103,19 @@ class Constituency:
     def __post_init__(self) -> None:
         if not self.constituency_id:
             raise ValueError("constituency_id is required and MUST NOT be empty")
-        seen = [(r.member_id, r.start_date) for r in self.representations]
+        # The key includes `term_number`, and that is the whole correction.
+        #
+        # It was `(member_id, start_date)`. Every `start_date` is NOT_STATED --
+        # the module docstring's declared gap, and the session enumeration has
+        # not supplied one -- so the key reduced to `member_id`, and ONE
+        # representation per member was all this rule would admit. A member who
+        # served BOTH covered terms in one seat therefore had a term silently
+        # dropped by the publisher's dedup, which was keyed to match this.
+        # MEASURED against the dataset built on 2026-10-10: the published set
+        # carried 558 in-window representations where the roster records
+        # **1,103** (member, term) pairs. "MUST list both with their periods"
+        # includes the case where both periods are one person's.
+        seen = [(r.member_id, r.term_number, r.start_date) for r in self.representations]
         if len(set(seen)) != len(seen):
             raise ValueError(
                 f"{self.constituency_id}: duplicate representation in "
@@ -62,3 +126,13 @@ class Constituency:
     def changed_hands_in_window(self) -> bool:
         """True when more than one member represented this seat in the window."""
         return len({r.member_id for r in self.representations}) > 1
+
+    @property
+    def term_numbers(self) -> tuple[int, ...]:
+        """The terms this seat has a representation for, ascending.
+
+        Stated rather than counted: a seat with two representations may be one
+        member across two terms or two members in one term, and the page has to
+        say which.
+        """
+        return tuple(sorted({r.term_number for r in self.representations if r.term_number}))

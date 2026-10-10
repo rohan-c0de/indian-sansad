@@ -380,7 +380,7 @@ def run_refresh(
         members=sorted(members, key=lambda m: m.member_id),
         ministries=[registry.ministries[k] for k in sorted(registry.ministries)],
         sessions=sessions_from(published_questions),
-        constituencies=constituencies_from(members),
+        constituencies=constituencies_from(members, window=WINDOW_TERMS),
     )
 
     # --- User Story 4 aggregates (T065-T067) --------------------------------

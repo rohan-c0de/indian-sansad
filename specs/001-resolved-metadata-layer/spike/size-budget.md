@@ -1234,3 +1234,142 @@ given file is compressed at all are assumptions.
 **And this is one machine, one browser, over loopback.** It measures what the
 page requests and how large those responses are. It does not measure latency,
 and it is not a measurement of GitHub Pages.
+
+---
+
+# T086 — the constituency reference set, corrected and bounded (Phase 7, 2026-10-10)
+
+The state and constituency view enters the record through
+`reference/constituencies.jsonl`. Reading it for T088 found **three defects that
+had already reached the published set**, each measured against the dataset built
+on 2026-10-10, and all three fixed before the view was written.
+
+## 1. The id merged two different seats
+
+`constituency_id` was `ministry_id_for(name)` — the seat name alone. Three names
+in this window name a **different seat in each of two states**:
+
+| Name | States |
+|---|---|
+| Aurangabad | Bihar, Maharashtra |
+| Hamirpur | Himachal Pradesh, Uttar Pradesh |
+| Maharajganj | Bihar, Uttar Pradesh |
+
+Keyed on the name, they merged. The published `aurangabad` row read:
+
+```
+id='aurangabad' name='Aurangabad' state='Hyderabad' representations=22
+```
+
+**22 representations drawn from both seats**, under a state (`Hyderabad`) that
+is neither of them — it is the historical state label of the oldest
+representation, and first-seen won. A visitor in Maharashtra looking up their
+own constituency would have been shown Bihar's members as their
+representatives. That is precisely the failure User Story 3 exists to prevent,
+arriving through the identity rule rather than through the merge rule.
+
+The id is now `constituency_id_for(name, state)` — state slug, then seat slug.
+`aurangabad` becomes `bihar-aurangabad` and `maharashtra-aurangabad`. Where the
+two halves are the same slug the seat keeps one (`sikkim`, not `sikkim-sikkim`):
+**8 of the 545 seats** are a single-seat state or union territory carrying its
+own name.
+
+## 2. A member holding both covered terms lost one
+
+`Constituency.__post_init__` keyed duplicate representations on
+`(member_id, start_date)`, and **every `start_date` is `NOT_STATED`** — the
+declared session/term period gap. So the key reduced to `member_id`, admitted
+one representation per member, and the publisher's dedup was written to match
+it. Measured: the published set carried **558** in-window representations where
+the roster records **1,103** (member, term) pairs.
+
+**216 of the 545 seats are held by one member across both covered terms** —
+exactly the 216 that `sansad.ingest.members` records as continuing from the 17th
+into the 18th. For every one of them, US3 scenario 3's "both with their
+respective periods" was unmet by the data before the page was even written. The
+key is now `(member_id, term_number, start_date)`, and the publisher groups on
+`(member_id, term_number)` structurally rather than de-duplicating afterwards.
+
+## 3. Out-of-window terms were published as the covered record
+
+Every term on a member's record was listed — **5,361 representations spanning
+terms 1 to 18** — in a set whose window is the 17th and 18th. `Adilabad` listed
+six representations, from terms 10, 11, 14, 15, 16 and 17. `window` is now a
+**required, keyword-only** argument with no default, because a default would
+silently restore exactly this.
+
+## Measured delta, on disk
+
+Rebuilt with `make refresh` (`SOURCE=scratch`, the cached window), 14.3 s:
+
+| | before | after | delta |
+|---|---|---|---|
+| `constituencies.jsonl` | 524,726 B | **147,243 B** | −377,483 B |
+| `constituencies.csv` | 537,976 B | **129,457 B** | −408,519 B |
+| rows | 897 | **545** | −352 |
+| representations | 5,361 | **1,103** | −4,258 |
+| whole dataset | 278,684,386 B | **277,898,384 B** | **−786,002 B (−0.282%)** |
+| files | 1,790 | 1,790 | 0 |
+
+The representation count is independently corroborated: 559 for the 17th and
+544 for the 18th, which are the two terms' membership totals as
+`aggregates/composition.jsonl` publishes them.
+
+**545 seats, not 543.** The Lok Sabha has 543 elected seats; this set has two
+more because the roster records a seat name the window's two terms spell
+differently, or a seat the upstream labels under two states. Recorded as an
+observation, not reconciled — no name in the window slugs to two spellings
+(verified, 0 of 545), so the difference is in the state labels and chasing it
+would need a seat list this project does not have.
+
+## What T086 does not establish
+
+It says nothing about the page. It also does **not** make the constituency set
+sufficient on its own for the view: a representation carries `member_id` and
+`term_number`, so a name, a party and a sitting status still have to come from
+somewhere. What that costs is measured below.
+
+## The gap T088 has to fetch across — measured
+
+Walking the corrected set: **545 seats, 1,103 representations, 887 distinct
+members**. Of those 887:
+
+- **796** have a name, party and state in `search/asker-names.jsonl` (92,713 B);
+- **91** do not, because they asked no question in the window, and their name
+  exists only in `reference/members.jsonl` (3,447,794 B) / `.csv` (2,765,236 B);
+- **89 of the 545 seats (16.3%)** list at least one such member.
+
+First-use cost of the view, one fetch of the seat set plus whatever supplies the
+names:
+
+| | bytes on first use of the view | dataset delta |
+|---|---|---|
+| A — `+ reference/members.jsonl` | 3,595,037 B | 0 |
+| A′ — `+ reference/members.csv` | 2,912,479 B | 0 |
+| B — name, party and sitting status on each representation | **252,226 B** | +104,983 B |
+| C — `+` an 887-row name file | **250,507 B** | +103,264 B (or +10,551 B for the 91 alone) |
+| D — seat set alone, the 91 unnamed and flagged | 147,243 B | 0 |
+
+Under D, US3 scenario 1 — "listed with their party and term" — is unmet on 89
+seats. **Owner decision pending; nothing was improvised.**
+
+## Scenario 2 — a state's subjects summarised — measured
+
+US3 acceptance scenario 2 asks that a state's subjects be "summarised and
+individual questions reachable". Nothing already loaded at that point carries a
+subject: the seat set carries `member_id` and `term_number` only.
+
+| Route | Cost |
+|---|---|
+| The state's `by-member` files | **Maharashtra 10,489,198 B** (85 members, 77 files); median state 958,942 B; largest single member file 442,053 B |
+| All 21 search digests, filtered by the state's members | 20,782,206 B |
+| A new `aggregates/state-subjects.jsonl`, every (state, subject) pair | 119,175 rows, 16,181,100 B |
+| The same, top 10 per state | 360 rows, **46,628 B** |
+| The same, top 25 per state | 900 rows, **118,297 B** |
+| The same, top 50 per state | 1,800 rows, 237,445 B |
+
+**Owner decision pending.** The last three would meet the scenario from one
+small fetch with no per-state question partition — but a "top 25 subjects by
+question count" is a ranking, and the owner's standing instruction for this
+phase is "no rankings". That tension is the owner's to resolve, not this
+document's.
