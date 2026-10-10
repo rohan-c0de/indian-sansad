@@ -943,3 +943,101 @@ as **43%**, which was wrong: it divided `by-member` in **MB** (105.88) by the to
 (245.86). Both correct forms give **41.07%** — 105,882,094 / 257,804,931 bytes, or 100.98 / 245.86
 MiB. The decision is unaffected (41% and 43% are both "the largest axis, and far from the 50%
 trigger"), but the number recorded here is the measured one.
+
+---
+
+# T079 — the search digest, measured (owner decision 2026-10-10)
+
+**The gate that forced this stands.** Resolving a search hit through the
+`by-session` question partitions was measured and rejected: the first 25 results
+for a **common word** cost **4,348,529 B** — the index plus one median
+1,863,771 B partition — which is **+3.9% over** T019's 4,183,979 B budget, and a
+two-word query spanning two sessions cost **7,236,751 B, +73.0%**. The index was
+never the problem. The partitions were.
+
+The owner's decision: T079 resolves hits through a **per-session search digest**
+published under `data/published/search/digest/`, with an asker-name lookup at
+`data/published/search/asker-names.jsonl`.
+
+## Everything a first search fetches
+
+Measured 2026-10-10 against the built dataset. The page shell is now a
+**measurement**, not T019's 61,440-byte estimate — 8 files, 102,195 B.
+
+| | Bytes |
+|---|---:|
+| page shell (8 files, measured) | 102,195 |
+| `manifest.json` | 1,618 |
+| `coverage.jsonl` | 4,654 |
+| `aggregates/counting-basis.jsonl` | 1,805 |
+| `reference/sessions.jsonl` | 2,801 |
+| `aggregates/ministry-profile.jsonl` | 284,685 |
+| `reference/ministries.jsonl` | 8,224 |
+| **on-load subtotal** | **405,982** |
+| `search/subject-index.json` *(first search only)* | 2,484,758 |
+| `search/asker-names.jsonl` *(first search only)* | 92,713 |
+| **base before any digest** | **2,983,453** |
+
+| query | hits | sessions | digests fetched | digest B | TOTAL | vs budget | was, via partitions |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `under` / `scheme` / `water` | 6,254 / 4,121 / 1,423 | 21 | 1 | 1,016,286 | **3,999,739** | **−4.4%** | 4,754,511 |
+| rare term `06243` | 1 | 1 | 1 | 1,016,286 | **3,999,739** | **−4.4%** | 4,754,511 |
+| `rural employment scheme` | 2 | 2 | 2 | 2,049,049 | 5,032,502 | **+20.3%** | 6,728,682 |
+| `drinking water` | 275 | 21 | 2 | 2,590,225 | **5,573,678** | **+33.2%** | 7,642,733 |
+
+**The gate condition is met and the general case is not.** A common word — the
+case the owner set the gate on — now lands at **−4.4% under** budget, where it
+was +3.9% over. A query whose first 25 results span **two** sessions is still
+over, at **+20.3% to +33.2%**, improved from +51.1% to +73.0% but not fixed.
+Stated rather than averaged away.
+
+| | Bytes | MiB |
+|---|---:|---:|
+| largest single digest (`lok-sabha-18-7`) | 1,573,939 | 1.50 |
+| median digest | 1,007,721 | 0.96 |
+| smallest digest (`lok-sabha-17-15`) | 328,138 | 0.31 |
+| median `by-session` partition it replaces | 1,863,771 | 1.78 |
+
+The digest is **54% of the median partition**. That is less saving than the
+617,716 B/session projected when the option was put to the owner, and the reason
+is measurable: that projection assumed a **positional** encoding
+(`[id, subject, date, ministry, askers, status]`) with no field names. The built
+digest uses named fields, matching every other published set, and **41% of it —
+8,478,852 of 20,782,206 bytes — is the repeated field names**. A positional
+encoding would remove essentially all of that; it would also make the digest the
+only published set a consumer cannot read without a schema.
+
+## Dataset size
+
+| | files | bytes | MiB | of 1 GiB |
+|---|---:|---:|---:|---:|
+| before | 1,768 | 257,807,480 | 245.9 | 24.01% |
+| **now** | **1,790** | **278,682,595** | **265.8** | **25.95%** |
+| delta | +22 | **+20,875,115** | +19.9 | +1.94% |
+
+**758 MiB of headroom** remains against the 1 GiB Pages ceiling, and the total is
+**52% of the way** to the 50%-of-ceiling trigger recorded for revisiting
+`by-member`.
+
+## Formats: NDJSON only, and why that is not a breach
+
+`contracts/published-dataset.md` says each published set ships in both NDJSON
+and CSV. The digest and the name lookup are **NDJSON only**, following the
+`search/subject-index.json` precedent. The reason does not generalise to the
+other sets: **the digest contains no information that is not already published
+in both formats.** Every field is a copy of a `by-session` field and every name
+is a copy of a `reference/members` field, both of which ship as NDJSON *and*
+CSV. A consumer who wants this as CSV already has it; a CSV digest would be a
+*third* copy of the same records, on a file whose entire purpose is to be the
+cheapest possible fetch.
+
+## What this does not establish
+
+- **No browser measured any of this.** These are file sizes plus a measured
+  shell. T083 measures the real first load from a network log, and compression
+  on the wire is not accounted for anywhere above — Pages serves gzip, and every
+  file here is highly compressible text, so the real figures will be lower by an
+  unmeasured amount.
+- **The 25-per-page rule drives the two-session case.** A page size that stopped
+  at the newest session would fetch one digest every time. It was not changed,
+  because 25 is the owner's number.

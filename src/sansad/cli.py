@@ -66,6 +66,7 @@ from sansad.publish.reference import (
     sessions_from,
     write_reference_sets,
 )
+from sansad.publish.search_digest import DIGEST_DIR_NAME, write_search_digest
 from sansad.publish.search_index import SEARCH_DIR_NAME, write_search_index
 from sansad.resolve import resolve_questions
 from sansad.resolve.assertions import load_assertions, load_ministry_renames
@@ -92,6 +93,8 @@ PUBLISHED_SETS: tuple[str, ...] = (
     "reference",
     "aggregates",
     "search",
+    "search/digest",
+    "search/asker-names",
     "coverage",
     RESOLUTION_STEM,
 )
@@ -425,6 +428,11 @@ def run_refresh(
     # T071 -- the subject-search index. Published so in-browser subject search
     # needs no server; fetched lazily by the page, only on an actual search.
     index = write_search_index(out, published_questions)
+    # T079's per-session digest and asker-name lookup. Written after the
+    # index because both are built from the same published question list.
+    digest = write_search_digest(
+        out, published_questions, sorted(members, key=lambda m: m.member_id)
+    )
     print(
         f"refresh: search index -- {index.distinct_terms:,} distinct term(s), "
         f"{index.total_postings:,} posting(s) over {index.documents:,} document(s), "
@@ -482,6 +490,11 @@ def run_refresh(
         "records": sum(aggregates.records.values()),
     }
     sets[SEARCH_DIR_NAME] = {"files": 1, "records": index.distinct_terms}
+    sets[f"{SEARCH_DIR_NAME}/{DIGEST_DIR_NAME}"] = {
+        "files": len(digest.digest_files),
+        "records": digest.records,
+    }
+    sets[f"{SEARCH_DIR_NAME}/asker-names"] = {"files": 1, "records": digest.askers}
     sets[RESOLUTION_STEM] = {
         "files": len(resolution_files),
         "records": len(resolution_records),
