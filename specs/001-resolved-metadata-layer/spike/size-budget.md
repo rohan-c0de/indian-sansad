@@ -1120,6 +1120,25 @@ so the composition changed as well as the arithmetic.
 Bandwidth at the 100 GB/month soft limit, on the same four components:
 **31,255** visitors raw, **118,018** compressed, against T019's own 23,901.
 
+## OWNER DECISION 2026-10-10 — which basis is the contract
+
+The question the section above left open is answered, and it is answered
+against the flattering row. **T019's raw 4,183,979 B stays the contract**: it is
+the number every gate in this project was set against, the only basis the
+gate's history is expressed in, and it does not move because a second basis was
+computed later. **The compressed restatement — the 847,324 B like-for-like
+budget and every `gzip -6` figure beside it — is INFORMATIONAL ONLY.** It gates
+nothing, it does not restate the contract, and a result that passes raw and
+fails compressed has passed. It is recorded because reporting a compressed
+total beside a raw budget is the specific false comparison this section exists
+to prevent, not because it replaces the budget. **And neither basis is the real
+compressed figure.** That one is read from the **live site's response headers**
+(`Content-Encoding`, `Content-Length`) after launch, once Pages is serving the
+`published` branch — `make serve-local` compresses nothing, GitHub Pages does
+not publish its encoder or level, so until that reading exists the encoder, the
+level and whether a given file is compressed at all are assumptions, and the
+`gzip -6` column is an estimate that says so in its name.
+
 ## What T083 must do
 
 **Two columns, always.** Raw bytes from the browser's network log — the T019
