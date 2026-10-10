@@ -634,3 +634,127 @@ change any conclusion here), and each newly resolved asker adds that question
 to a per-member file in both formats. The published total will **grow** — by roughly the share
 those questions represent of the by-member axis, which is 46% of all published bytes. The size
 figures above should be re-measured once Phase 3's matcher is in place.
+
+---
+
+# T061 — the real published dataset, MEASURED
+
+**Date**: 2026-10-10
+**Basis**: `make refresh SOURCE=upstream` — a live fetch of the full window, 52m 38s wall clock,
+exit 0. `manifest.json` records `"source": "upstream"`. **This is no longer a projection.**
+
+Every figure in this file above it that was marked PROJECTED for the window is now superseded by
+measurement. The projections are left in place, struck through where quoted, because a report
+that silently acquires better numbers cannot be audited.
+
+## Bytes per axis, per format, per partition
+
+| Axis | files | NDJSON | CSV | total |
+|---|---:|---:|---:|---:|
+| `by-session` | 42 | 38,761,450 | 22,451,842 | 61,213,292 |
+| `by-ministry` | 112 | 38,761,450 | 22,456,112 | 61,217,562 |
+| `by-member` | 1,592 | 66,505,933 | 39,376,161 | 105,882,094 |
+| `reference` | 8 | 3,983,545 | 3,308,363 | 7,291,908 |
+| `coverage` | 2 | 3,200 | 2,399 | 5,599 |
+| `resolution-records` | 2 | 231,196 | 123,303 | 354,499 |
+| `manifest.json` | 1 | — | — | 616 |
+| **TOTAL** | **1,759** | **148,246,774** | **87,718,180** | **235,965,570** |
+
+- **235,965,570 bytes = 225.0 MiB = 0.2198 GiB**
+- **2,476.9 bytes per question** over 95,268 published questions
+- NDJSON is **62.8%** of the bytes, CSV **37.2%**
+- duplication across axes: **3.855×** the single-copy `by-session` cost
+- largest file: **3,447,794 B (3.29 MiB)** — `reference/members.jsonl`
+- largest *question* partition: **2,888,222 B (2.75 MiB)** — `by-session/lok-sabha-18-7.jsonl`
+- per-record cost is near-identical between terms: **404.6 B/question** (17th) against
+  **410.8** (18th), NDJSON, one copy. The 3× per-*page fetch* cost difference between terms
+  does not show up as a size difference at all.
+
+## Against T015's published limits
+
+| Limit | Value | Measured | Verdict |
+|---|---|---|---|
+| GitHub Pages published site | **1 GiB (hard)** | **0.2198 GiB** | **FITS — 22.0% of the ceiling** |
+| Pages per-file maximum | **100 MiB (hard)** | **3.29 MiB** | **FITS — 30× headroom** |
+| Pages bandwidth | 100 GB/month (soft) | not exercised | see T019; unmeasured |
+| File count | **not published by GitHub** | **1,759** | **still UNVERIFIED against an unpublished limit** |
+
+**The total does not exceed the tier and no axis needs dropping.** Principle I's remedy is not
+triggered. T017 said the same thing from a projection; it is now measured.
+
+**The constraint T017 called binding is addressed, not by size but by the publication
+mechanism.** T017's finding was that version-controlling `data/published/` grows the
+*repository* by ~326 MiB per refresh and passes GitHub's 1 GiB guidance in about five refreshes.
+At the measured 225.0 MiB that would have been about seven refreshes rather than five — the
+problem was real either way. The owner's orphan-branch decision (T051) bounds it: the dataset's
+history is one commit deep at all times. `data/published/` is git-ignored on `main` and the
+repository does not carry the dataset at all.
+
+## Against T017's projections — the projection was high by 24.2%
+
+| | Bytes | B/question | Files |
+|---|---:|---:|---:|
+| ~~T017 Method A (single-session basis)~~ | ~~341,920,673~~ | ~~3,589.0~~ | — |
+| ~~T017 Method B (per-copy rebuild)~~ | ~~327,425,964~~ | — | — |
+| ~~T017 revised (whole-18th-term basis, operative)~~ | ~~311,222,000~~ | ~~3,266.9~~ | ~~~1,950~~ |
+| **MEASURED, live** | **235,965,570** | **2,476.9** | **1,759** |
+
+- against Method A: **−105,955,103 B (−31.0%)**
+- against Method B: **−91,460,394 B (−27.9%)**
+- against the operative revised projection: **−75,256,430 B (−24.2%)**
+- file count: **1,759 against ~1,950 projected (−191)**
+
+### Why it was high — and it is the projection's basis, not the implementation
+
+The projection scaled the **18th Lok Sabha alone** at 3,266.9 B/question to the window. That
+basis was unrepresentative, and **the spike's own numbers already showed it** before any
+production code existed:
+
+| Measurement of the window | B/question |
+|---|---:|
+| 18th term alone, extrapolated (what T017 used) | 3,266.9 |
+| **The spike's OWN window-mode publish, same code, same format** | **2,382.8** |
+| Production, live | 2,476.9 |
+
+**The 18th-term basis overstates the window by 37.1% on the spike's own figures.** Two window
+measurements, taken with two different codebases, agree with each other to within 3.9% and both
+sit ~24–27% below the projection. So the error is in the extrapolation, not in what was built.
+
+The three candidate explanations, each checked rather than assumed:
+
+- **Not per-record size between terms** — 404.6 against 410.8 B/question, a 1.5% difference.
+- **Not the duplication factor** — 3.855× measured against the 3.872× assumed, 0.4%.
+- **The 18th-term publish's own single-copy cost** implies 843.7 B/question against the 639.7
+  the spike's window publish measured with identical code. Those two spike runs disagree by 32%
+  and **the cause is UNVERIFIED** — the 18th-term run is not reproducible from the artefacts
+  retained, so nothing more is claimed about it here.
+
+### Where production differs from the prototype (the +3.9%)
+
+Production records are **larger** per record and the total is still only 3.9% above the
+prototype's window publish, because fewer files carry them:
+
+| | Prototype | Production | Δ |
+|---|---|---|---|
+| line length, one `by-session` record | 374 B | 418 B | **+11.8%** |
+| `question_id` | 12 ch | 26 ch | +14 — `type` is now in the composite |
+| `session` | 8 ch | 14 ch | +6 — the term is now in the id |
+| `source_record_ref` | 25 ch | 67 ch | +42 — the full route plus the composite |
+| JSON separators | `", "` / `": "` | `","` / `":"` | **−21 B/record** |
+| `by-ministry` files | 124 | **112** | 62 slugged names → 56 ids: the fold merged 2, the four confirmed renames merged 4 |
+| `by-member` files | 1,576 | **1,592** | 788 → 796 identities, because more questions resolve |
+| new published sets | — | `resolution-records` (2), `manifest.json` (1) | FR-005 and FR-016 made explicit, which the orphan branch cost us for free |
+
+The two id fields and `source_record_ref` grew because of correctness fixes — `type` in the
+question composite, the term in the session id, the full route in the reference — and each is
+worth its bytes. The compact separators pay for about half of it.
+
+## What T061 does NOT establish
+
+- **The subject-search index** (T018's 3.13 MiB) is still a **linear projection**. It was not
+  built; `data/published/` carries no index, and the sub-linearity T018 asserted remains
+  unmeasured.
+- **T019's first-page-load budget** still rests on window-scaled per-file sizes. No page exists.
+- **Bandwidth** against the 100 GB/month soft limit is unexercised — nothing has been served.
+- **The orphan branch has never been pushed.** The 1 GiB ceiling is measured against a working
+  tree; what GitHub Pages actually accounts for is unobserved.
