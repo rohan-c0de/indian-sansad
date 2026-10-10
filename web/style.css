@@ -1,0 +1,595 @@
+/* Indian Sansad — question explorer. T075.
+ *
+ * Hand-written. No framework, no build step, no preprocessor. And no
+ * reference of any kind to another file or another host: no @import, no
+ * url(), no web font. The font stacks below name faces the operating system
+ * already has, which is why there is no network request for type.
+ *
+ * Designed at 390 px FIRST (owner decision 2026-10-10). Every rule outside a
+ * media query is the narrow layout; the one `min-width` block widens it. The
+ * page must never scroll horizontally, so anything that cannot shrink -- the
+ * session table -- scrolls inside its own container instead.
+ *
+ * Contrast, against the --surface and --ground grounds, measured with the
+ * WCAG relative-luminance formula:
+ *   --ink    #14213D on #FFFFFF = 14.07:1   body text
+ *   --ink    #14213D on #F3F4F6 = 12.98:1
+ *   --muted  #4B5563 on #FFFFFF =  7.56:1   notes and captions
+ *   --muted  #4B5563 on #F3F4F6 =  6.97:1
+ *   --accent #8C3325 on #FFFFFF =  7.33:1   links and focus ring
+ *   --flag-text #7A3B06 on #FFF4E0 = 7.25:1 flagged text on flagged ground
+ * All are above the 4.5:1 required for text. The non-text marks that carry
+ * meaning -- the flag border and the focus ring -- are above 3:1:
+ *   --flag-border #D9A441 on #FFF4E0 = 1.63:1  <-- decorative only; the flag
+ *     is also carried by a word ("Not built yet", "not stated") and never by
+ *     colour alone, so the border is not the signal.
+ *   --accent #8C3325 outline on #FFFFFF = 7.33:1 focus ring.
+ *
+ * Nothing on this page carries meaning by colour alone. "not stated" is a
+ * word. A gap is a list item. A region that is not built says so in text.
+ */
+
+:root {
+  --ground: #f3f4f6;
+  --surface: #ffffff;
+  --ink: #14213d;
+  --muted: #4b5563;
+  --rule: #d5d9e0;
+  --accent: #8c3325;
+  --flag-bg: #fff4e0;
+  --flag-border: #d9a441;
+  --flag-text: #7a3b06;
+
+  --font-head: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --container: 1120px;
+  --gutter: 16px;
+  --radius: 6px;
+  --tap: 44px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  /* The page itself never scrolls sideways. Wide content scrolls inside its
+     own container; see .table-wrap. */
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  /* Belt and braces with html{} above: a single over-wide child cannot drag
+     the viewport. */
+  overflow-wrap: break-word;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-head);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.6rem;
+}
+
+h2 {
+  font-size: 1.35rem;
+}
+
+h3 {
+  font-size: 1.1rem;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* Keyboard operability: a visible ring everywhere, never removed. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Every figure reads as a figure. */
+.fact-value,
+table,
+.num-col {
+  font-variant-numeric: tabular-nums;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--ground);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.container {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+}
+
+.skip-link:focus {
+  left: 8px;
+  top: 8px;
+  z-index: 10;
+  background: var(--surface);
+  padding: 10px 14px;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  min-height: var(--tap);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Header                                                                 */
+/* ---------------------------------------------------------------------- */
+
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+  padding: 18px 0;
+}
+
+.site-name {
+  font-family: var(--font-head);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.tagline {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Sections and cards                                                     */
+/* ---------------------------------------------------------------------- */
+
+main {
+  padding-top: 20px;
+  padding-bottom: 36px;
+}
+
+.section,
+.card {
+  margin-top: 24px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+}
+
+.section-head {
+  margin-bottom: 12px;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.lede {
+  color: var(--muted);
+  font-size: 0.94rem;
+  margin-top: 4px;
+}
+
+.status {
+  color: var(--muted);
+  font-size: 0.94rem;
+  padding: 6px 0;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Coverage                                                               */
+/* ---------------------------------------------------------------------- */
+
+.houses {
+  border-left: 4px solid var(--accent);
+  padding: 2px 0 2px 12px;
+  margin-bottom: 18px;
+}
+
+.houses-value {
+  font-family: var(--font-head);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.houses-note,
+.houses-why {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-top: 3px;
+}
+
+.fact-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.fact {
+  background: var(--surface);
+  padding: 12px 14px;
+}
+
+.fact-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.fact-value {
+  font-family: var(--font-head);
+  font-size: 1.45rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.fact-note {
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin-top: 4px;
+}
+
+/* The counting basis. Read at runtime; never retyped in the page. */
+.basis {
+  margin-top: 18px;
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.basis-head {
+  font-weight: 700;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.basis-text {
+  margin-top: 6px;
+  font-size: 0.9rem;
+}
+
+.basis-src {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Sessions, gaps, merges                                                 */
+/* ---------------------------------------------------------------------- */
+
+.sessions,
+.gaps,
+.merges {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+
+.gaps-lede {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
+
+.gap-list,
+.merge-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.9rem;
+}
+
+.gap-list li,
+.merge-list li {
+  margin-bottom: 8px;
+}
+
+.merge-list li {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+/* Wide content scrolls HERE, not the page. */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+thead th {
+  background: var(--ground);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+}
+
+tbody tr:last-child th,
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.num-col {
+  text-align: right;
+}
+
+/* An absent value is a WORD, never an empty cell and never a dash whose
+   meaning a reader has to guess. */
+.not-stated {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Regions that are not built yet (T078, T079, T080)                      */
+/* ---------------------------------------------------------------------- */
+
+.not-built {
+  background: var(--flag-bg);
+  border-color: var(--flag-border);
+  /* A second, non-colour signal: the heavy left rule plus the text tag. */
+  border-left: 5px solid var(--flag-text);
+  color: var(--flag-text);
+}
+
+.not-built-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.not-built p {
+  font-size: 0.9rem;
+}
+
+.not-built p + p {
+  margin-top: 8px;
+}
+
+.not-built-note {
+  border-top: 1px solid var(--flag-border);
+  padding-top: 8px;
+}
+
+.not-built code {
+  background: rgb(255 255 255 / 60%);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Failure                                                                */
+/* ---------------------------------------------------------------------- */
+
+.unavailable {
+  background: var(--flag-bg);
+  border: 1px solid var(--flag-border);
+  border-left: 5px solid var(--flag-text);
+  border-radius: var(--radius);
+  color: var(--flag-text);
+  padding: 14px;
+  font-size: 0.9rem;
+}
+
+.unavailable-head {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.unavailable-detail {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.unavailable-note {
+  margin-top: 8px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Footer                                                                 */
+/* ---------------------------------------------------------------------- */
+
+.site-footer {
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+  padding: 22px 0 36px;
+}
+
+.origin-note {
+  color: var(--muted);
+  font-size: 0.86rem;
+  max-width: 62ch;
+}
+
+.licence {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  max-width: 72ch;
+}
+
+.licence-head {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-top: 14px;
+}
+
+.licence-head:first-child {
+  margin-top: 0;
+}
+
+.licence-id {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  margin-top: 2px;
+}
+
+.licence-scope {
+  font-size: 0.86rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.attribution {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  background: var(--ground);
+  border-left: 4px solid var(--rule);
+  border-radius: var(--radius);
+  font-size: 0.86rem;
+}
+
+.licence-links {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  font-size: 0.86rem;
+}
+
+.licence-links li {
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+
+.licence-links-note {
+  color: var(--muted);
+}
+
+.licence-src {
+  margin-top: 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Wider than 390 px. This is the ONLY widening block.                    */
+/* ---------------------------------------------------------------------- */
+
+@media (min-width: 40rem) {
+  :root {
+    --gutter: 24px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h2 {
+    font-size: 1.55rem;
+  }
+
+  .site-name {
+    font-size: 1.5rem;
+  }
+
+  main {
+    padding-top: 28px;
+  }
+
+  .card {
+    padding: 22px 24px;
+  }
+
+  .fact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  th,
+  td {
+    padding: 9px 14px;
+  }
+}
+
+@media (min-width: 64rem) {
+  .fact-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Respect a reader who asks for less motion. There is no animation on this
+   page today; this keeps that true if one is ever added. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

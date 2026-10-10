@@ -182,9 +182,11 @@ def test_an_empty_web_publishes_the_dataset_alone(tmp_path: Path, target: Path) 
 
 
 def test_an_absent_web_publishes_the_dataset_alone(tmp_path: Path, target: Path) -> None:
-    """The REAL case today: `web/` is untracked and empty, so a CI checkout has
-    no `web/` at all -- git cannot track an empty directory. This is what the
-    first run will actually do."""
+    """`web/` missing entirely. This WAS the real first-run case until T074
+    landed on 2026-10-10 and `web/` acquired tracked files; it is now a
+    defensive case rather than the expected one, and is kept because the
+    guard that makes it safe is one line and removing it would make a future
+    empty `web/` a failed refresh rather than a dataset-only release."""
     workspace = _workspace(tmp_path, web="absent")
     assert not (workspace / "web").exists()
 
@@ -197,19 +199,30 @@ def test_an_absent_web_publishes_the_dataset_alone(tmp_path: Path, target: Path)
     assert not (target / "index.html").exists()
 
 
-def test_web_today_is_in_fact_empty_or_absent() -> None:
-    """Pins the premise the two tests above rest on. When `web/` acquires
-    T074's files this test fails, which is the signal to re-read them."""
-    page = REPO_ROOT / "web"
+def test_web_is_tracked_so_the_populated_case_is_the_real_one() -> None:
+    """This test used to pin the opposite premise, and it fired.
+
+    Until 2026-10-10 it read "web/ today is in fact empty or absent", with the
+    note: "When `web/` acquires T074's files this test fails, which is the
+    signal to re-read them." T074 landed, it failed, and the two tests above
+    were re-read: the empty and absent cases are now DEFENSIVE, not expected.
+
+    What is expected now, and what this asserts: `web/` tracks the page, so a
+    CI checkout has it, and the first run copies the page to the branch root.
+    Every path T076 fetches is relative to that page."""
     tracked = subprocess.run(
         ["git", "ls-files", "web/"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         check=True,
-    ).stdout.strip()
-    assert tracked == "", f"web/ now tracks files: {tracked!r} -- T074 has landed"
-    assert not page.exists() or not any(page.iterdir())
+    ).stdout.split()
+    assert "web/index.html" in tracked, "the page is not tracked; a CI checkout has no page"
+    for required in ("web/style.css", "web/app.js", "web/lib/fetch.js"):
+        assert required in tracked, f"{required} is not tracked"
+
+    page = REPO_ROOT / "web"
+    assert page.is_dir() and any(page.iterdir())
 
 
 @pytest.mark.parametrize("web", ["populated", "empty", "absent"])

@@ -24,7 +24,7 @@ SANSAD_SCRATCH ?= $(or $(TMPDIR),/tmp/)sansad-scratch
 
 .PHONY: scratch guard setup lint yamllint audit-fields \
         refresh verify-joins extract report lookup composition coverage \
-        serve-local test-page validate
+        serve-local serve-local-mapping test-page validate
 
 # --------------------------------------------------------------------------
 # scratch -- create the out-of-tree scratch directory, and REFUSE to if the
@@ -280,13 +280,15 @@ coverage:
 
 serve-local:
 	@set -eu -o pipefail; \
-	 echo "make serve-local: NOT IMPLEMENTED YET."; \
-	 echo "  will: serve web/ and data/published/ from ONE local static host, on one origin"; \
-	 echo "  quickstart.md: scenario 12 (US2, US3)"; \
-	 echo "  implemented by: T081"; \
-	 echo "  Failing deliberately (T035): a stub that exited 0 would let"; \
-	 echo "  'make validate' report success on work that has not been done."; \
-	 exit 1
+	 $(PYTHON) tools/serve_local.py --host "$${SANSAD_HOST:-127.0.0.1}" --port "$${SANSAD_PORT:-8013}"
+
+# --------------------------------------------------------------------------
+# serve-local-mapping -- print the URL-to-file mapping and exit. Binds no
+#                        port, so it is safe in a check that must not block.
+# --------------------------------------------------------------------------
+serve-local-mapping:
+	@set -eu -o pipefail; \
+	 $(PYTHON) tools/serve_local.py --print-mapping
 
 test-page:
 	@set -eu -o pipefail; \

@@ -51,10 +51,11 @@ published to GitHub.**
 
 ### Not done
 
-- **The reader page does not exist.** `web/` is empty. T074–T085 — the page shell, the fetch
-  layer, the coverage display, the ministry-profile and subject-search views, two-ministry
-  comparison and `make serve-local` — are open. A static mockup of the intended page sits at
-  [`mockup/`](specs/001-resolved-metadata-layer/mockup/) and is wired to nothing.
+- **The reader page is half built.** The shell, the stylesheet, the fetch layer, the coverage
+  display and `make serve-local` are done (T074–T077, T081). **The ministry-profile view
+  (T078), subject search (T079) and two-ministry comparison (T080) are not** — the page shows
+  a region saying so for each. The browser proof and the real first-load measurement
+  (T082–T085) have not been run.
 - **The refresh workflow has never run on GitHub.** `.github/workflows/refresh.yml` is written
   and statically checked (`make yamllint`, 0 findings) but unproven: the daily schedule, the
   force-push to the `published` branch and the 60-day keep-alive are all unobservable locally.
@@ -138,7 +139,7 @@ does not clear it.
 
 ```
 src/sansad/        the pipeline — ingest, resolve, model, publish, views, signals
-web/               the static reader page; no build step
+web/               the static reader page; no build step (T074-T077, T081 done)
 data/published/    the dataset consumers take
 data/assertions/   maintainer resolution corrections, surviving refreshes
 tests/             resolution, resilience, contract, unit
@@ -147,8 +148,9 @@ spike/             throwaway spike code (Phase 2); not production
 specs/             specification artefacts
 ```
 
-Everything above exists except `web/`, which is empty. `data/published/` is a build output,
-git-ignored on `main` and served from the `published` branch.
+Everything above exists. `data/published/` is a build output, git-ignored on `main` and served
+from the `published` branch; `make serve-local` serves the page and the dataset together from
+one origin, in the same layout the `published` branch carries.
 
 ## Licence
 

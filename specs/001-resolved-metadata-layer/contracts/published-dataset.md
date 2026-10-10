@@ -36,7 +36,7 @@ The dataset lives on the rolling orphan branch **`published`**, which GitHub Pag
 /.nojekyll               so Pages serves files whose names begin with _
 ```
 
-Both licence files are copied to the branch root on every refresh, including a refresh that publishes no page: a consumer who takes this branch gets the dataset and no repository, so a licence that stayed on `main` would be one they never see. The machine-readable form of the same terms is on `manifest.json` and the Coverage Statement — guarantee 10.
+Both licence files are copied to the branch root on every refresh, including a refresh that publishes no page (a state that no longer arises now the page exists, but which the step still handles): a consumer who takes this branch gets the dataset and no repository, so a licence that stayed on `main` would be one they never see. The machine-readable form of the same terms is on `manifest.json` and the Coverage Statement — guarantee 10.
 
 So a published set named `reference/members.jsonl` in this contract is fetched at `/data/published/reference/members.jsonl`, relative to wherever the branch is served. **The page and the dataset are on one origin by construction** — GitHub Pages serves one site per repository — which is load-bearing rather than convenient: the upstream sends no `Access-Control-Allow-Origin` (verified first-hand, `spike/route-capture.md` T005), so a browser is refused cross-origin reads, and a dataset on a different origin from the page would hit the identical wall against this project's own files.
 

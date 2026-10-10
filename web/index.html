@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indian Sansad — Lok Sabha questions joined to the members who asked them</title>
+<!--
+  No build step. Two local files and one local module; nothing is fetched from
+  another host, and there is no web font, CDN, analytics or beacon anywhere on
+  this page. Every request the page can make goes through
+  web/lib/fetch.js -> requestUrl, which refuses any URL whose origin differs
+  from this page's.
+-->
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="container">
+    <p class="site-name">Indian Sansad</p>
+    <p class="tagline">Lok Sabha questions, joined to the members who asked them</p>
+  </div>
+</header>
+
+<main class="container" id="main">
+
+  <!-- ===================================================================
+       COVERAGE STATEMENT — T077.
+       Filled at runtime from data/published/coverage.jsonl (the row where
+       house = "lok-sabha") and data/published/reference/sessions.jsonl.
+       Nothing in it is hardcoded. Until it loads it says so.
+       =================================================================== -->
+  <section class="card coverage" id="coverage" aria-labelledby="coverage-h">
+    <div class="section-head">
+      <p class="eyebrow">Read from the published record, not typed into this page</p>
+      <h1 id="coverage-h">Coverage</h1>
+      <p class="lede">What this record claims to cover, and where it is known to be
+        incomplete.</p>
+    </div>
+
+    <div id="coverage-body" data-state="loading">
+      <p class="status" role="status">Reading the coverage statement…</p>
+    </div>
+  </section>
+
+  <!-- ===================================================================
+       T078 — ministry profile. NOT IMPLEMENTED IN THIS PART.
+       =================================================================== -->
+  <section class="section" id="ministry-profile" aria-labelledby="profile-h">
+    <div class="section-head">
+      <h2 id="profile-h">Ministry profile</h2>
+      <p class="lede">Question load for one ministry across a span of sessions.</p>
+    </div>
+    <div class="card not-built" data-task="T078">
+      <p class="not-built-tag">Not built yet</p>
+      <p>This region is deliberately empty. The ministry profile view is task
+        <strong>T078</strong>, which is not part of this change. The data it will read
+        is already published — <code>aggregates/ministry-profile.jsonl</code>, 1,146
+        rows — and the counting basis it must show beside every figure is published
+        alongside it.</p>
+    </div>
+  </section>
+
+  <!-- ===================================================================
+       T079 — subject search. NOT IMPLEMENTED IN THIS PART.
+       The search index is NOT fetched here. loadSearchIndex() exists in the
+       fetch layer and is called by nothing on this page yet, which is what
+       keeps a visitor who never searches from paying its 2.37 MiB.
+       =================================================================== -->
+  <section class="section" id="subject-search" aria-labelledby="search-h">
+    <div class="section-head">
+      <h2 id="search-h">Subject search</h2>
+      <p class="lede">Prior occurrences of a subject, with dates, ministries and asking
+        members.</p>
+    </div>
+    <div class="card not-built" data-task="T079">
+      <p class="not-built-tag">Not built yet</p>
+      <p>This region is deliberately empty. The subject-search view is task
+        <strong>T079</strong>. Its index is published as a single file
+        (<code>search/subject-index.json</code>, 2.37 MiB) and
+        <strong>has not been requested</strong> — it is fetched on the first search
+        only, so a visitor who never searches never downloads it.</p>
+      <p class="not-built-note">When it is built, results will be ordered newest
+        session first — by term then session number, descending — then by newest
+        question date, then by question number. Every query word must match. No
+        result is scored or graded, because the index publishes nothing to grade
+        with.</p>
+    </div>
+  </section>
+
+  <!-- ===================================================================
+       T080 — two-ministry comparison. NOT IMPLEMENTED IN THIS PART.
+       =================================================================== -->
+  <section class="section" id="compare" aria-labelledby="compare-h">
+    <div class="section-head">
+      <h2 id="compare-h">Compare two ministries</h2>
+      <p class="lede">The same sessions and the same counting basis for both.</p>
+    </div>
+    <div class="card not-built" data-task="T080">
+      <p class="not-built-tag">Not built yet</p>
+      <p>This region is deliberately empty. Two-ministry comparison is task
+        <strong>T080</strong>.</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- =====================================================================
+     FOOTER — licence, attribution and scope, all read at runtime from
+     data/published/manifest.json. None of it is hardcoded: if the licence
+     changes in the dataset, this changes with it.
+     ===================================================================== -->
+<footer class="site-footer">
+  <div class="container">
+    <p class="origin-note">This page reads only this project's own published files,
+      from this same host. Your browser never contacts sansad.in — it cannot: the
+      upstream sends no cross-origin header, which is why the data is republished
+      here.</p>
+
+    <div id="licence-body" data-state="loading">
+      <p class="status" role="status">Reading the licence from the published
+        manifest…</p>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
