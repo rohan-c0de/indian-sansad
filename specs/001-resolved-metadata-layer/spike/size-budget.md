@@ -920,3 +920,26 @@ exists to close.)
 - **The index is not lazily fetched by anything yet.** `contracts/published-dataset.md` says
   consumers "should expect the page to fetch it lazily, only on an actual search"; whether the
   page does that is T079's to honour.
+
+---
+
+# Owner decision 2026-10-10 — the `by-member` axis stays as it is
+
+`by-member` is **1,592 files and 105,882,094 B (100.98 MiB)**, which is **41.1% of the published
+dataset** (257,804,931 B = 245.86 MiB total, 1,768 files). It is the largest single axis and
+nothing reads it yet — the page reaches a member through the member reference set, not through
+`by-member/`. **It stays.** FR-007 names member as a subset axis and a consumer taking one
+member's questions in one fetch is exactly what it is for; the page not using it is not evidence
+that a dataset consumer will not.
+
+**Revisit only if the total passes 50% of the Pages ceiling** — 536,870,912 B. The total is at
+**24.0%**, so the headroom is **279,065,981 B (266.1 MiB)**, and at today's size the whole
+dataset would have to more than double before the question arises. If it does arise, the remedy
+named in advance (T015, "What T015 does not establish") is to **drop the per-member axis** and let
+consumers filter the session partitions — not to buy hosting.
+
+**One correction to the figure this decision was taken on.** The share was reported to the owner
+as **43%**, which was wrong: it divided `by-member` in **MB** (105.88) by the total in **MiB**
+(245.86). Both correct forms give **41.07%** — 105,882,094 / 257,804,931 bytes, or 100.98 / 245.86
+MiB. The decision is unaffected (41% and 43% are both "the largest axis, and far from the 50%
+trigger"), but the number recorded here is the measured one.
