@@ -1,0 +1,76 @@
+{
+  "_policy": "HAND-WRITTEN. No upstream response. All identities fictional; see README.md.",
+  "_exercises": "contracts/published-dataset.md guarantee 6 -- 'a question_id appearing in several files is ONE question: a consumer combining partitions must de-duplicate on question_id rather than sum'. That instruction is only safe if question_id identifies exactly one question. Before 2026-10-09 it did not: the composite omitted `type`, and 7,431 of 95,269 real records collided.",
+  "_why_these_records": "quesNo is numbered per (session, type). This fixture reproduces the exact shape at minimum size: one STARRED and one UNSTARRED question in the SAME session with the SAME quesNo, which the old composite merged into one id and the corrected one keeps apart.",
+  "listOfQuestions": [
+    {
+      "quesNo": 55, "lokNo": "18", "sessionNo": "5", "date": "2025-02-03",
+      "type": "STARRED", "subjects": "Placeholder subject, starred, quesNo 55",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["Shri Sunil Kumar Singh"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    },
+    {
+      "quesNo": 55, "lokNo": "18", "sessionNo": "5", "date": "2025-02-04",
+      "type": "UNSTARRED", "subjects": "Placeholder subject, UNSTARRED, same quesNo and session",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["Smt. Asha Devi Verma"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    },
+    {
+      "quesNo": 56, "lokNo": "18", "sessionNo": "5", "date": "2025-02-05",
+      "type": "UNSTARRED   ", "subjects": "Placeholder subject, type carries trailing whitespace as the 17th LS serves it",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["Shri Sunil Kumar Singh"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    },
+    {
+      "quesNo": 57, "lokNo": "18", "sessionNo": "5", "date": "2025-02-06",
+      "type": "UNSTARRED", "subjects": "Placeholder subject, served twice by the upstream",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["Smt. Asha Devi Verma"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    },
+    {
+      "quesNo": 57, "lokNo": "18", "sessionNo": "5", "date": "2025-02-06",
+      "type": "UNSTARRED", "subjects": "Placeholder subject, served twice by the upstream",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["Smt. Asha Devi Verma"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    }
+  ],
+  "totalRecordSize": 5,
+  "_expected": {
+    "records_in": 5,
+    "questions_out": 4,
+    "ids": [
+      "lok-sabha/18/5/starred/55",
+      "lok-sabha/18/5/unstarred/55",
+      "lok-sabha/18/5/unstarred/56",
+      "lok-sabha/18/5/unstarred/57"
+    ],
+    "q55_pair": "TWO distinct question_ids. Under the old (lokNo, sessionNo, quesNo) composite these were one id and a consumer de-duplicating on it would have merged a starred question with an unstarred one.",
+    "q56": "the trailing whitespace on `type` MUST NOT reach the id -- the 17th LS serves 'UNSTARRED ' and the 18th serves 'UNSTARRED', and two ids differing by invisible padding would be two ids for one question.",
+    "q57": "ONE question out of two byte-identical records. The drop MUST be declared as a known gap for the Coverage Statement (FR-013), never silent."
+  }
+}

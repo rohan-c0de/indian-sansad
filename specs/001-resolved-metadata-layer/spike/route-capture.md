@@ -162,7 +162,7 @@ saying which: **34,720 is the 18th Lok Sabha, not the 17th.** The 17th is 60,549
 
 | `data-model.md` → Question | Upstream source |
 |---|---|
-| `question_id` | **No single upstream field.** `quesNo` is unique *within* a session — 250 sampled records, 0 duplicate `quesNo` — so the identity must be the composite `(lokNo, sessionNo, quesNo)`. Recorded as a derivation, not a source field. |
+| `question_id` | **No single upstream field.** `quesNo` showed no duplicate within this session's 250 sampled records. **The composite drawn from that — `(lokNo, sessionNo, quesNo)` — was WRONG, and is corrected below (2026-10-09): `quesNo` is numbered per (session, `type`), and the identity is `(House, session, type, quesNo)`.** Recorded as a derivation, not a source field. |
 | `house` | `lokNo` (and the route's own `loksabhaNo` parameter) |
 | `session` | `sessionNo` |
 | `date` | `date` |
@@ -593,7 +593,7 @@ Every field of `data-model.md` → Question, against the route's 17 observed fie
 
 | `data-model.md` → Question | Upstream field | Status |
 |---|---|---|
-| `question_id` | — | **DERIVED.** No single upstream id. `quesNo` is a number unique *within* a session (250 records sampled, **0 duplicates**), so identity is the composite `(lokNo, sessionNo, quesNo)`. Stable as long as the upstream does not renumber. |
+| `question_id` | — | **DERIVED.** No single upstream id. `quesNo` showed **0 duplicates** across the 250 sampled records of one session. **That did not generalise — see the correction at the end of this file.** Identity is the composite `(House, session, type, quesNo)`; `type` is load-bearing. Stable as long as the upstream does not renumber. |
 | `house` | `lokNo` | **PRESENT.** String. Also echoed by the request's own `loksabhaNo`. |
 | `session` | `sessionNo` | **PRESENT.** String. Must be House-scoped per `data-model.md` → Session, which the composite above already does. |
 | `date` | `date` | **PRESENT.** String. Format not yet asserted — see open item below. |
@@ -657,6 +657,46 @@ outside its scope.
    carries supplementary questions with their own askers, it is a second asking-member surface
    and FR-003's "co-asked question carries every asking member" would extend to it. Must be
    re-checked on a session where it is populated.
-3. **`quesNo` uniqueness is observed within one session only** (250 records, 0 duplicates). The
+3. ~~**`quesNo` uniqueness is observed within one session only** (250 records, 0 duplicates). The
    composite key assumes it holds across all 23 sessions in the window. **Observed once, not
-   established** — the ingest must assert it, not trust it.
+   established** — the ingest must assert it, not trust it.~~
+   **CLOSED 2026-10-09, and it did not hold — see the correction below.**
+
+---
+
+# CORRECTION 2026-10-09 — the `quesNo` uniqueness claim does not generalise
+
+**This file's own caveat was right, and the thing it cautioned about happened.** Open item 3
+above said the composite "assumes it holds across all 23 sessions in the window… the ingest must
+assert it, not trust it". The ingest trusted it. It was checked over the full window on
+2026-10-09 by `tools/check_equivalence.py`, offline against the already-fetched slice, and the
+composite `(lokNo, sessionNo, quesNo)` is **not unique**:
+
+| Term | Records | distinct `(lokNo, sessionNo, quesNo)` | + `type` | + `type` + `date` |
+|---|---:|---:|---:|---:|
+| 18th LS | 34,720 | 31,945 (**2,775** collisions) | 34,720 (0) | 34,720 (0) |
+| 17th LS | 60,549 | 55,893 (**4,656** collisions) | 60,548 (1) | 60,548 (1) |
+
+**7,431 of 95,269 records — 7.8% — collided onto an already-used id.**
+
+**Cause, VERIFIED, not inferred**: `quesNo` is numbered **per (session, `type`)**. `STARRED` and
+`UNSTARRED` are separate series, so a starred and an unstarred question in the same session
+routinely carry the same `quesNo`. The control that establishes it: of the 2,775 colliding
+composites in the 18th Lok Sabha, **zero** have records that share a `type`. Adding `type`
+removes every collision in the 18th and all but one in the 17th.
+
+**The one residual collision is a genuine upstream duplicate, not a third series.**
+`(17, session 4, UNSTARRED, 2204)` is served **twice, byte-identical** — two copies of one
+question. It is now reduced to one at ingest and declared as a known gap in the Coverage
+Statement (FR-013), per `data-model.md` → Question.
+
+**Why the sample could not have caught it.** The 250 records came from **one session of one
+term**, and `quesNo` *is* unique within a (session, type) pair. A sample that happened to draw
+mostly one type, or few enough records to miss a pair, shows 0 duplicates while the
+generalisation is false. The figure was right; the inference from it was not. Nothing is wrong
+with the measurement recorded above — only with the composite that was built on it.
+
+**What changed as a result**: `sansad.ingest.questions.question_id_for` now takes the type;
+`data-model.md` → Question and `contracts/published-dataset.md` guarantee 6 record the new
+composite; `tools/check_equivalence.py` asserts zero collisions over the full window on every
+run, so this cannot regress unnoticed. **No dataset was ever published under the old composite.**

@@ -25,18 +25,27 @@ footnote.**
 | | Resolved | Rate | vs 95% |
 |---|---|---|---|
 | Matcher with the containment tier, no assertions | 90,299 / 95,269 | **94.78%** | fails by 0.22 |
-| **+ these four assertions** | **91,708 / 95,269** | **96.26%** | **met, +1.26 points** |
+| **+ these four assertions** | **91,796 / 95,268** | **96.36%** | **met, +1.36 points** |
 
 The automatic rate is **below** the target. T053 publishes both figures
 separately for exactly that reason: a single blended number would present four
 hand corrections as matcher performance, and would hide a future matcher
 regression behind them.
 
-**Recovered: 1,409 questions, not 1,572.** The per-form figures are not
-additive -- a question resolves only when *all* its askers do (FR-003) -- so
-163 of the questions these forms appear in stay unresolved because each is
-co-asked by someone whose form is still residual, "including, for some, the
-dropped row 4".
+**Recovered: 1,498 questions.** 1,411 where one assertion unblocks the
+question, plus **87 co-asked by two of the four, which resolve only when both
+are applied**. The per-form figures are not additive -- a question resolves
+only when *all* its askers do (FR-003).
+
+**This corrects the spike's published 1,409 / 96.26%** (2026-10-09). That
+recount scored one asserted form at a time, which cannot reach the 87. Two
+questions of the 89-question difference are **not explained**: the code that
+produced 1,409 was never committed, so they cannot be traced to a line. See
+`spike/matcher-equivalence.md`.
+
+The denominator is **95,268 distinct questions**, not 95,269 records: the
+upstream serves one record of the window twice and it is reduced to one, with
+the drop declared as a known gap (FR-013).
 
 **Cost**: 4 x the 3-minute measured median = **12 minutes**, one time.
 Correcting the remaining 21 residual forms is optional (~63 min).

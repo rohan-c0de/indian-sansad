@@ -17,6 +17,11 @@ Validation rules, quoted verbatim from
   rather than silently re-attributed (Edge Cases)."
 - "Answer text is explicitly **not** part of this entity. No document file is
   opened (FR-015)."
+- A `question_id` identifies exactly one question. The upstream may serve one
+  record more than once; identical copies are reduced to one at ingest and the
+  drop MUST be declared in the Coverage Statement rather than passing silently
+  (FR-013). Copies that are **not** identical are refused, because no choice
+  between them is publishable (`sansad.ingest.questions.dedupe_question_records`).
 
 The last rule is why this module has no answer field and no field that could
 hold one. FR-015 is not a preference about scope: opening the answer documents
@@ -26,8 +31,10 @@ Principle I and Principle II.
 The co-asking rule is also what makes resolution rates non-additive. A question
 resolves only when *all* its askers resolve (FR-003), which is why the spike
 had to re-walk all 95,269 records to compute the effect of four assertions
-rather than summing their per-form figures -- 1,409 recovered, not the naive
-sum of 1,572.
+rather than summing their per-form figures. Measured recovery is **1,498**
+questions: 1,411 unblocked by one assertion and **87 more that two assertions
+unblock only together**. The spike published 1,409, which undercounted -- a
+per-form recount cannot see a question that two asserted forms both block.
 """
 
 from __future__ import annotations
@@ -58,6 +65,19 @@ class Question:
     Answer text is explicitly **not** part of this entity.
     """
 
+    #: The composite `(House, session, type, quesNo)` -- **`type` included**.
+    #:
+    #: No single upstream field is a question id. `quesNo` is numbered **per
+    #: (session, type)**: `STARRED` and `UNSTARRED` are separate series, so a
+    #: starred and an unstarred question in one session routinely share a
+    #: `quesNo`. Measured over the full 95,269-record window, the earlier
+    #: `(lokNo, sessionNo, quesNo)` composite collided on **7,431** records;
+    #: with `type` the collisions are zero apart from one byte-identical
+    #: duplicate the upstream serves twice.
+    #:
+    #: `spike/route-capture.md` had recorded `quesNo` as unique within a
+    #: session on a 250-record sample, and flagged that scope itself. The
+    #: sample held; the generalisation did not.
     question_id: str
     house: House
     #: Session it belongs to -- a House-scoped `session_id`, never a bare

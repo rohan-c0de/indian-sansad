@@ -20,7 +20,7 @@ property.
 | **1** | Capture the question-metadata route | **VERIFIED WORKING** | `GET /api_ls/question/qetFilteredQuestionsAns` → HTTP 200, retrieved first-hand from the browser *and* programmatically. No credential, and with `User-Agent` and `Accept` stripped, **no required header at all**. [`route-capture.md`](./route-capture.md) |
 | **4a** | Name the free CI tier | **VERIFIED WORKING** | GitHub Actions, public repository: *"GitHub Actions usage is free ... for public repositories that use standard GitHub-hosted runners."* **Unmetered — no overage is possible.** [`free-tiers.md`](./free-tiers.md) |
 | **2** | Can a free CI runner reach the route | **VERIFIED WORKING** | HTTP 200 on both routes from an Azure `westus3` runner, run `37973110849`. No 403, no 429, no geo-block. **FR-009 is not blocked.** [`ci-reachability.md`](./ci-reachability.md) |
-| **3** | Measure the resolution rate and correction cost | **VERIFIED WORKING, by owner decision** | Matcher alone: **90.64%** over the complete 95,269-question window (18th LS 99.68%; 17th LS 85.45%) — **below** the 95% target. With the adopted containment tier: **94.78%** — still below. With four seeded assertions: **96.26% — SC-002 met** with a 1.26-point margin, target unchanged at 95%. Correction cost **12 min** for the four. **The automatic rate remains below 95%**, which T053 requires be published separately. [`resolution-rate.md`](./resolution-rate.md) |
+| **3** | Measure the resolution rate and correction cost | **VERIFIED WORKING, by owner decision** | Matcher alone: **90.64%** over the complete 95,269-question window (18th LS 99.68%; 17th LS 85.45%) — **below** the 95% target. With the adopted containment tier: **94.78%** — still below. With four seeded assertions: **96.36% — SC-002 met** with a **+1.36-point** margin, target unchanged at 95% (corrected 2026-10-09 from 96.26%; see [matcher-equivalence.md](./matcher-equivalence.md)). Correction cost **12 min** for the four. **The automatic rate remains below 95%**, which T053 requires be published separately. [`resolution-rate.md`](./resolution-rate.md) |
 | **4b** | Name the free static hosting tier | **VERIFIED, one part by construction** | GitHub Pages: 1 GiB site, soft 100 GB/month, soft 10 builds/hour, 100 MiB hard per-file. One-origin service of `web/` + `data/published/` holds **by construction, not by execution** — no page exists yet. [`free-tiers.md`](./free-tiers.md) |
 | **5** | Measure bytes per partition and per first page load | **VERIFIED WORKING** | **227,007,149 bytes (216.5 MiB) MEASURED across the full window** — **21.1%** of the 1 GiB ceiling, **1,750 files**, largest file 3.53 MiB against a 100 MiB limit. Subject index **2.86 MiB measured**. First page load **587 KiB** median ministry / **401 KiB** median constituency / **2.50 MiB** largest ministry. [`size-budget.md`](./size-budget.md) |
 
@@ -122,7 +122,7 @@ automatically and the hand work is what remains after it:
 | Optional — the remaining 21 residual forms | 21 | ≈63 min | 147 min |
 | *Not chosen* — matcher unchanged, all 44 forms by hand | *44* | *132 min = 2.2 h* | *308 min = 5.1 h* |
 
-**The required hand work is about 12 minutes** — the four assertions that carry SC-002 to 96.26%.
+**The required hand work is about 12 minutes** — the four assertions that carry SC-002 to 96.36% (corrected 2026-10-09 from 96.26%).
 That is **well inside Principle II's ~2 hours per week**, and it is a one-time cost rather than
 recurring work.
 
@@ -193,7 +193,7 @@ before the pipeline has run on a schedule.
 > | Tier's gain on the **blind holdout** (sessions 11–15, 15,082 unseen questions) | **+6.31 points** (85.57% → 91.88%) |
 > | Gain on the data the rule was derived from | +6.35 points — a 0.04-point difference, so **no measurable overfitting** |
 > | Full window **with the tier** | **94.78%** (90,299 / 95,269) — still 207 questions short |
-> | Full window **after the four confirmed assertions** | **96.26%** (91,708 / 95,269) — **SC-002 met with 1.26 points of margin** |
+> | Full window **after the four confirmed assertions** | **96.36%** (91,796 / 95,268) — **SC-002 met with +1.36 points of margin** (corrected 2026-10-09 from ~~96.26% (91,708 / 95,269)~~) |
 >
 > ### Why adopting it after seeing the shortfall is acceptable
 >
@@ -338,25 +338,41 @@ corrections available. Four were confirmed and one dropped.
 | | Resolved | Rate | vs 95% |
 |---|---:|---:|---:|
 | Tier only, no assertions (the **automatic** rate) | 90,299 / 95,269 | **94.78%** | fails by 0.22 |
-| **+ the four confirmed assertions** | **91,708 / 95,269** | **96.26%** | **met, +1.26 points** |
+| **+ the four confirmed assertions** | **91,796 / 95,268** | **96.36%** | **met, +1.36 points** |
+| ~~as originally published~~ | ~~91,708 / 95,269~~ | ~~96.26%~~ | ~~met, +1.26 points~~ |
 
-**Recovered: 1,409 questions.** This was computed by re-walking all 95,269 question records and
-counting those whose every residual asker is one of the four confirmed forms — **not** by adding
-the per-form figures, because co-asked questions make them non-additive:
+**CORRECTED 2026-10-09 — the assisted figure below undercounted.** The recount that produced it scored one asserted form at a time, which cannot reach the **87** questions co-asked by **two** of the four asserted forms: neither assertion unblocks those alone, so a per-form method credits them to neither. Measured recovery is **1,498**, the assisted window figure is **96.36%**, and the margin is **+1.36 points**. Two questions of the 89-question difference are **not explained** — the code that produced 1,409 was never committed, so they cannot be traced to a line. Verified by `tools/check_equivalence.py`; see [matcher-equivalence.md](./matcher-equivalence.md). The original figures are left in place below, struck through where they are quoted, because a report that silently acquires better numbers cannot be audited.
+
+**Recovered: 1,498 questions** (~~1,409~~). The rule is right and was stated correctly here —
+re-walk every record and count those whose *every* residual asker is one of the four confirmed
+forms — but the computation did not implement it. Measured:
 
 ```
-naive sum of questions the four forms appear in : 1,572
-actually recovered                              : 1,409
-difference                                      :   163
+recovered when ONE assertion unblocks the question  : 1,411
+recovered only when TWO unblock it together         :    87
+total recovered                                     : 1,498
 ```
 
-Those **163 questions stay unresolved** because each is co-asked by someone whose form is still
-residual — including, for some, the dropped row 4. A question resolves only when *all* its
-askers do (FR-003), so the figures cannot be summed and the earlier five-pair cumulative table
-has been replaced by this computation rather than adjusted.
+The 87 are the questions a per-form method cannot see. `tests/unit/test_assertion_co_asking.py`
+reproduces the mechanism on two hand-built records.
+
+**The per-form column in the assertions table above is also not reproducible.** It gives 513 /
+414 / 372 / 273 (sum 1,572). Re-measured over all 60,549 records of the 17th Lok Sabha, the
+number of question records in which each form appears as an asker is **528 / 443 / 395 / 296**
+(sum 1,662), and the number of name *instances* is **528 / 443 / 396 / 296** (sum 1,663) — which
+matches this spike's own correction worklist, whose column is headed "instances blocked".
+`D.K. Suresh` differs between the two because one question lists that form twice. **No
+definition measured reproduces 513 / 414 / 372 / 273.** That figure is not load-bearing — it
+exists here only to be rejected as a naive sum — but it is wrong by more than rounding, and no
+provenance for it is guessed at here.
+
+A question resolves only when *all* its askers do (FR-003), so per-form figures cannot be summed
+in either direction. The denominator is now **95,268 distinct questions** rather than 95,269
+records: the upstream serves one record of the window twice (byte-identical) and it is reduced to
+one, with the drop declared as a known gap (FR-013).
 
 **The previously recorded figure was 96.56% (91,991) for five pairs. With row 4 dropped the real
-figure is 96.26% (91,708)** — 283 questions fewer. Row 4 would have recovered 283 of its 292
+figure is 96.36% (91,796)** — 283 questions fewer than the five-pair figure. Row 4 would have recovered 283 of its 292
 blocked questions.
 
 ### Residual forms after seeding: **21**
@@ -536,7 +552,7 @@ at 95%, four assertions seeded, a fifth dropped). The answer is recorded above, 
   maintainer assertions** separately, so a matcher regression cannot hide behind accumulated hand
   corrections.
 
-**One thing Phase 3 must not inherit as settled**: SC-002 is met at 96.26% *with* four hand
+**One thing Phase 3 must not inherit as settled**: SC-002 is met at 96.36% *with* four hand
 assertions, and at **94.78% without them**. The automatic rate is **below** the threshold. That is
 why T053 publishes both figures, and why the published record will show the shortfall rather than
 conceal it.

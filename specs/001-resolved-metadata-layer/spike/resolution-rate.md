@@ -864,25 +864,28 @@ Seeding the four confirmed assertions:
 | | Resolved | Rate | vs 95% |
 |---|---:|---:|---:|
 | Automatic (tier only, no assertions) | 90,299 / 95,269 | **94.78%** | fails by 0.22 |
-| **+ four confirmed assertions** | **91,708 / 95,269** | **96.26%** | **met, +1.26 points** |
+| **+ four confirmed assertions** | **91,796 / 95,268** | **96.36%** | **met, +1.36 points** |
+| ~~as originally published~~ | ~~91,708 / 95,269~~ | ~~96.26%~~ | ~~met, +1.26 points~~ |
 
-**1,409 questions recovered.** Computed by re-walking all 95,269 question records and counting
-those whose *every* residual asker is one of the four confirmed forms. **Not** obtained by adding
-the per-form blocked counts, which would be wrong:
+**CORRECTED 2026-10-09 — the assisted figure below undercounted.** The recount that produced it scored one asserted form at a time, which cannot reach the **87** questions co-asked by **two** of the four asserted forms: neither assertion unblocks those alone, so a per-form method credits them to neither. Measured recovery is **1,498**, the assisted window figure is **96.36%**, and the margin is **+1.36 points**. Two questions of the 89-question difference are **not explained** — the code that produced 1,409 was never committed, so they cannot be traced to a line. Verified by `tools/check_equivalence.py`; see [matcher-equivalence.md](./matcher-equivalence.md). The original figures are left in place below, struck through where they are quoted, because a report that silently acquires better numbers cannot be audited.
+
+**1,498 questions recovered** (~~1,409~~). The rule stated here is right — re-walk every record
+and count those whose *every* residual asker is one of the four confirmed forms — and the
+computation did not implement it:
 
 ```
-naive sum of questions the four forms appear in : 1,572
-actually recovered                              : 1,409
-difference                                      :   163
+recovered when ONE assertion unblocks the question  : 1,411
+recovered only when TWO unblock it together         :    87
+total recovered                                     : 1,498
 ```
 
-Those **163 questions remain unresolved** because each is co-asked by someone whose form is still
-residual. A question resolves only when **all** its askers resolve (FR-003), so blocked counts
-overlap and cannot be summed — which is exactly why this figure was recomputed rather than
-derived from the earlier five-pair table.
+A question resolves only when **all** its askers resolve (FR-003). That is why blocked counts
+cannot be summed — and it is also why they cannot be scored one at a time: the 87 questions above
+are blocked by two asserted forms each, so neither form unblocks them alone and a per-form
+recount credits them to neither.
 
 **The earlier record said 96.56% (91,991 resolved) for five pairs. With row 4 dropped the real
-figure is 96.26% (91,708)** — 283 questions fewer.
+figure is 96.36% (91,796)** — 283 questions fewer than the five-pair figure.
 
 **Cost**: 4 × the measured 3-minute median = **12 minutes**. The remaining 21 residual forms are
 optional; correcting all of them would reach 100.00%.

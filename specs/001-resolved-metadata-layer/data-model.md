@@ -36,7 +36,7 @@ One question put to a ministry.
 
 | Field | Notes |
 |---|---|
-| `question_id` | Stable identity for the question. |
+| `question_id` | Stable identity: the composite `(House, session, type, quesNo)`. **`type` is part of the identity** — `quesNo` is numbered per (session, type), so a starred and an unstarred question in one session share a `quesNo` (corrected 2026-10-09; see the validation rules). |
 | `house` | Which House it was asked in. |
 | `session` | Session it belongs to. |
 | `date` | Date recorded by the source. |
@@ -55,6 +55,8 @@ One question put to a ministry.
 - A question dated outside the covered window MUST be excluded, and its exclusion reflected in the Coverage Statement rather than passing silently (FR-013).
 - A question attributed to a member not sitting on its date MUST be flagged rather than silently re-attributed (Edge Cases).
 - Answer text is explicitly **not** part of this entity. No document file is opened (FR-015).
+- A `question_id` MUST identify exactly one question. **Corrected 2026-10-09**: the composite was `(lokNo, sessionNo, quesNo)`, on a 250-record observation that `quesNo` is unique within a session. Measured over the full 95,269-record window that is false — **7,431 records collided onto an already-used id**, because `quesNo` is numbered per (session, **type**) and `STARRED`/`UNSTARRED` are separate series. The composite now includes `type`, which leaves zero collisions apart from one byte-identical duplicate record.
+- An upstream record served more than once MUST be reduced to one published question, and the drop MUST be declared in the Coverage Statement rather than passing silently (FR-013). Copies that are **not** identical MUST be refused rather than resolved by choosing one: keeping either drops a real question (FR-004) and keeping both breaks the de-duplication guarantee consumers are told to rely on (`contracts/published-dataset.md` guarantee 6).
 
 ## Resolution Record
 
@@ -118,7 +120,7 @@ A first-class published entity, because FR-013 makes coverage a user-visible req
 | `house` | Which House this statement describes. |
 | `period_start`, `period_end` | Claimed coverage window. |
 | `sessions_covered` | Session identifiers included. |
-| `known_gaps` | Sessions or dates known to be missing or incomplete. |
+| `known_gaps` | Known gaps in coverage: sessions or dates missing or incomplete, **field-level gaps** that apply to every record (question and answer text, which Principle III puts out of scope), and **record-level gaps** such as an upstream record served twice and reduced to one. Widened 2026-10-09 — the earlier wording named only sessions and dates, which `spike/route-capture.md` had already recorded as too narrow for the text gap. |
 | `resolution_rate` | Share of questions resolved to exactly one member. |
 | `last_refreshed` | Date of last successful refresh. |
 | `last_known_good` | Whether the published record is current or being served from the last good state (FR-010). |

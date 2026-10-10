@@ -57,8 +57,10 @@ def test_a_partly_resolved_question_is_not_counted_as_resolved(variant_members, 
 
     `unresolvable.json` q202 is co-asked by one resolvable and one unresolvable
     form. "A question resolves only when *all* its askers do" -- the reason the
-    four confirmed assertions recovered 1,409 questions rather than the naive
-    sum of 1,572 (`spike/spike-report.md`).
+    four confirmed assertions recovered **1,498** questions rather than a sum
+    of per-form figures -- 1,411 unblocked by one assertion and 87 by two
+    together (`spike/matcher-equivalence.md`; the spike published 1,409, which
+    undercounted).
     """
     from sansad.resolve import resolve_questions
 
@@ -97,7 +99,7 @@ def test_the_automatic_and_assisted_counts_are_reported_separately(
     """T053 publishes two rates, so resolution has to count two.
 
     The owner's decision of 2026-10-09 left the automatic rate at 94.78% --
-    below SC-002 -- with the published rate carried to 96.26% by four
+    below SC-002 -- with the published rate carried to 96.36% by four
     assertions. A single blended figure would hide a matcher regression behind
     accumulated hand corrections.
     """

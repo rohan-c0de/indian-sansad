@@ -174,15 +174,51 @@ def session_id_for(house: House, lok_no: str, session_no: str) -> str:
     return f"{house.value}/{lok_no}/{session_no}"
 
 
-def question_id_for(house: House, lok_no: str, session_no: str, ques_no: str) -> str:
-    """The composite identity `(lokNo, sessionNo, quesNo)`, House-scoped.
+def question_type_slug(value: str) -> str:
+    """The question type as an id segment.
 
-    "Stable as long as the upstream does not renumber" -- which the upstream
-    makes no promise about, carrying no contract, versioning or deprecation
-    notice. `quesNo` uniqueness is observed **within one session only** (250
-    records, 0 duplicates).
+    Stripped before slugging, because the 17th Lok Sabha serves the type with
+    **trailing whitespace** (`'UNSTARRED '`) where the 18th does not. Two ids
+    differing by invisible padding would be two ids for one question.
+
+    An absent type becomes `not-stated` rather than an empty segment: an id
+    with a hole in it collides with every other id that has the same hole.
     """
-    return f"{session_id_for(house, lok_no, session_no)}/{ques_no}"
+    slug = _SLUG_STRIP.sub("-", (value or "").strip().lower()).strip("-")
+    return slug or "not-stated"
+
+
+def question_id_for(
+    house: House, lok_no: str, session_no: str, question_type: str, ques_no: str
+) -> str:
+    """The composite identity `(House, session, type, quesNo)`.
+
+    **`type` is part of the identity, and that is a correction** (2026-10-09).
+    The composite was `(lokNo, sessionNo, quesNo)`, on the strength of
+    `spike/route-capture.md`'s "`quesNo` is unique *within* a session -- 250
+    sampled records, 0 duplicate `quesNo`", which that document itself flagged
+    as observed "within one session only".
+
+    Measured over the full 95,269-record window it is **false**: 7,431 records
+    collided onto an already-used id. `quesNo` is numbered **per (session,
+    type)** -- `STARRED` and `UNSTARRED` are separate series -- and of 2,775
+    colliding composites in the 18th Lok Sabha, **zero** had records sharing a
+    type. Adding `type` removes every collision in the 18th and all but one in
+    the 17th, and that one is a byte-identical duplicate row the upstream
+    serves twice (see `dedupe_question_records`).
+
+    Why this matters beyond tidiness: `contracts/published-dataset.md`
+    guarantee 6 tells a consumer to "de-duplicate on `question_id` rather than
+    sum across" partitions. Under the old composite, a consumer following that
+    instruction merged a starred question with an unstarred one.
+
+    Still "stable as long as the upstream does not renumber", about which it
+    makes no promise -- it carries no contract, versioning or deprecation
+    notice.
+    """
+    return (
+        f"{session_id_for(house, lok_no, session_no)}/{question_type_slug(question_type)}/{ques_no}"
+    )
 
 
 def ministry_id_for(name: str) -> str:
@@ -238,13 +274,14 @@ def question_record_from(
             f"composite cannot be published under a minted one."
         )
 
-    question_id = question_id_for(house, lok_no, session_no, ques_no)
+    question_type = _text(filtered, _TYPE_KEYS)
+    question_id = question_id_for(house, lok_no, session_no, question_type, ques_no)
     question = Question(
         question_id=question_id,
         house=house,
         session=session_id_for(house, lok_no, session_no),
         date=_text(filtered, _DATE_KEYS),
-        type=_text(filtered, _TYPE_KEYS),
+        type=question_type,
         subject=_text(filtered, _SUBJECT_KEYS),
         ministry_id=ministry_id_for(_text(filtered, _MINISTRY_KEYS, default="")),
         # Empty and `unresolved` until `sansad.resolve` says otherwise. The
@@ -257,6 +294,97 @@ def question_record_from(
     return QuestionRecord(question=question, asker_forms=_asker_forms(filtered))
 
 
+@dataclass(frozen=True, slots=True)
+class DuplicateRecord:
+    """One `question_id` the upstream served more than once.
+
+    Carried out of ingest so the Coverage Statement can **declare** it (FR-013:
+    a known gap must be "reflected in the Coverage Statement rather than
+    passing silently"). A duplicate that is dropped and not declared is a
+    silent edit to the record count, and the published total would no longer
+    match the upstream's own `totalRecordSize`.
+    """
+
+    question_id: str
+    #: How many copies arrived, including the one kept.
+    copies: int
+    #: Whether every copy mapped to an identical published record.
+    identical: bool
+
+    @property
+    def gap_note(self) -> str:
+        """The sentence the Coverage Statement carries for this duplicate."""
+        return (
+            f"{self.question_id}: the upstream served {self.copies} copies of this "
+            f"record; {self.copies - 1} identical copy/copies were dropped and one kept."
+        )
+
+
+#: The kind of known gap `DuplicateRecord` produces, for the Coverage Statement.
+#:
+#: `data-model.md` types `known_gaps` as "Sessions or dates known to be missing
+#: or incomplete", which does not cover a **record-level** gap. The type is
+#: widened there; this constant is the label.
+KNOWN_GAP_DUPLICATE_RECORDS = "upstream-duplicate-record"
+
+
+def dedupe_question_records(
+    records: Iterable[QuestionRecord],
+) -> tuple[tuple[QuestionRecord, ...], tuple[DuplicateRecord, ...]]:
+    """Keep one copy of each `question_id`. Refuse if the copies disagree.
+
+    Two outcomes, and the split is the point.
+
+    **Identical copies**: keep the first, declare the rest. Nothing is lost --
+    the copies map to the same published record, so which one survives cannot
+    matter -- and the drop is reported rather than performed quietly. The
+    upstream serves exactly one of these over the 95,269-record window:
+    `(17, session 4, UNSTARRED, 2204)`, byte-identical.
+
+    **Copies that differ**: refuse. Two different questions sharing one
+    `question_id` cannot both be published under contract guarantee 6 ("a
+    `question_id` appearing in several files is **one** question"), and there is
+    no safe choice available here -- keeping either drops a real question in
+    breach of FR-004, and keeping both hands consumers two different records
+    under one id. So this raises, and the maintainer decides. **Measured count
+    over the full window after adding `type` to the composite: zero.** The path
+    is unreached on today's data and is deliberately loud rather than absent,
+    because the next renumbering upstream is the case it exists for.
+    """
+    kept: dict[str, QuestionRecord] = {}
+    copies: dict[str, list[QuestionRecord]] = {}
+    order: list[str] = []
+
+    for record in records:
+        question_id = record.question.question_id
+        if question_id not in kept:
+            kept[question_id] = record
+            copies[question_id] = [record]
+            order.append(question_id)
+        else:
+            copies[question_id].append(record)
+
+    duplicates: list[DuplicateRecord] = []
+    for question_id in order:
+        group = copies[question_id]
+        if len(group) == 1:
+            continue
+        identical = all(other == group[0] for other in group[1:])
+        if not identical:
+            raise ValueError(
+                f"{question_id}: the upstream served {len(group)} records under one "
+                f"question_id and they are NOT identical. Publishing either would drop "
+                f"a real question (FR-004) and publishing both would break contract "
+                f"guarantee 6. Refusing rather than choosing: the composite identity "
+                f"needs widening, or the upstream has renumbered."
+            )
+        duplicates.append(
+            DuplicateRecord(question_id=question_id, copies=len(group), identical=True)
+        )
+
+    return tuple(kept[q] for q in order), tuple(duplicates)
+
+
 def load_question_records(
     records: Iterable[Mapping[str, Any]],
     *,
@@ -264,8 +392,24 @@ def load_question_records(
     last_refreshed: str | None = None,
     source_route: str = QUESTION_PATH,
     already_filtered: bool = False,
+    dedupe: bool = True,
+    duplicates: list[DuplicateRecord] | None = None,
 ) -> tuple[QuestionRecord, ...]:
-    return tuple(
+    """Map upstream records, then keep one copy of each `question_id`.
+
+    `duplicates` is an optional collector. Pass a list and it receives one
+    `DuplicateRecord` per id the upstream served twice, for the Coverage
+    Statement to declare (FR-013). Omitting it does not make the drop silent --
+    the de-duplication still happens and is still reportable -- but a caller
+    that publishes a coverage statement MUST pass it, or it will declare a
+    coverage it has not checked.
+
+    `dedupe=False` returns the records exactly as the upstream served them.
+    It exists for the equivalence check in `tools/check_equivalence.py`, which
+    has to reproduce the spike's 95,269-record denominator; it is not for the
+    pipeline.
+    """
+    mapped = tuple(
         question_record_from(
             record,
             house=house,
@@ -275,6 +419,12 @@ def load_question_records(
         )
         for record in records
     )
+    if not dedupe:
+        return mapped
+    kept, found = dedupe_question_records(mapped)
+    if duplicates is not None:
+        duplicates.extend(found)
+    return kept
 
 
 def _page(body: Any) -> tuple[list[Mapping[str, Any]], int | None]:
@@ -305,8 +455,14 @@ def fetch_question_records(
     last_refreshed: str | None = None,
     signals: SignalLog | None = None,
     check_upstream_shape: bool = True,
+    duplicates: list[DuplicateRecord] | None = None,
 ) -> tuple[QuestionRecord, ...]:
     """Page through one term (or one session) and map every record.
+
+    `duplicates` collects the ids the upstream served more than once, for the
+    Coverage Statement to declare (FR-013). The truncation check below compares
+    against the **records received**, not the records kept, so dropping an
+    upstream duplicate can never be mistaken for a short fetch.
 
     Raises:
         IngestionFailed: if the upstream is unreachable, answers with an error
@@ -403,4 +559,5 @@ def fetch_question_records(
         house=house,
         last_refreshed=last_refreshed,
         already_filtered=True,
+        duplicates=duplicates,
     )

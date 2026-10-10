@@ -46,17 +46,32 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from sansad.ingest.members import load_members
-from sansad.ingest.questions import load_question_records
+from sansad.ingest.questions import DuplicateRecord, load_question_records
 from sansad.model._common import ResolutionStatus
 from sansad.resolve import resolve_questions
 from sansad.resolve.assertions import load_assertions
 
 #: The figures to reproduce, from `spike/resolution-rate.md` -> FINAL.
+#: Expected figures on the **spike's basis** -- all 95,269 records as served,
+#: with the one upstream duplicate NOT removed, because that is the denominator
+#: `spike/resolution-rate.md` measured against.
+#:
+#: The first two are the spike's published figures, unchanged, and must
+#: reproduce exactly. The third is **corrected**: the spike published
+#: 91,708 / 96.26%, which undercounted by 89 questions. 87 of those are
+#: co-asked by two of the four asserted forms and resolve only when both
+#: assertions are applied -- invisible to a per-form recount. The remaining 2
+#: are NOT explained: the code that produced 1,409 was never committed, so the
+#: last two questions cannot be traced to a line.
+#: See `spike/matcher-equivalence.md`.
 SPIKE_WINDOW = {
     "off": (86_352, 95_269, "90.64%"),
     "on": (90_299, 95_269, "94.78%"),
-    "assertions": (91_708, 95_269, "96.26%"),
+    "assertions": (91_797, 95_269, "96.36%"),
 }
+#: What the spike published for the assisted configuration, kept so the
+#: correction stays visible in the output rather than only in a commit message.
+SPIKE_PUBLISHED_ASSISTED = (91_708, 95_269, "96.26%")
 #: Per-term resolved counts the report gives, so a window mismatch can be
 #: attributed to a term rather than only observed.
 SPIKE_PER_TERM = {
@@ -115,6 +130,7 @@ def run_term(
     *,
     containment: bool,
     assertions: Mapping[str, Any] | None,
+    dedupe: bool,
 ):
     pool_records = [r for r in roster if term in ls_expr_terms(r)]
     members = load_members(pool_records, last_refreshed="2026-10-09")
@@ -126,8 +142,12 @@ def run_term(
         if {t.number for t in member.terms} != ls_expr_terms(record)
     )
 
+    duplicates: list[DuplicateRecord] = []
     questions = load_question_records(
-        read_jsonl(scratch / f"questions_ls{term}.jsonl"), last_refreshed="2026-10-09"
+        read_jsonl(scratch / f"questions_ls{term}.jsonl"),
+        last_refreshed="2026-10-09",
+        dedupe=dedupe,
+        duplicates=duplicates,
     )
     result = resolve_questions(questions, members, assertions=assertions, containment=containment)
     no_asker = sum(1 for q in questions if not q.asker_forms)
@@ -137,32 +157,52 @@ def run_term(
     # (session, TYPE) and starred/unstarred are separate series. A dict keyed by
     # it silently drops records and miscounts. See `spike/matcher-equivalence.md`.
     asker_forms = tuple(q.asker_forms for q in questions)
-    return result, len(members), disagreeing_pool, no_asker, asker_forms
+    return result, len(members), disagreeing_pool, no_asker, asker_forms, tuple(duplicates)
 
 
-def check_question_identity(scratch: Path) -> list[tuple[int, int, int, int, int]]:
-    """Is the derived `question_id` actually unique over the full window?
+#: The one `question_id` the upstream serves twice over the covered window,
+#: byte-identical. Declared, not tolerated: `sansad.ingest.questions` reduces it
+#: to one and the Coverage Statement carries the gap (FR-013). Any OTHER
+#: collision is a failure of the composite identity.
+DECLARED_DUPLICATE = "lok-sabha/17/4/unstarred/2204"
 
-    `route-capture.md` left this open: "`quesNo` uniqueness is observed **within
-    one session only** (250 records, 0 duplicates)". The composite
-    `(lokNo, sessionNo, quesNo)` that `sansad.ingest.questions` derives rests on
-    it, and contract guarantee 6 ("a `question_id` appearing in several files is
-    **one** question") rests on the composite. Checking it is free here, and the
-    full window is the only place it can be checked.
 
-    Returns one row per term: (term, records, distinct composite, distinct
-    composite+type, distinct composite+type+date).
+def check_question_identity(scratch: Path) -> tuple[list[tuple[int, int, int, int]], list[str]]:
+    """Assert the derived `question_id` is unique over the full window.
+
+    `route-capture.md` left this open -- "`quesNo` uniqueness is observed
+    **within one session only** (250 records, 0 duplicates) ... the ingest must
+    assert it, not trust it" -- and it did not hold: the old
+    `(lokNo, sessionNo, quesNo)` composite collided on 7,431 of 95,269 records,
+    because `quesNo` is numbered per (session, `type`).
+
+    This now runs on every invocation, so the corrected composite cannot
+    regress unnoticed. It is the only check here that is a **pass/fail
+    assertion** rather than a comparison against the spike: the spike never
+    measured it.
+
+    Returns (per-term rows, unexpected collisions). A row is
+    (term, records, distinct old composite, distinct new composite).
     """
-    rows: list[tuple[int, int, int, int, int]] = []
+    rows: list[tuple[int, int, int, int]] = []
+    unexpected: list[str] = []
     for term in TERMS:
         records = read_jsonl(scratch / f"questions_ls{term}.jsonl")
-        base = {(r["lokNo"], r["sessionNo"], r["quesNo"]) for r in records}
-        with_type = {(r["lokNo"], r["sessionNo"], r["quesNo"], r["type"]) for r in records}
-        with_date = {
-            (r["lokNo"], r["sessionNo"], r["quesNo"], r["type"], r["date"]) for r in records
-        }
-        rows.append((term, len(records), len(base), len(with_type), len(with_date)))
-    return rows
+        old_composite = {(r["lokNo"], r["sessionNo"], r["quesNo"]) for r in records}
+
+        # The production mapper with de-duplication OFF, so every record keeps
+        # its own entry and a collision is visible rather than already merged.
+        mapped = load_question_records(records, last_refreshed="2026-10-09", dedupe=False)
+        seen: dict[str, int] = {}
+        for record in mapped:
+            question_id = record.question.question_id
+            seen[question_id] = seen.get(question_id, 0) + 1
+        rows.append((term, len(records), len(old_composite), len(seen)))
+
+        for question_id, copies in sorted(seen.items()):
+            if copies > 1 and question_id != DECLARED_DUPLICATE:
+                unexpected.append(f"{question_id} x{copies}")
+    return rows, unexpected
 
 
 def spike_forms(scratch: Path, term: int, *, containment: bool) -> dict[str, dict[str, Any]]:
@@ -236,16 +276,21 @@ def main() -> int:
     disagreements: dict[str, list[tuple[str, str, str]]] = {}
     question_forms: dict[int, tuple[tuple[str, ...], ...]] = {}
 
+    published: dict[str, dict[int, Any]] = {}
+    declared_duplicates: list[DuplicateRecord] = []
+
     for config, containment, applied in (
         ("off", False, None),
         ("on", True, None),
         ("assertions", True, assertions),
     ):
         results[config] = {}
+        published[config] = {}
         rows: list[tuple[str, str, str]] = []
         for term in TERMS:
-            result, pool, pool_bad, no_asker, asker_forms = run_term(
-                scratch, term, roster, containment=containment, assertions=applied
+            # Spike basis: every record as served, duplicate included.
+            result, pool, pool_bad, no_asker, asker_forms, _ = run_term(
+                scratch, term, roster, containment=containment, assertions=applied, dedupe=False
             )
             question_forms[term] = asker_forms
             results[config][term] = result
@@ -258,6 +303,13 @@ def main() -> int:
                         result.outcomes, spike_forms(scratch, term, containment=containment)
                     )
                 )
+            # Published basis: the upstream duplicate reduced to one.
+            pub, _, _, _, _, dups = run_term(
+                scratch, term, roster, containment=containment, assertions=applied, dedupe=True
+            )
+            published[config][term] = pub
+            if config == "assertions":
+                declared_duplicates.extend(dups)
         if applied is None:
             disagreements[config] = rows
 
@@ -283,6 +335,45 @@ def main() -> int:
         )
     print()
 
+    print(
+        f"The spike published **{SPIKE_PUBLISHED_ASSISTED[0]:,} / "
+        f"{SPIKE_PUBLISHED_ASSISTED[1]:,} = {SPIKE_PUBLISHED_ASSISTED[2]}** for the assisted "
+        f"configuration. That **undercounted** -- see the decomposition below. The expected "
+        f"value above is the corrected one."
+    )
+    print()
+
+    print("## The published basis -- one upstream duplicate removed")
+    print()
+    print(
+        "The table above uses the spike's denominator: all 95,269 records as served. The "
+        "upstream serves one of them twice (byte-identical), so the number of distinct "
+        "questions is one lower, and these are the figures the project publishes. The dropped "
+        "copy is declared as a known gap in the Coverage Statement (FR-013), not removed "
+        "silently."
+    )
+    print()
+    print("| Configuration | Resolved | Questions | Rate | Margin vs SC-002's 95% |")
+    print("|---|---:|---:|---:|---:|")
+    for config, label in (
+        ("off", "containment OFF"),
+        ("on", "containment ON"),
+        ("assertions", "containment ON + four assertions"),
+    ):
+        key = "resolved_assisted" if config == "assertions" else "resolved_automatic"
+        resolved = sum(getattr(published[config][t], key) for t in TERMS)
+        total = sum(published[config][t].total_questions for t in TERMS)
+        rate = 100.0 * resolved / total if total else 0.0
+        print(
+            f"| {label} | {resolved:,} | {total:,} | **{rate:.2f}%** | {rate - 95.0:+.2f} points |"
+        )
+    print()
+    print(
+        f"Declared upstream duplicate(s): "
+        f"{', '.join(f'`{d.question_id}` (x{d.copies})' for d in declared_duplicates) or 'none'}"
+    )
+    print()
+
     print("## Per term, so a mismatch has an address")
     print()
     print("| Term | Pool (lsExpr) | Questions | No asker field | OFF | spike | ON | spike |")
@@ -306,33 +397,43 @@ def main() -> int:
     )
     print()
 
-    print("## Derived question identity, checked over the full window")
+    print("## Derived question identity, asserted over the full window")
     print()
     print(
-        "Not a matcher property, but this is the first run over all 95,269 records and the "
-        'check costs nothing. `route-capture.md` left it open: *"`quesNo` uniqueness is '
-        'observed **within one session only** (250 records, 0 duplicates)"*.'
+        '`route-capture.md` left this open: *"`quesNo` uniqueness is observed **within one '
+        "session only** (250 records, 0 duplicates) ... the ingest must assert it, not trust "
+        'it"*. It did not hold. The composite now includes `type`, and this is the assertion.'
     )
     print()
-    print("| Term | Records | distinct (lokNo, sessionNo, quesNo) | + type | + type + date |")
-    print("|---|---:|---:|---:|---:|")
-    identity_collisions = 0
-    identity_collisions_with_type = 0
-    for term, records, base, with_type, with_date in check_question_identity(scratch):
-        identity_collisions += records - base
-        identity_collisions_with_type += records - with_type
+    print(
+        "| Term | Records | distinct old `(lokNo, sessionNo, quesNo)` "
+        "| distinct `(House, session, type, quesNo)` |"
+    )
+    print("|---|---:|---:|---:|")
+    identity_rows, unexpected = check_question_identity(scratch)
+    old_collisions = 0
+    new_collisions = 0
+    for term, records, old_distinct, new_distinct in identity_rows:
+        old_collisions += records - old_distinct
+        new_collisions += records - new_distinct
         print(
-            f"| {term}th LS | {records:,} | {base:,} "
-            f"({records - base:,} collisions) | {with_type:,} "
-            f"({records - with_type:,}) | {with_date:,} ({records - with_date:,}) |"
+            f"| {term}th LS | {records:,} | {old_distinct:,} "
+            f"(**{records - old_distinct:,}** collisions) | {new_distinct:,} "
+            f"({records - new_distinct:,}) |"
         )
     print()
+    print(f"- old composite: **{old_collisions:,}** record(s) collided onto an already-used id")
     print(
-        f"**The composite `sansad.ingest.questions` derives is NOT unique: "
-        f"{identity_collisions:,} record(s) collide onto an already-used id.** Adding `type` "
-        f"leaves {identity_collisions_with_type:,}. Reported, not fixed -- see "
-        f"`spike/matcher-equivalence.md`."
+        f"- corrected composite: **{new_collisions:,}** collision(s), which must all be the one "
+        f"declared upstream duplicate `{DECLARED_DUPLICATE}`"
     )
+    if unexpected:
+        print()
+        print("**UNDECLARED COLLISIONS -- the composite identity is still wrong:**")
+        for entry in unexpected:
+            print(f"- `{entry}`")
+    else:
+        print("- undeclared collisions: **0**")
     print()
 
     print("## Per-form disagreements")
@@ -424,7 +525,9 @@ def main() -> int:
     single = buckets.get(1, 0)
     print(f"| **total recovered** | **{recovered:,}** |")
     print()
-    spike_recovered = SPIKE_WINDOW["assertions"][0] - SPIKE_WINDOW["on"][0]
+    # The figure the spike PUBLISHED, not the corrected expectation -- otherwise this
+    # section would compare the correction against itself and report a remainder of 0.
+    spike_recovered = SPIKE_PUBLISHED_ASSISTED[0] - SPIKE_WINDOW["on"][0]
     print(f"- spike's published recovered figure: **{spike_recovered:,}**")
     print(f"- recovered by exactly one assertion: **{single:,}** (per-form sets are disjoint here)")
     print(
@@ -437,13 +540,25 @@ def main() -> int:
     print("## Verdict")
     print()
     reproduced = all(produced_window[c] == SPIKE_WINDOW[c][:2] for c in ("off", "on", "assertions"))
-    if reproduced and total_disagreements == 0 and conflicts == 0 and bad_pools == 0:
+    if (
+        reproduced
+        and total_disagreements == 0
+        and conflicts == 0
+        and bad_pools == 0
+        and not unexpected
+    ):
         print(
             "**VERIFIED WORKING.** All three window figures reproduce exactly, no form "
             "disagrees, the pool rule agrees, and no assertion overrides a different "
             "resolved member."
         )
         return 0
+    if unexpected:
+        print(
+            f"**IDENTITY FAILURE.** {len(unexpected)} undeclared `question_id` collision(s). "
+            f"The composite is still not unique -- fix the composite, not the figures."
+        )
+        print()
     print("**MISMATCH.** See the tables above. The matcher is NOT to be changed to close a")
     print("gap found here -- a difference is a finding about the port, and its cause belongs")
     print("in `spike/matcher-equivalence.md` before anything is edited.")

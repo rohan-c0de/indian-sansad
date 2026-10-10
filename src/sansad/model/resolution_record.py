@@ -24,7 +24,7 @@ decision -- which rests on exactly that breakdown -- would not be externally
 checkable.
 
 `manual-assertion` is a `method` value for the same reason: four assertions are
-load-bearing for SC-002 (96.26% assisted against 94.78% automatic), and T053
+load-bearing for SC-002 (96.36% assisted against 94.78% automatic), and T053
 requires the automatic rate be published separately. A join cannot be counted
 into the right rate unless it says which kind it is.
 """

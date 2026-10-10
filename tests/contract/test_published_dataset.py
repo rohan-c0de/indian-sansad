@@ -125,10 +125,115 @@ def test_guarantee_5_coverage_statement_is_published_per_house():
 # ---------------------------------------------------------------------------
 # 6. Subsets are addressable, and partitions de-duplicate  -- PENDING T051/T052
 # ---------------------------------------------------------------------------
+def test_guarantee_6_identity_distinguishes_starred_from_unstarred(question_records):
+    """The precondition for guarantee 6's de-duplication instruction.
+
+    Guarantee 6 tells a consumer to de-duplicate on `question_id` rather than
+    sum across partitions. That instruction is only safe if a `question_id`
+    identifies exactly one question. **Until 2026-10-09 it did not**: the
+    composite omitted `type`, `quesNo` is numbered per (session, type), and
+    7,431 of 95,269 real records collided onto an already-used id -- so a
+    consumer following the instruction merged a starred question with an
+    unstarred one.
+
+    The fixture is the minimum case: one `STARRED` and one `UNSTARRED` question
+    in the same session carrying the same `quesNo`.
+    """
+    records = question_records("shared_ques_no.json")
+    ids = [r.question.question_id for r in records]
+
+    assert len(ids) == len(set(ids)), f"colliding question_id(s): {ids}"
+    assert "lok-sabha/18/5/starred/55" in ids
+    assert "lok-sabha/18/5/unstarred/55" in ids
+
+    starred = next(r for r in records if r.question.type == "STARRED")
+    unstarred = next(
+        r
+        for r in records
+        if r.question.type == "UNSTARRED" and r.question.question_id.endswith("/55")
+    )
+    assert starred.question.question_id != unstarred.question.question_id
+    assert starred.question.session == unstarred.question.session
+    # ...and the two are genuinely different questions, not one record twice.
+    assert starred.question.subject != unstarred.question.subject
+
+
+def test_guarantee_6_invisible_type_padding_does_not_create_a_second_id(question_records):
+    """The 17th Lok Sabha serves `'UNSTARRED '`; the 18th serves `'UNSTARRED'`.
+
+    Two ids differing by trailing whitespace would be two ids for one question
+    -- the same defect as the collision, entering from the opposite direction.
+    """
+    records = question_records("shared_ques_no.json")
+    padded = next(r for r in records if r.question.question_id.endswith("/56"))
+
+    assert padded.question.question_id == "lok-sabha/18/5/unstarred/56"
+    assert padded.question.type == "UNSTARRED"
+
+
+def test_guarantee_6_an_upstream_duplicate_is_reduced_to_one_and_declared(fixtures_dir):
+    """One question out of two byte-identical records, and the drop is declared.
+
+    FR-013: a gap must be "reflected in the Coverage Statement rather than
+    passing silently". A duplicate dropped and not declared is a silent edit to
+    the record count, and the published total would stop matching the
+    upstream's own `totalRecordSize` with no explanation on the page.
+    """
+    import json
+
+    from sansad.ingest.questions import (
+        KNOWN_GAP_DUPLICATE_RECORDS,
+        DuplicateRecord,
+        load_question_records,
+    )
+
+    body = json.loads((fixtures_dir / "shared_ques_no.json").read_text(encoding="utf-8"))
+    duplicates: list[DuplicateRecord] = []
+    records = load_question_records(
+        body["listOfQuestions"], last_refreshed="2026-10-09", duplicates=duplicates
+    )
+
+    assert len(body["listOfQuestions"]) == 5
+    assert len(records) == 4, "the duplicate record was not reduced to one"
+
+    assert len(duplicates) == 1
+    declared = duplicates[0]
+    assert declared.question_id == "lok-sabha/18/5/unstarred/57"
+    assert declared.copies == 2
+    assert declared.identical is True
+    assert declared.question_id in declared.gap_note
+    assert KNOWN_GAP_DUPLICATE_RECORDS
+
+
+def test_guarantee_6_non_identical_records_sharing_an_id_are_refused(fixtures_dir):
+    """Two *different* questions under one id must raise, not pick a winner.
+
+    Keeping either drops a real question (FR-004); keeping both hands consumers
+    two records under one id and breaks the instruction guarantee 6 gives them.
+    There is no publishable choice, so ingest refuses and the maintainer
+    decides. Measured over the full window after adding `type`: **zero** such
+    cases -- this path is unreached on today's data and exists for the next
+    time the upstream renumbers.
+    """
+    import json
+
+    from sansad.ingest.questions import load_question_records
+
+    body = json.loads((fixtures_dir / "shared_ques_no.json").read_text(encoding="utf-8"))
+    rows = [dict(r) for r in body["listOfQuestions"]]
+    # Make the second copy of quesNo 57 a different question under the same id.
+    rows[-1]["subjects"] = "A DIFFERENT subject under the same composite identity"
+
+    with pytest.raises(ValueError, match="NOT identical"):
+        load_question_records(rows, last_refreshed="2026-10-09")
+
+
 def test_guarantee_6_a_question_id_in_several_partitions_is_one_question():
-    """ "a `question_id` appearing in several files is **one** question: a
-    consumer combining partitions must de-duplicate on `question_id` rather
-    than sum across them."""
+    """The partition half: the same record republished under several keys.
+
+    The identity half is asserted above and passes. This one needs the
+    partitions T051 writes.
+    """
     from sansad.publish import partitions  # PENDING T051
 
     assert hasattr(partitions, "write_partitions")

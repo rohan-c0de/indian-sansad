@@ -60,3 +60,5 @@ orderings", and all four owner-confirmed assertions are of that kind.
 | `ambiguous.json` | A form matching several members equally — must list candidates |
 | `near_identical_members.json` | Two genuinely distinct members with near-identical names — must never merge |
 | `roster.json` | A small member roster the above resolve against |
+| `co_asked_assertions.json` | A question co-asked by **two** forms that each need a maintainer assertion — it resolves only when both are loaded. Carries its own member slice and assertions. This is the mechanism by which the spike's published 96.26% undercounted (87 questions); see `spike/matcher-equivalence.md` |
+| `shared_ques_no.json` | A `STARRED` and an `UNSTARRED` question in one session sharing a `quesNo`, a `type` carrying trailing whitespace as the 17th Lok Sabha serves it, and one record served twice — the three cases behind the `question_id` correction of 2026-10-09 |

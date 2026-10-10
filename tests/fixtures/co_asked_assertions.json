@@ -1,0 +1,51 @@
+{
+  "_policy": "HAND-WRITTEN. No upstream response. All identities fictional; see README.md.",
+  "_exercises": "The mechanism behind the 87-question correction in spike/matcher-equivalence.md: a question co-asked by TWO forms that each need a maintainer assertion. It resolves only when BOTH are loaded, because a question resolves only when ALL its askers do (FR-003). A per-form recount cannot see these questions -- neither assertion unblocks the question on its own -- which is why the spike's 1,409 figure undercounted.",
+  "_why_these_name_shapes": "Both forms are of the residual class spike-report.md names -- 'initials, parenthetical aliases and divergent orderings' -- and all four owner-confirmed assertions are of that kind. The initials form mirrors 'D.K. Suresh' <- 'Doddalahalli Kempegowda Suresh'; the surname-plus-initial form mirrors 'Ganesan Selvam' <- 'Selvam G'.",
+  "members": [
+    {"memberId": "fx-0040", "memberName": "Rajagopalan Krishnamurthy Venkat", "party": "Party E",
+     "state": "State Seven", "constituency": "Constituency Theta", "house": "Lok Sabha",
+     "term": 18, "sittingStatus": "sitting"},
+    {"memberId": "fx-0041", "memberName": "Thangavelu Muthusamy", "party": "Party F",
+     "state": "State Eight", "constituency": "Constituency Iota", "house": "Lok Sabha",
+     "term": 18, "sittingStatus": "sitting"},
+    {"memberId": "fx-0042", "memberName": "Priya Anand", "party": "Party G",
+     "state": "State Nine", "constituency": "Constituency Kappa", "house": "Lok Sabha",
+     "term": 18, "sittingStatus": "sitting"}
+  ],
+  "assertions": [
+    {"name_as_written": "R.K. Venkat", "member_id": "fx-0040",
+     "basis": "test fixture: R.K. = R(ajagopalan) K(rishnamurthy); both initials correspond."},
+    {"name_as_written": "Muthusamy T", "member_id": "fx-0041",
+     "basis": "test fixture: the roster's Thangavelu abbreviates to T, reordered."}
+  ],
+  "listOfQuestions": [
+    {
+      "quesNo": 401, "lokNo": "18", "sessionNo": "4", "date": "2024-11-01",
+      "type": "UNSTARRED", "subjects": "Placeholder subject, two askers each needing an assertion",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["R.K. Venkat", "Muthusamy T"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    },
+    {
+      "quesNo": 402, "lokNo": "18", "sessionNo": "4", "date": "2024-11-02",
+      "type": "UNSTARRED", "subjects": "Placeholder subject, one asserted asker and one already resolvable",
+      "ministry": "Ministry of Placeholder Affairs",
+      "member": ["R.K. Venkat", "Priya Anand"],
+      "supplementaryType": false,
+      "questionText": null, "answerText": null, "answerTextHindi": null,
+      "supplementaryQuestionResDtoList": null,
+      "questionsFilePath": "placeholder", "questionsFilePathHindi": "placeholder",
+      "questionsDocPath": "placeholder", "questionsDocPathHindi": "placeholder"
+    }
+  ],
+  "totalRecordSize": 2,
+  "_expected": {
+    "q401": "unresolved with NO assertions, unresolved with EITHER one alone, resolved to (fx-0040, fx-0041) with BOTH. This is the 87-question case.",
+    "q402": "unresolved with no assertions (R.K. Venkat blocks it) even though Priya Anand resolves at the normalised tier; resolved with the R.K. Venkat assertion alone. This is the 1,411-question case, and the control that shows the fixture's two mechanisms are different."
+  }
+}

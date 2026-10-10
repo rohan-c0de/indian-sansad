@@ -50,8 +50,11 @@ on 2026-10-09 — see
   questions resolve to exactly one member, but only **85.45%** of the 17th's, for **90.64%**
   across the window with the original matcher. The adopted containment tier lifts that to
   **94.78% automatic**, and **four owner-confirmed maintainer assertions** carry it to
-  **96.26%** — a 1.26-point margin over the 95% target, which was kept unchanged. The automatic
-  rate remains **below** 95%, so the coverage statement publishes both figures separately.
+  **96.36%** (91,796 of 95,268 questions) — a **+1.36-point** margin over the 95% target, which
+  was kept unchanged. The automatic rate remains **below** 95%, so the coverage statement
+  publishes both figures separately. *The assisted figure was corrected from 96.26% on
+  2026-10-09: the original recount scored one asserted form at a time and so missed 87 questions
+  co-asked by two of them, which resolve only when both assertions are applied.*
 - **Zero running cost is evidenced**, not asserted: every component sits on a named free tier
   with its behaviour at the limit quoted from the provider's own published pages.
 

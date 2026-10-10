@@ -24,7 +24,7 @@ The first rule is why `resolution_rate` is a published field with its own
 denominator rather than a bare percentage. A rate without the denominator is
 not externally checkable, which is the entire point of publishing it; and the
 rate carries **two** figures because four maintainer assertions are
-load-bearing for SC-002 -- 94.78% automatic against 96.26% assisted. T053
+load-bearing for SC-002 -- 94.78% automatic against 96.36% assisted. T053
 requires both, so a consumer can see the project's dependence on hand
 corrections instead of having it blended away.
 """

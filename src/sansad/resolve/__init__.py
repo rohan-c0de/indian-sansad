@@ -15,13 +15,16 @@ extra. T055 (the CLI) calls it; T053 reads its two counts.
 re-walk all 95,269 question records to compute the effect of four assertions
 rather than summing their per-form figures:
 
-    naive sum of questions the four forms appear in : 1,572
-    actually recovered                              : 1,409
-    difference                                      :   163
+    recovered when one assertion unblocks the question  : 1,411
+    recovered only when TWO assertions unblock it       :    87
+    total recovered                                     : 1,498
 
-Those 163 stay unresolved because each is co-asked by someone whose form is
-still residual. Any shortcut that counts per form rather than per question gets
-this wrong in the flattering direction.
+Any shortcut that counts per form rather than per question misses the 87 --
+neither assertion unblocks those questions alone, so a per-form method credits
+them to neither. The spike published **1,409** and this is the correction
+(2026-10-09); 2 questions of the difference remain unexplained, because the
+code that produced 1,409 was never committed. `spike/matcher-equivalence.md`,
+and `tests/unit/test_assertion_co_asking.py` for the mechanism on two records.
 
 **What a partly-resolved question publishes.** The asker that resolved is kept
 in `asking_members`, and the status stays `unresolved` or `ambiguous`. Both

@@ -627,8 +627,10 @@ measured. The publish used the current unadopted matcher, so 8,917 of 95,269 que
 empty `asking_members` array.
 
 **So these are a floor, not the final size.** Adopting the containment tier and seeding the four
-confirmed assertions resolves 9,133 further questions (90,299 − 86,352 = 3,947 from the tier,
-plus 1,409 from the assertions, less overlap), and each newly resolved asker adds that question
+confirmed assertions resolves 9,222 further questions (90,299 − 86,352 = 3,947 from the tier,
+plus **1,498** from the assertions, less overlap — corrected 2026-10-09 from 1,409, which
+undercounted by 89; the effect on these byte projections is under 0.1% of the window and does not
+change any conclusion here), and each newly resolved asker adds that question
 to a per-member file in both formats. The published total will **grow** — by roughly the share
 those questions represent of the by-member axis, which is 46% of all published bytes. The size
 figures above should be re-measured once Phase 3's matcher is in place.

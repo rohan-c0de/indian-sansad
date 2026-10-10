@@ -200,7 +200,7 @@ def resolution_rate_below_target(
     Both rates are checked, and they are not the same check. The owner's
     decision of 2026-10-09 left the **automatic** rate at 94.78% -- already
     below SC-002's 95% -- with the published rate carried over the line to
-    96.26% by four maintainer assertions. So an automatic rate below target is
+    96.36% by four maintainer assertions. So an automatic rate below target is
     the KNOWN AND ACCEPTED state, raised as a NOTICE, while the published rate
     falling below target is a real regression against a met criterion.
 

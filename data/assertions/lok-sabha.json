@@ -3,7 +3,7 @@
   "_why_this_directory_is_outside_data_published": "data/published/ is a build output, git-ignored on main and rewritten wholesale on every refresh. An assertion is an INPUT that must survive that rewrite (plan.md -> Structure Decision; data-model.md: 'A manual assertion MUST survive subsequent refreshes and MUST NOT be overwritten by automatic matching').",
   "_fields_are_inside_fr_008": "name forms, member identity, constituency and state only. Confirming an identity needs more than a name, and all four attributes sit inside Principle V's permitted set.",
   "_provenance": "specs/001-resolved-metadata-layer/spike/spike-report.md -> 'Assertions -- four CONFIRMED BY OWNER, one DROPPED BY OWNER (2026-10-09)'. The spike's table is marked PROPOSED; only the rows the owner confirmed appear here. An unconfirmed row is not an assertion.",
-  "_measured_effect": "Automatic rate 94.78% (90,299/95,269). With these four: 96.26% (91,708/95,269) -- SC-002 met with 1.26 points of margin. Recovered 1,409 questions, computed by re-walking all 95,269 records, NOT by summing the per-form figures (naive sum 1,572; a question resolves only when ALL its askers do, FR-003).",
+  "_measured_effect": "Automatic rate 94.78% (90,298/95,268). With these four: 96.36% (91,796/95,268) -- SC-002 met with +1.36 points of margin. Recovered 1,498 questions: 1,411 where one assertion unblocks the question, plus 87 co-asked by TWO of the four, which resolve only when both are applied. Computed by re-walking every record, NOT by summing per-form figures (a question resolves only when ALL its askers do, FR-003). Denominator is 95,268 distinct questions, not 95,269 records: the upstream serves one record twice and it is reduced to one, declared as a known gap (FR-013).",
   "_dropped_by_owner": "Row 4, 'Poonam (Mahajan) Vajendla Rao' (292 questions blocked), was DROPPED BY THE OWNER. No reason was recorded by the owner and none is inferred. The form stays among the residual forms, now 21. It is listed in sansad.resolve.assertions.DROPPED_BY_OWNER so re-adding it cannot happen by accident.",
   "house": "lok-sabha",
   "confirmed_on": "2026-10-09",
@@ -14,8 +14,9 @@
       "roster_name_form": "Tatkare Sunil Dattatrey",
       "constituency": "Raigad",
       "state": "Maharashtra",
-      "questions_blocked": 513,
-      "basis": "Token reorder plus one spelling variant (Dattatray / Dattatrey); every token corresponds."
+      "questions_blocked": 528,
+      "basis": "Token reorder plus one spelling variant (Dattatray / Dattatrey); every token corresponds.",
+      "name_instances": 528
     },
     {
       "name_as_written": "Ganesan Selvam",
@@ -23,8 +24,9 @@
       "roster_name_form": "Selvam G",
       "constituency": "Kancheepuram",
       "state": "Tamil Nadu",
-      "questions_blocked": 414,
-      "basis": "The roster's G initial expands to Ganesan, reordered. Rests on that expansion, which the roster does not spell out."
+      "questions_blocked": 443,
+      "basis": "The roster's G initial expands to Ganesan, reordered. Rests on that expansion, which the roster does not spell out.",
+      "name_instances": 443
     },
     {
       "name_as_written": "D.K. Suresh",
@@ -32,8 +34,9 @@
       "roster_name_form": "Doddalahalli Kempegowda Suresh",
       "constituency": "Bangalore Rural",
       "state": "Karnataka",
-      "questions_blocked": 372,
-      "basis": "D.K. = D(oddalahalli) K(empegowda); both initials match and the only Suresh in a Bangalore constituency this term."
+      "questions_blocked": 395,
+      "basis": "D.K. = D(oddalahalli) K(empegowda); both initials match and the only Suresh in a Bangalore constituency this term.",
+      "name_instances": 396
     },
     {
       "name_as_written": "V. Kalanidhi",
@@ -41,8 +44,11 @@
       "roster_name_form": "Kalanidhi Veeraswamy",
       "constituency": "Chennai North",
       "state": "Tamil Nadu",
-      "questions_blocked": 273,
-      "basis": "V. = V(eeraswamy), reordered; the only Kalanidhi in the term."
+      "questions_blocked": 296,
+      "basis": "V. = V(eeraswamy), reordered; the only Kalanidhi in the term.",
+      "name_instances": 296
     }
-  ]
+  ],
+  "_corrected_2026_10_09": "These figures replace 96.26% / 91,708 / 1,409, which UNDERCOUNTED. The original recount scored one asserted form at a time and so could not reach the 87 questions that two asserted forms both block. 2 questions of the 89-question difference are NOT explained: the code that produced 1,409 was never committed. Verified by tools/check_equivalence.py; see specs/001-resolved-metadata-layer/spike/matcher-equivalence.md.",
+  "_questions_blocked_definition": "`questions_blocked` below is the number of question RECORDS in the 17th Lok Sabha in which the form appears as an asker, re-measured 2026-10-09 over all 60,549 records. It replaces the 513/414/372/273 column in spike-report.md, which is not reproducible under any definition measured. For reference, name INSTANCES (appearances in asker arrays) are 528/443/396/296 -- matching the spike's own correction worklist, whose column is headed 'instances blocked' -- and `D.K. Suresh` differs between the two because one question lists that form twice. A third quantity, questions where the form is the ONLY residual asker, is 437/352/366/256 and sums to 1,411."
 }
