@@ -187,22 +187,112 @@ def test_the_shell_loads_the_module_and_the_stylesheet_relatively() -> None:
     assert '<html lang="en">' in html
 
 
-def test_the_only_unbuilt_region_is_the_one_a_gate_stopped() -> None:
-    """T078 and T080 are built. T079 is NOT, and that is a measurement result
-    rather than unfinished work: showing the first 25 results for a common word
-    costs 4,348,529 B against T019's 4,183,979 B budget, and a two-word query
-    costs 7,236,751 B. The region has to say so on screen, because a blank
-    region reads as a bug and a missing one reads as a feature nobody wanted.
+def test_no_region_of_the_page_is_unbuilt() -> None:
+    """T078, T079 and T080 are all built now.
+
+    This test previously asserted the OPPOSITE for T079 -- that the region said
+    "Not built yet" on screen, because its measurement gate had failed. The
+    gate was then re-measured against the published search digest
+    (`spike/size-budget.md` -> T079: a common word at 3,999,739 B, -4.4% under
+    T019's budget) and the view was built, so the assertion is inverted rather
+    than deleted: a `data-task` marker or a "Not built yet" string reappearing
+    in the shell is a region that silently stopped working.
     """
     html = (WEB / "index.html").read_text(encoding="utf-8")
-    assert 'data-task="T079"' in html, "T079's region is not marked"
-    for built in ("T078", "T080"):
+    for built in ("T078", "T079", "T080"):
         assert f'data-task="{built}"' not in html, f"{built} is built; its region should be gone"
-    assert html.count("Not built yet") == 1
-    assert "measurement gate failed" in html
-    # The real containers the built views render into.
-    for node_id in ("profile-picker", "profile-result", "compare-picker", "compare-result"):
+    assert "Not built yet" not in html
+    assert "measurement gate failed" not in html
+    # The real containers the three built views render into.
+    for node_id in (
+        "profile-picker",
+        "profile-result",
+        "search-form-host",
+        "search-result",
+        "compare-picker",
+        "compare-result",
+    ):
         assert f'id="{node_id}"' in html, f"{node_id} is missing"
+
+
+def test_the_search_view_is_keyboard_operable_and_labelled() -> None:
+    """A search box reachable only by mouse is a search box most readers of a
+    public record cannot use.
+
+    Asserted on the code rather than the rendered page because no browser runs
+    here -- T082 drives the real thing. What is asserted is the shape that
+    makes it work: a real `<form>` (so Enter submits), a `<label>` bound to the
+    input by `htmlFor`, a submit button, and a politely-announced result
+    region.
+    """
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+    assert 'el("form", "search-form")' in body, "the search box is not a form"
+    assert 'form.addEventListener("submit"' in body, "Enter in the field would not search"
+    assert "event.preventDefault()" in body, "submitting would navigate; there is no server"
+    assert 'label.htmlFor = "search-query"' in body, "the input has no bound label"
+    assert 'input.id = "search-query"' in body
+    assert 'submit.type = "submit"' in body
+    # Announced politely: a reader who submits is told the outcome without
+    # focus being yanked out from under them.
+    assert 'result.setAttribute("role", "status")' in body
+    assert 'result.setAttribute("aria-live", "polite")' in body
+    assert 'input.setAttribute("aria-describedby", "search-help")' in body
+    # Focus after "Show 25 more" lands on the first NEW result.
+    assert "focusFrom" in body
+    assert "subject.tabIndex = -1" in body
+
+
+def test_the_result_order_is_rendered_from_the_code_not_retyped() -> None:
+    """The order sentence on screen and the comparator that produces it must be
+    one thing. `ORDER_STATEMENT` lives in `web/lib/search.js` beside the sort,
+    and the page renders it -- so the page cannot describe an order it does not
+    implement."""
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    assert "ORDER_STATEMENT" in app, "the page never renders the order statement"
+    assert 'el("p", "order-text", ORDER_STATEMENT)' in app
+    # And the sentence itself is not duplicated into the page or the shell.
+    for name in PAGE_FILES:
+        if name == "lib/search.js":
+            continue
+        text = (WEB / name).read_text(encoding="utf-8")
+        assert "Newest session first" not in text, f"{name} retypes the order statement"
+
+
+def test_no_match_is_labelled_near_identical_or_similar() -> None:
+    """Owner decision 2026-10-10. The published index carries no grade, so a
+    page that graded a match would present an unmeasured judgement as a
+    property of the data. Checked over every page file, code and prose alike --
+    the prohibition is on what a reader can be shown, so a comment proposing
+    the label is as much a problem as the label."""
+    forbidden = ("near-identical", "near identical", "most relevant", "best match", "closest match")
+    offenders = []
+    for name in PAGE_FILES:
+        text = (WEB / name).read_text(encoding="utf-8").lower()
+        for word in forbidden:
+            if word in text:
+                offenders.append(f"{name} contains {word!r}")
+    assert offenders == [], "a match grade reached the page: " + "; ".join(offenders)
+
+    # "similar" is checked separately: it is an ordinary English word, so the
+    # ban is on it being used ABOUT a result. Any occurrence at all in these
+    # files would need reading, so none is allowed and the exemption list is
+    # empty rather than unstated.
+    for name in PAGE_FILES:
+        text = (WEB / name).read_text(encoding="utf-8").lower()
+        assert "similar" not in text, f"{name} contains 'similar'"
+
+
+def test_the_search_view_renders_no_position_number() -> None:
+    """The results are an `<ol>` so a screen reader announces "3 of 25", but
+    the numbers are NOT shown: a visible 1, 2, 3 reads as a ranking, and
+    nothing here is ranked."""
+    css = (WEB / "style.css").read_text(encoding="utf-8")
+    block = css[css.index(".result-list {") :]
+    rule = block[: block.index("}")]
+    assert "list-style: none" in rule, "the result list shows its numbers"
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    assert 'el("ol", "result-list")' in app, "the list is not an ordered list"
 
 
 #: Every field the page reads out of manifest.json or coverage.jsonl. A value
@@ -412,11 +502,73 @@ def test_the_corrections_link_is_https_only_and_opened_safely() -> None:
     assert ".href = url" not in body, "the unchecked value reaches an href"
 
 
-def test_the_search_index_is_not_fetched_on_load() -> None:
-    """The laziness is asserted by the page itself at boot, not just intended."""
+def _function_body(source: str, name: str) -> str:
+    """One top-level function's body, by name.
+
+    Sliced from its signature to the next `}` in column 0 -- every top-level
+    function in `web/app.js` closes that way, and brace-counting through
+    template literals would need a lexer to be correct. Raises rather than
+    returning "" if the function is not found: a silently empty body would make
+    the assertions below pass by finding nothing.
+    """
+    match = re.search(rf"^(?:export )?(?:async )?function {re.escape(name)}\(", source, re.M)
+    assert match, f"{name}() is not defined in app.js"
+    rest = source[match.start() :]
+    end = re.search(r"^\}", rest[1:], re.M)
+    assert end, f"{name}() has no closing brace in column 0"
+    return rest[: end.end() + 1]
+
+
+def test_the_function_body_helper_actually_slices_a_function() -> None:
+    """The helper above is load-bearing for the laziness test: if it returned
+    the whole file, or nothing, that test would pass for the wrong reason."""
     app = (WEB / "app.js").read_text(encoding="utf-8")
-    assert "loadSearchIndex" not in app, "app.js must not load the index in this part"
-    assert "searchIndexRequested()" in app, "boot must assert the index is unrequested"
+    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+    boot = _function_body(body, "boot")
+    assert boot.startswith("export async function boot(")
+    assert "await bootViews(doc)" in boot, "the slice stopped short of the end of boot()"
+    assert "function bootViews" not in boot, "the slice ran past the end of boot()"
+    assert len(boot) < len(body) / 2, "the slice is most of the file; it is not slicing"
+    views = _function_body(body, "bootViews")
+    assert "buildCompareView(doc)" in views
+    assert "buildSearchView(doc)" in views
+    assert "function resultItem" not in views, "the slice ran past the end of bootViews()"
+
+
+def test_no_search_file_is_fetched_on_load() -> None:
+    """The laziness is asserted by the page itself at boot, not just intended.
+
+    This test used to assert `loadSearchIndex` appeared nowhere in `app.js`,
+    which was right while T079 was unbuilt and is now the wrong shape: the
+    search handler has to call it. What survives is the part that matters --
+    the index is loaded from the SEARCH PATH and from nowhere else, and boot
+    asserts that no search file has been touched before it renders.
+
+    `searchAssetsRequested`, not `searchIndexRequested`: the narrower check
+    would pass while a digest was already in flight, and a digest is up to
+    1,573,939 B.
+    """
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+
+    assert "searchAssetsRequested()" in body, "boot must assert NO search file is requested"
+    assert "a search file was requested during boot" in body, (
+        "the boot assertion has lost its message"
+    )
+
+    # The three lazy loaders are called from the search path only. `boot` and
+    # `bootViews` run on page load; neither may name one.
+    for loader in ("loadSearchIndex", "loadAskerNames", "loadSearchDigest"):
+        assert loader in body, f"{loader} is never called; the view cannot work"
+    for loader in ("loadSearchIndex", "loadAskerNames", "loadSearchDigest"):
+        for runs_on_load in ("boot", "bootViews"):
+            called = _function_body(body, runs_on_load)
+            assert loader not in called, f"{runs_on_load}() calls {loader}; it must be lazy"
+
+    # And the index is loaded in exactly one place, so there is one thing to
+    # reason about when asking what a first search costs.
+    assert body.count("loadSearchIndex(") == 1, "loadSearchIndex is called more than once"
+    assert body.count("loadAskerNames(") == 1
 
 
 # ---------------------------------------------------------------------------

@@ -67,6 +67,7 @@ SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 
 _OFF_HOST = re.compile(r"(?:https?:)?//[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _BASE = re.compile(r"""PUBLISHED_BASE\s*=\s*["']([^"']+)["']""")
+_DIGEST_BASE = re.compile(r"""DIGEST_BASE\s*=\s*["']([^"']+)["']""")
 _ENTRY = re.compile(r"""^\s*([A-Za-z][A-Za-z0-9]*)\s*:\s*["']([^"']+)["'],?\s*$""", re.M)
 
 
@@ -81,6 +82,22 @@ def strip_comments(text: str, *, html: bool = False) -> str:
             continue
         kept.append(line)
     return "\n".join(kept)
+
+
+def digest_base() -> str:
+    """The per-session search-digest prefix, read out of `web/lib/fetch.js`.
+
+    The 21 digests are NOT entries in `PUBLISHED_FILES`, deliberately: which
+    ones a search fetches depends on which sessions contain a match, and most
+    searches fetch one. Listing 21 URLs here would read as 21 requests. So the
+    prefix is read and the set is reported as a pattern with its real bytes
+    beside it.
+    """
+    source = (WEB / "lib" / "fetch.js").read_text(encoding="utf-8")
+    match = _DIGEST_BASE.search(source)
+    if not match:
+        raise SystemExit("could not find DIGEST_BASE in web/lib/fetch.js")
+    return match.group(1)
 
 
 def declared_urls() -> list[tuple[str, str]]:
@@ -103,6 +120,10 @@ def eager_names(declared: list[tuple[str, str]]) -> set[str]:
     fetched = set()
     for name, _ in declared:
         # app.js calls the named helper, e.g. fetchCoverage for `coverage`.
+        # The LAZY files have a `loadX` helper instead and are deliberately
+        # not matched here: `searchIndex` and `askerNames` are fetched on the
+        # first search, not on load, and a `loadX` call in app.js is what
+        # makes that true rather than what breaks it.
         helper = "fetch" + name[0].upper() + name[1:]
         if helper in app:
             fetched.add(name)
@@ -139,14 +160,43 @@ def main() -> int:
             problems.append(f"{name}: {url} is not a relative path")
         if url.startswith("//") or re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", url):
             problems.append(f"{name}: {url} is absolute or protocol-relative")
+    # The per-session digests, as a pattern with measured bytes.
+    base = digest_base()
+    digest_dir = published / base
+    digest_files = sorted(digest_dir.glob("*.jsonl")) if digest_dir.is_dir() else []
+    digest_sizes = [path.stat().st_size for path in digest_files]
+    pattern = f"{PUBLISHED_BASE_PREFIX}{base}<house>-<term>-<session>.jsonl"
+    if digest_sizes:
+        shown = f"{max(digest_sizes):,}"
+    else:
+        shown = "NOT BUILT"
+        missing = True
+    print(f"{'per search':<11}{'searchDigest':<17}{shown:>12}  {pattern}")
+    if not pattern.startswith("./"):
+        problems.append(f"searchDigest: {pattern} is not a relative path")
+
     print("-" * 92)
-    print(f"{len(declared)} URL(s): {len(eager)} on load, {len(declared) - len(eager)} on demand")
+    print(
+        f"{len(declared)} URL(s): {len(eager)} on load, {len(declared) - len(eager)} on demand, "
+        f"plus 1 pattern over {len(digest_files)} per-session digest file(s)"
+    )
     if missing:
         print("  (sizes are from the locally built dataset; some files are NOT BUILT)")
     else:
+        median_digest = sorted(digest_sizes)[len(digest_sizes) // 2] if digest_sizes else 0
+        largest_digest = max(digest_sizes) if digest_sizes else 0
         print(f"  on load  : {eager_bytes:>12,} B   = {eager_bytes / 1048576:.2f} MiB")
         print(f"  on demand: {lazy_bytes:>12,} B   = {lazy_bytes / 1048576:.2f} MiB")
-        print(f"  all      : {eager_bytes + lazy_bytes:>12,} B")
+        print(f"  all      : {eager_bytes + lazy_bytes:>12,} B   (no digest)")
+        if digest_sizes:
+            print(
+                f"  digests  : {len(digest_sizes)} file(s), median {median_digest:,} B, "
+                f"largest {largest_digest:,} B, total {sum(digest_sizes):,} B"
+            )
+            print(
+                f"  a FIRST SEARCH fetching one median digest: "
+                f"{eager_bytes + lazy_bytes + median_digest:>12,} B"
+            )
         print()
         print("  Against T019's budgets (spike/size-budget.md):")
         print(
@@ -154,9 +204,20 @@ def main() -> int:
             f"{100 * eager_bytes / 904231 - 100:+.1f}%"
         )
         print(
-            f"    with subject search, 4,183,979 B   -> on load + index is "
+            f"    with subject search, 4,183,979 B   -> on load + index + names is "
             f"{100 * (eager_bytes + lazy_bytes) / 4183979 - 100:+.1f}%"
         )
+        if digest_sizes:
+            first = eager_bytes + lazy_bytes + median_digest
+            print(f"    same, plus one median digest        -> {100 * first / 4183979 - 100:+.1f}%")
+            worst = eager_bytes + lazy_bytes + largest_digest + median_digest
+            print(
+                f"    two sessions (largest + median)     -> "
+                f"{100 * worst / 4183979 - 100:+.1f}%   <- the accepted overrun"
+            )
+        print()
+        print("  These are FILE SIZES, not a measurement of a page load. T083 measures")
+        print("  the real thing from a browser network log.")
     print()
     print("Outbound LINKS (not requests -- nothing is fetched unless clicked):")
     print("  manifest.project_url, rendered in the footer from the published manifest")

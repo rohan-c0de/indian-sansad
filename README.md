@@ -76,18 +76,21 @@ published to GitHub.**
   `make audit-fields` are clean. No count is quoted here on purpose: a hand-typed
   figure beside a growing suite went stale twice in two days, and a number nobody
   re-measures is worse than no number.
+- **All three reader-page views are built, and the page has been driven in a real browser.**
+  The shell, the stylesheet, the fetch layer, the coverage display, the licence and
+  source-terms footer, the ministry-profile view (T078), **subject search (T079)**,
+  two-ministry comparison (T080), `make serve-local` (T081), `make test-page` (T082) and
+  `make report` (T085) are done. T079's gate was **re-measured against the published search
+  digest and passed**, where the earlier attempt through the `by-session` partitions had
+  failed it; the figures are in
+  [`spike/size-budget.md`](specs/001-resolved-metadata-layer/spike/size-budget.md) → *T079*
+  and → *T083*, which is where they stay rather than being retyped here — the last two
+  figures quoted in this bullet went stale within a day. The remaining first-load unknown is
+  the real **compressed** figure, which can only be read from the live site's response
+  headers once Pages is serving the `published` branch.
 
 ### Not done
 
-- **One of the reader page's views is missing, and that is a measurement result rather than
-  unfinished work.** The shell, the stylesheet, the fetch layer, the coverage display, the
-  licence and source-terms footer, the ministry-profile view (T078), two-ministry comparison
-  (T080) and `make serve-local` (T081) are all done. **Subject search (T079) is NOT** — it
-  **STOPPED at its own gate**: rendering the first 25 results for a common word costs
-  4,348,529 B against T019's 4,183,979 B first-load budget, and a two-word query 7,236,751 B.
-  Its dataset side is built and published (the per-session digest and the asker-name lookup);
-  the view is not, and the page shows one region saying so. The browser proof and the real
-  first-load measurement (T082–T085) have not been run.
 - **The refresh workflow has never run on GitHub.** `.github/workflows/refresh.yml` is written
   and statically checked (`make yamllint`, 0 findings) but unproven: the daily schedule, the
   force-push to the `published` branch and the 60-day keep-alive are all unobservable locally.

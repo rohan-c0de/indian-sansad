@@ -24,6 +24,8 @@
  * font, no analytics, no module specifier that is not a relative path.
  */
 
+import { digestFileName } from "./format.js";
+
 /** Published dataset root, relative to the page. Owner decision 2026-10-10. */
 export const PUBLISHED_BASE = "./data/published/";
 
@@ -164,10 +166,9 @@ export async function fetchNdjson(relativePath, options = {}) {
 /* The named published files. Spelled once, here.                           */
 /* ------------------------------------------------------------------------ */
 
-/* Exactly what this page can request -- nothing dead, nothing speculative.
- * T078/T079/T080 add their own entries when they are built; an unused entry
- * here would overstate the page's request surface, and that surface is the
- * thing T082 asserts against a real network log. */
+/* Exactly what this page can request -- nothing dead, nothing speculative. An
+ * unused entry here would overstate the page's request surface, and that
+ * surface is the thing T082 asserts against a real network log. */
 export const PUBLISHED_FILES = Object.freeze({
   manifest: "manifest.json",
   coverage: "coverage.jsonl",
@@ -178,13 +179,32 @@ export const PUBLISHED_FILES = Object.freeze({
   // replaces the 842,496 B one-by-ministry file T019 budgeted for.
   ministryProfile: "aggregates/ministry-profile.jsonl",
   ministries: "reference/ministries.jsonl",
+  // T079, both fetched on the FIRST SEARCH only -- see below.
   searchIndex: "search/subject-index.json",
+  askerNames: "search/asker-names.jsonl",
 });
 
+/* The 21 per-session search digests are NOT in the object above, because they
+ * are not a fixed list of files: which ones a search fetches depends on which
+ * sessions contain a match, and most searches fetch one. They are a PATTERN,
+ * declared here and printed as one by `tools/list_page_urls.py`. */
+export const DIGEST_BASE = "search/digest/";
+
+/** The published path of one session's digest. `lok-sabha/17/4` ->
+ * `./data/published/search/digest/lok-sabha-17-4.jsonl`. */
+export function digestRelativePath(sessionId) {
+  return DIGEST_BASE + digestFileName(sessionId);
+}
+
 /** Every URL this page can request, as it would be resolved. For the record,
- * and for `tools/list_page_urls.py` to print without running a browser. */
+ * and for `tools/list_page_urls.py` to print without running a browser. The
+ * digest pattern is appended as a pattern, not as 21 entries: listing them
+ * all would read as 21 requests a page load makes, and a search makes one. */
 export function requestableUrls() {
-  return Object.values(PUBLISHED_FILES).map(publishedPath);
+  return [
+    ...Object.values(PUBLISHED_FILES).map(publishedPath),
+    publishedPath(DIGEST_BASE) + "<house>-<term>-<session>.jsonl",
+  ];
 }
 
 export const fetchManifest = (o) => fetchJson(PUBLISHED_FILES.manifest, o);
@@ -208,6 +228,11 @@ export const fetchMinistries = (o) => fetchNdjson(PUBLISHED_FILES.ministries, o)
  * the first resolves must share ONE request, not race two.
  */
 let searchIndexPromise = null;
+let askerNamesPromise = null;
+/** One memoised promise per session id. A session fetched for page 1 is not
+ * refetched for page 2, and two concurrent searches over the same session
+ * share one request. */
+const digestPromises = new Map();
 
 export function loadSearchIndex(options = {}) {
   if (searchIndexPromise === null) {
@@ -220,13 +245,63 @@ export function loadSearchIndex(options = {}) {
   return searchIndexPromise;
 }
 
+/** `search/asker-names.jsonl`, fetched with the index on the first search.
+ * 92,713 B against the index's 2,484,758 B: it rides along rather than being
+ * a second round trip, because no result can be shown without it. */
+export function loadAskerNames(options = {}) {
+  if (askerNamesPromise === null) {
+    askerNamesPromise = fetchNdjson(PUBLISHED_FILES.askerNames, options).catch((error) => {
+      askerNamesPromise = null;
+      throw error;
+    });
+  }
+  return askerNamesPromise;
+}
+
+/**
+ * One session's search digest.
+ *
+ * Called ONLY for a session the index says contains a match, and only when a
+ * page of results actually needs it -- `web/lib/search.js` ->
+ * `createResultSet` decides, and this just fetches. That is the whole of
+ * T079's measured saving: `spike/size-budget.md` records 1,016,286 B for one
+ * digest against 1,863,771 B for the median partition it replaces.
+ */
+export function loadSearchDigest(sessionId, options = {}) {
+  const key = String(sessionId);
+  if (!digestPromises.has(key)) {
+    const promise = fetchNdjson(digestRelativePath(key), options).catch((error) => {
+      digestPromises.delete(key);
+      throw error;
+    });
+    digestPromises.set(key, promise);
+  }
+  return digestPromises.get(key);
+}
+
 /** Whether the index has been requested yet. For tests and for the page's own
  * "not loaded" state; never used to decide whether to fetch. */
 export function searchIndexRequested() {
   return searchIndexPromise !== null;
 }
 
-/** Test seam only: forget that the index was requested. */
+/** Whether ANY search file has been requested -- the index, the name lookup
+ * or a digest. `boot()` asserts this is false, which is the assertion that
+ * keeps a visitor who never searches from paying for search. The narrower
+ * `searchIndexRequested` would pass while a digest was already in flight. */
+export function searchAssetsRequested() {
+  return searchIndexPromise !== null || askerNamesPromise !== null || digestPromises.size > 0;
+}
+
+/** Which session digests have been requested. For tests, and for the page to
+ * report what a search actually cost. */
+export function requestedDigests() {
+  return [...digestPromises.keys()];
+}
+
+/** Test seam only: forget every search request. */
 export function resetSearchIndex() {
   searchIndexPromise = null;
+  askerNamesPromise = null;
+  digestPromises.clear();
 }
