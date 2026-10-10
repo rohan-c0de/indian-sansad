@@ -887,3 +887,44 @@ figure is 96.26% (91,708)** — 283 questions fewer.
 **Cost**: 4 × the measured 3-minute median = **12 minutes**. The remaining 21 residual forms are
 optional; correcting all of them would reach 100.00%.
 
+
+---
+
+# NOTE — a latent defect in `spike/resolve_rate.py`, found 2026-10-09 during T046
+
+**Date**: 2026-10-09 · **Found by**: T046 (`src/sansad/resolve/match.py`), while porting this
+script's tier order into `src/`.
+
+**The defect.** In `resolve_form`, the exact, normalised and normalised-reordered tiers call
+`fallback(...)` on an ambiguous result. `def fallback` appears **below** those three call sites,
+inside the same function, so `fallback` is a local name that is not yet bound when they run.
+Python raises rather than falling back to an enclosing scope. VERIFIED by running the same
+construction in isolation:
+
+```
+UnboundLocalError: cannot access local variable 'fallback' where it is not associated with a value
+```
+
+The approximate tier is unaffected — its `fallback` calls sit after the definition.
+
+**Every figure in this report stands.** The measured runs completed and produced the aggregates
+recorded above, which they could not have done had any of those three paths executed. So **no
+name form in the 95,269-question window reached ambiguity at the exact, normalised or
+normalised-reordered tier** — consistent with the `ambiguous` column being **0** in every table
+in this report, for both terms and both candidate pools. The defect is in an unreached branch.
+It is recorded here anyway: "a failure you didn't capture is a data point you destroyed", and a
+future run on different data would hit it.
+
+**What it means for the containment tier's measured gain.** The tier was reachable only from the
+approximate tier's failure paths during measurement, which is where all 19 of its matches came
+from. The **+6.31-point holdout gain and the 90.64% → 94.78% window figures are therefore
+measurements of the tier as it actually ran**, not of a partially-disabled version of it.
+
+**Fixed in `src/`.** `src/sansad/resolve/match.py` implements the intended behaviour: the three
+deterministic tiers do reach the containment fallback on an ambiguous result. The consequence is
+narrow and worth stating plainly — the production matcher can resolve a form on which this
+script would have raised. That is a difference in *reachable* behaviour, not in any figure
+published here.
+
+**So T046 is "as this script, plus that fix", not "exactly as this script".** `tasks.md` T046
+carries the same correction.
