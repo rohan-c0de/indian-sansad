@@ -228,7 +228,15 @@ def test_the_published_row_carries_exactly_the_contracted_fields(constituencies)
     for row in rows:
         assert tuple(row) == PUBLISHED_FIELDS
         for rep in row["representations"]:
-            assert tuple(rep) == ("member_id", "start_date", "end_date", "term_number")
+            assert tuple(rep) == (
+                "member_id",
+                "member_name",
+                "party",
+                "sitting_status",
+                "term_number",
+                "start_date",
+                "end_date",
+            )
 
 
 def test_the_slug_copy_agrees_with_ministry_id_for():
@@ -249,3 +257,136 @@ def test_an_unnameable_seat_is_not_given_a_state_prefixed_id():
     """A name that slugs to nothing has no identity to prefix."""
     assert constituency_id_for("", "State Alpha") == NOT_STATED
     assert constituency_id_for("!!!", "State Alpha") == NOT_STATED
+
+
+# ---------------------------------------------------------------------------
+# The three copied member fields (owner decision 2026-10-10)
+#
+# A representation carries the member's name, party and sitting status so the
+# page can answer US3 scenario 1 from this set instead of fetching the 3.4 MB
+# member set. A copy that can drift from its definition is worse than a second
+# fetch, so these are the tests that stop it drifting -- the owner's condition
+# on the decision.
+# ---------------------------------------------------------------------------
+def test_every_carried_name_and_party_equals_the_member_record(members, constituencies):
+    """The owner's condition, over the fixture: this always runs."""
+    by_member = {m.member_id: m for m in members}
+    checked = 0
+    for seat in constituencies:
+        for rep in seat.representations:
+            member = by_member[rep.member_id]
+            assert rep.member_name == member.canonical_name, (
+                f"{rep.member_id}: carried name {rep.member_name!r} != "
+                f"{member.canonical_name!r} on the member record"
+            )
+            assert rep.party == member.party, (
+                f"{rep.member_id}: carried party {rep.party!r} != {member.party!r}"
+            )
+            assert rep.sitting_status == str(member.sitting_status)
+            checked += 1
+    assert checked > 0, "no representation was checked"
+
+
+def test_a_carried_party_prefers_the_term_s_own_value(members):
+    """`Term.party` first, the member's as the fallback.
+
+    Verified 2026-10-10 that the two are identical for all 1,103 in-window
+    member-terms, so this asserts the PRECEDENCE on a constructed case rather
+    than on the real data -- a member who changed party between terms is an
+    Edge Case the data model names, and if the roster ever records one the set
+    must follow the term.
+    """
+    from dataclasses import replace
+
+    member = next(m for m in members if m.member_id == "fx-c003")
+    terms = tuple(
+        replace(term, party="Party Changed") if term.number == 18 else term for term in member.terms
+    )
+    changed = replace(member, terms=terms)
+
+    seats = constituencies_from([changed], window=WINDOW)
+    reps = {r.term_number: r for r in seats[0].representations}
+    assert reps[17].party == member.party
+    assert reps[18].party == "Party Changed"
+
+
+def test_nothing_outside_the_fr_008_set_is_carried():
+    """The bound that makes the copy permissible rather than merely convenient."""
+    from dataclasses import fields
+
+    from sansad.model.constituency import Representation
+    from sansad.model.member import PUBLISHED_FIELDS as MEMBER_FIELDS
+
+    carried = {f.name for f in fields(Representation)}
+    # The representation's own fields, which are about the representation.
+    own = {"member_id", "term_number", "start_date", "end_date"}
+    copied = carried - own
+    assert copied == {"member_name", "party", "sitting_status"}
+    # Each copied name maps to a field the Member set already publishes.
+    equivalent = {
+        "member_name": "canonical_name",
+        "party": "party",
+        "sitting_status": "sitting_status",
+    }
+    for name in copied:
+        assert equivalent[name] in MEMBER_FIELDS, (
+            f"{name} has no counterpart in the FR-008 member field set"
+        )
+
+
+# ---------------------------------------------------------------------------
+# The same assertion against the BUILT dataset -- the cross-file check
+# ---------------------------------------------------------------------------
+PUBLISHED = Path(__file__).resolve().parents[2] / "data" / "published"
+
+
+def _published(stem: str) -> list[dict]:
+    path = PUBLISHED / stem
+    if not path.is_file():
+        pytest.skip(f"{stem} not built -- NOT AUDITED, not a pass. Run `make refresh`.")
+    return [
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
+
+
+def test_the_published_copy_equals_the_published_member_record():
+    """Over the real set: 545 seats, 1,103 representations, 5,426 member rows.
+
+    This is the one the owner asked for -- `reference/constituencies.jsonl`
+    against `reference/members.jsonl`, as published, not as built in memory.
+    The fixture test above proves the rule; this proves the artefact.
+    """
+    seats = _published("reference/constituencies.jsonl")
+    members = {m["member_id"]: m for m in _published("reference/members.jsonl")}
+    assert seats, "the constituency set is empty"
+
+    checked = 0
+    for seat in seats:
+        for rep in seat["representations"]:
+            member = members.get(rep["member_id"])
+            assert member is not None, (
+                f"{rep['member_id']} is on a representation but not in the member set"
+            )
+            assert rep["member_name"] == member["canonical_name"]
+            assert rep["party"] == member["party"]
+            assert rep["sitting_status"] == member["sitting_status"]
+            checked += 1
+    assert checked > 1000, f"only {checked} representations were checked"
+
+
+def test_the_published_set_is_bounded_to_the_window_and_the_states_separated():
+    seats = _published("reference/constituencies.jsonl")
+    terms = {r["term_number"] for s in seats for r in s["representations"]}
+    assert terms == set(WINDOW), f"out-of-window terms published: {sorted(terms - set(WINDOW))}"
+
+    ids = [s["constituency_id"] for s in seats]
+    assert len(set(ids)) == len(ids)
+    # Every seat's id is reproducible from its own name and state.
+    for seat in seats:
+        assert seat["constituency_id"] == constituency_id_for(seat["name"], seat["state"])
+
+    # The three repeated names are separate rows with distinct states.
+    for name in ("Aurangabad", "Hamirpur", "Maharajganj"):
+        rows = [s for s in seats if s["name"] == name]
+        assert len(rows) == 2, f"{name}: expected two seats, got {len(rows)}"
+        assert len({s["state"] for s in rows}) == 2

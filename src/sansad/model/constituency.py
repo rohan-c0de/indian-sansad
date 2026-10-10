@@ -80,14 +80,54 @@ class Representation:
 
     A pair, not a single current holder: "MUST list both with their periods,
     not merged."
+
+    **The member's name, party and sitting status ride here** (owner decision
+    2026-10-10). They are a copy -- `reference/members.jsonl` is where they are
+    defined -- and the copy exists because the page's entry point for the state
+    and constituency axes is this set, and a representation that carried only a
+    `member_id` could not answer US3 scenario 1, "listed with their party and
+    term", without the 3.4 MB member set. Measured: 887 members are reachable
+    across the window's 545 seats; 796 have a name in `search/asker-names.jsonl`
+    but **91 asked no question in the window**, so for them `reference/members`
+    was the only published source -- and they appear on **89 of the 545 seats**.
+    Carrying the three fields costs **+104,983 B** and takes the view's first
+    fetch from 3,595,037 B to 252,226 B.
+
+    **Nothing outside the FR-008 set is here**, and that bound is what makes the
+    copy permissible rather than merely convenient: name, party and sitting
+    status are three of the seven published member fields, and the same three
+    reasoning applies that `search/asker-names.jsonl` was published under -- a
+    field is copied into a page-serving file when the page actually shows it.
+    `tests/contract/test_constituency_reference.py` asserts every carried value
+    equals the one in `reference/members.jsonl`, so the copy cannot drift from
+    the definition.
+
+    `sitting_status` is a MEMBER-level fact as of the last refresh, not a fact
+    about this term -- a former member's historical representation still reads
+    `former`. The page must say "as of" rather than implying the status belonged
+    to the term.
     """
 
     member_id: str
-    start_date: str
-    end_date: str | None = None
+    #: `Member.canonical_name`. The display form, not a name variant.
+    member_name: str = NOT_STATED
+    #: The term's own party where the source records one, else the member's.
+    #: Verified 2026-10-10: the two are identical for all 1,103 in-window
+    #: member-terms, so this is a copy today -- but a member who changed party
+    #: between terms is an Edge Case the data model names, and reading the
+    #: term's value first means the set improves by itself if the roster ever
+    #: records the change.
+    party: str = NOT_STATED
+    #: `Member.sitting_status`, as of the last refresh. See the class docstring.
+    sitting_status: str = NOT_STATED
     #: Term number as the House numbers it, so a reader can see which of the
     #: two covered terms this representation belongs to.
     term_number: int | None = None
+    #: A declared gap, not an omission: see the `sansad.publish.reference`
+    #: module docstring. Defaulted so the published field order can put the
+    #: identity first; it has never been anything but NOT_STATED.
+    start_date: str = NOT_STATED
+    end_date: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -392,10 +392,19 @@ def constituencies_from(
 
     **An upstream limitation, recorded not worked around**: the roster gives one
     constituency per member, and `Term.constituency` is a copy of it -- verified,
-    0 of 9,986 member-terms differ. So a member who moved seats between terms
-    would be recorded by the upstream against one seat only, and this function
-    cannot see the move. The term's own value is read first anyway, so the set
-    improves by itself if the roster ever carries per-term seats.
+    0 of 9,986 member-terms differ. The same holds for `Term.party` and
+    `Term.state`: 0 of the 1,103 in-window member-terms differ from the member's
+    own value. So a member who moved seat, party or state between terms would be
+    recorded by the upstream against one value only, and this function cannot
+    see the change. Each term's own value is read FIRST anyway, so the set
+    improves by itself if the roster ever records one.
+
+    **Each representation also carries the member's name, party and sitting
+    status** (owner decision 2026-10-10) -- three FR-008 fields, copied so the
+    page can answer US3 scenario 1 from this set instead of fetching the 3.4 MB
+    member set. `Representation`'s docstring carries the measurement and the
+    reasoning; `tests/contract/test_constituency_reference.py` pins every copied
+    value to `reference/members.jsonl`.
     """
     terms_in_window = frozenset(int(number) for number in window)
     if not terms_in_window:
@@ -428,11 +437,19 @@ def constituencies_from(
                     "so this is a slug collision, not a repeated name."
                 )
             reps: dict[tuple[str, int], Representation] = entry["reps"]  # type: ignore[assignment]
+            party = term.party if term.party and term.party != NOT_STATED else member.party
             reps[(member.member_id, term.number)] = Representation(
                 member_id=member.member_id,
+                # A COPY of three FR-008 fields, so the page's entry point for
+                # this axis does not need the 3.4 MB member set. See
+                # `Representation`'s docstring for the measurement and the
+                # bound; a contract test pins every value to the member record.
+                member_name=member.canonical_name or NOT_STATED,
+                party=(party or NOT_STATED),
+                sitting_status=str(member.sitting_status),
+                term_number=term.number,
                 start_date=term.start_date,
                 end_date=term.end_date,
-                term_number=term.number,
             )
 
     out: list[Constituency] = []

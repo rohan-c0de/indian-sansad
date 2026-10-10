@@ -77,6 +77,7 @@ from sansad.resolve.assertions import load_assertions, load_ministry_renames
 from sansad.signals.alerts import SignalLog, ingestion_failure
 from sansad.views.composition import compose
 from sansad.views.ministry_profile import ministry_profiles
+from sansad.views.state_subjects import state_subjects, states_by_member
 from sansad.views.subject_trends import subject_trends
 
 __all__ = ["main", "run_refresh"]
@@ -375,12 +376,20 @@ def run_refresh(
     # has nothing to check against.
     resolution_records = [record for result in resolved_by_term for record in result.records]
     resolution_files = write_both(out, RESOLUTION_STEM, rows_for(resolution_records))
+
+    # The window's seats, built ONCE and used twice: as the published
+    # constituency reference set, and as the authority on which state a member
+    # sits for when `state-subjects` is tallied below. Two builds could not
+    # disagree today, but the page reaches a state's members through this set,
+    # so the aggregate and the page must be reading one definition.
+    seats = constituencies_from(members, window=WINDOW_TERMS)
+
     reference = write_reference_sets(
         out,
         members=sorted(members, key=lambda m: m.member_id),
         ministries=[registry.ministries[k] for k in sorted(registry.ministries)],
         sessions=sessions_from(published_questions),
-        constituencies=constituencies_from(members, window=WINDOW_TERMS),
+        constituencies=seats,
     )
 
     # --- User Story 4 aggregates (T065-T067) --------------------------------
@@ -412,11 +421,16 @@ def run_refresh(
         max_askers=max_askers,
     )
     profiles = ministry_profiles(published_questions)
+    # T088 -- the state subject summary, over `seats` above. See
+    # `states_by_member` for why the seat set rather than `Member.state` is the
+    # authority on which state a member sits for.
+    states = state_subjects(published_questions, member_states=states_by_member(seats))
     aggregates = write_aggregates(
         out,
         compositions=compositions,
         trends=trends,
         profiles=profiles,
+        state_subjects=states,
         unresolved=unresolved_count,
         partly_resolved=partly_resolved_count,
         co_asked=co_asked_count,
@@ -426,7 +440,11 @@ def run_refresh(
         f"refresh: aggregates -- composition {aggregates.records['composition']:,} row(s) "
         f"for {len(compositions)} term(s); subject-trends "
         f"{aggregates.records['subject-trends']:,} row(s); ministry-profile "
-        f"{aggregates.records['ministry-profile']:,} row(s)"
+        f"{aggregates.records['ministry-profile']:,} row(s); state-subjects "
+        f"{aggregates.records['state-subjects']:,} row(s) over "
+        f"{len(states.state_totals)} state(s), top {states.top_n} each "
+        f"({states.unattributable:,} question(s) unattributable, "
+        f"{states.multi_state:,} counted for more than one state)"
     )
 
     # T071 -- the subject-search index. Published so in-browser subject search
