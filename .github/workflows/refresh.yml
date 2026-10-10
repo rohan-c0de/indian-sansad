@@ -62,10 +62,21 @@ concurrency:
 
 jobs:
   refresh:
-    runs-on: ubuntu-latest
+    # PINNED, not `ubuntu-latest`. GitHub's own annotation on run #1 reads
+    # "ubuntu-latest will migrate to Ubuntu 26 on 2026-10-19", and an image
+    # that changes under a 45-minute live-upstream job is one more variable
+    # between a red run and its cause. Bump this deliberately, with a run to
+    # look at, rather than finding out on a schedule.
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
 
     steps:
+      # NOT ACTED ON, recorded: run #1 carried GitHub's warning that
+      # `actions/checkout@v4` and `actions/setup-python@v5` run on Node 20,
+      # which is deprecated. The versions below are left as they are -- the
+      # bump is a separate change with its own run to look at, and it is not
+      # what broke run #1. `@v5`/`@v6` move to Node 24 and raise the minimum
+      # Actions runner version; neither changes an input this job passes.
       - name: Check out main
         uses: actions/checkout@v4
         with:
@@ -132,8 +143,27 @@ jobs:
           make guard
           make audit-fields
 
+      # Runs the tool DIRECTLY, not `make verify-joins`. Every Makefile target
+      # that reads the published dataset runs `$(VENV_PY)` -- `.venv/bin/python`
+      # -- and this job has no `.venv`: `Install` above installs into the
+      # setup-python interpreter, which is why `Refresh` calls
+      # `python -m sansad.cli` directly too.
+      #
+      # VERIFIED BROKEN on run #1, 2026-10-10: after the 42-minute live refresh
+      # and the field audit had both passed, `make verify-joins` failed in 0s
+      # with `.venv/bin/python: No such file or directory` (make Error 127), and
+      # because this step failed `Publish` was skipped -- 44m 25s of work
+      # discarded over a path that was never going to exist on a runner.
+      #
+      # The Makefile is deliberately NOT given a fallback to `$(PYTHON)`. Its
+      # whole no-silent-fallback rule is that a target which quietly runs on a
+      # different interpreter than the one `make setup` pinned is worse than one
+      # that refuses to start. CI names its own interpreter instead of asking
+      # the Makefile to guess.
       - name: Verify every published join is auditable
-        run: make verify-joins
+        run: |
+          set -eu -o pipefail
+          python tools/verify_joins.py data/published
 
       # (b) On success: force-push a SINGLE commit to the orphan branch
       # `published`, which GitHub Pages serves. The history is one commit deep
