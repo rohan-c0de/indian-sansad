@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`make composition TERM=n` -- quickstart.md scenario 8 (User Story 4).
+"""`make composition LS_TERM=n` -- quickstart.md scenario 8 (User Story 4).
 
 > **Expected**: category counts sum to that term's total membership. Members
 > with missing attributes appear under an explicit "not stated" category, never

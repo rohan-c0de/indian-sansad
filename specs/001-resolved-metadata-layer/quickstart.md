@@ -84,7 +84,7 @@ make extract CONSTITUENCY=<name>
 
 ## Scenario 8 — Composition totals reconcile (US4)
 
-**Run**: `make composition TERM=18`
+**Run**: `make composition LS_TERM=18`
 
 **Expected**: category counts sum to that term's total membership. Members with missing attributes appear under an explicit "not stated" category, never omitted.
 

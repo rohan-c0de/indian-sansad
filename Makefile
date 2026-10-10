@@ -246,15 +246,22 @@ extract:
 # -- the tool says so on its own output rather than picking a term silently.
 #
 # LS_TERM, not TERM: every interactive shell EXPORTS `TERM`, so a `TERM ?=`
-# here picks up `xterm-256color` from the environment whenever the caller does
-# not pass one. Measured on this machine -- `make composition` with no TERM
-# given fails with `argument --term: invalid int value: 'xterm-256color'`,
-# which is the same collision in the older target. That one is left as it is
-# rather than renamed in passing: `make composition TERM=18` is the documented
-# interface and a command-line variable overrides the environment, so it works
-# as documented and only the no-argument case is affected. Recorded here so the
-# next person reads it as a known collision rather than a new one.
+# picks up `xterm-256color` from the environment whenever the caller does not
+# pass one. MEASURED on this machine, before the rename below:
+#
+#   $ TERM=xterm-256color make composition
+#   show_composition.py: error: argument --term: invalid int value: 'xterm-256color'
+#   make: *** [composition] Error 2
+#
+# `make composition` carried the same collision and was left alone when this
+# target was written, on the reasoning that `TERM=18` on the command line
+# overrides the environment so only the no-argument case was affected.
+# OWNER DECISION 2026-10-10: rename it too. One variable name for the same
+# thing in both targets, and the no-argument case says what is missing instead
+# of reporting the caller's terminal type as a bad integer.
 # --------------------------------------------------------------------------
+# Used by BOTH `report` (optional -- narrows a session range to one term) and
+# `composition` (required).
 LS_TERM ?=
 
 report:
@@ -283,7 +290,9 @@ lookup:
 # --------------------------------------------------------------------------
 # composition -- T068 / quickstart.md scenario 8 (US4).
 #
-#   make composition TERM=18
+#   make composition LS_TERM=18
+#
+# LS_TERM, not TERM -- see the note above `report`.
 #
 # Reads the PUBLISHED aggregate rather than recomputing, and prints the
 # reconciliation category by category -- the scenario's assertion is that the
@@ -293,7 +302,12 @@ lookup:
 # --------------------------------------------------------------------------
 composition:
 	@set -eu -o pipefail; \
-	 "$(VENV_PY)" tools/show_composition.py --term "$(TERM)" \
+	 if [[ -z "$(LS_TERM)" ]]; then \
+	   echo "make composition: LS_TERM is required."; \
+	   echo "  e.g. make composition LS_TERM=18"; \
+	   exit 1; \
+	 fi; \
+	 "$(VENV_PY)" tools/show_composition.py --term "$(LS_TERM)" \
 	   --published "$(REPO_ROOT)/data/published"
 
 # --------------------------------------------------------------------------
