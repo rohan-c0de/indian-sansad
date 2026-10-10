@@ -1,0 +1,6 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/3/unstarred/3773,lok-sabha,lok-sabha/17/3,2020-03-17,UNSTARRED,Financial Problems of SCs and OBCs,social-justice-and-empowerment,ls-5040,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/3773,2026-10-10
+lok-sabha/17/3/unstarred/1907,lok-sabha,lok-sabha/17/3,2020-03-03,UNSTARRED,Financial Condition of Farmers,agriculture-and-farmers-welfare,ls-5040,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/1907,2026-10-10
+lok-sabha/17/1/unstarred/5271,lok-sabha,lok-sabha/17/1,2019-07-25,UNSTARRED,Funds for All Round Development of Minorities,minority-affairs,ls-5040,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/1/unstarred/5271,2026-10-10
+lok-sabha/17/1/unstarred/5029,lok-sabha,lok-sabha/17/1,2019-07-24,UNSTARRED,Increase in FDI,commerce-and-industry,ls-5040,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/1/unstarred/5029,2026-10-10
+lok-sabha/17/1/unstarred/4615,lok-sabha,lok-sabha/17/1,2019-07-22,UNSTARRED,Debt Burden of States,finance,ls-5040,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/1/unstarred/4615,2026-10-10

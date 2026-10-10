@@ -1,0 +1,7 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/9/unstarred/2744,lok-sabha,lok-sabha/17/9,2022-08-02,UNSTARRED,Development Project under MoS,home-affairs,ls-5025,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/9/unstarred/2744,2026-10-10
+lok-sabha/17/6/unstarred/3676,lok-sabha,lok-sabha/17/6,2021-08-10,UNSTARRED,Setting up of Cold Storage,food-processing-industries,ls-5025,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/6/unstarred/3676,2026-10-10
+lok-sabha/17/5/unstarred/4286,lok-sabha,lok-sabha/17/5,2021-03-22,UNSTARRED,Construction of Engineering College,human-resource-development,ls-5025,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/5/unstarred/4286,2026-10-10
+lok-sabha/17/2/unstarred/354,lok-sabha,lok-sabha/17/2,2019-11-19,UNSTARRED,Creation of Autonomous State,home-affairs,ls-5025,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/2/unstarred/354,2026-10-10
+lok-sabha/17/1/unstarred/4000,lok-sabha,lok-sabha/17/1,2019-07-17,UNSTARRED,Reconstruction of Road,development-of-north-eastern-region,ls-5025,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/1/unstarred/4000,2026-10-10
+lok-sabha/17/1/unstarred/3776,lok-sabha,lok-sabha/17/1,2019-07-16,UNSTARRED,Funding for Karbi Anglong Autonomous Council,home-affairs,ls-5025,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/1/unstarred/3776,2026-10-10

@@ -1,0 +1,7 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/11/unstarred/1642,lok-sabha,lok-sabha/17/11,2023-02-13,UNSTARRED,Pilot Project for Skilling Tribal Youth,skill-development-and-entrepreneurship,ls-170,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/11/unstarred/1642,2026-10-10
+lok-sabha/18/7/unstarred/6307,lok-sabha,lok-sabha/18/7,2026-04-02,UNSTARRED,Development of Greenfield Airport in Karnataka,civil-aviation,ls-170,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/7/unstarred/6307,2026-10-10
+lok-sabha/18/3/unstarred/4017,lok-sabha,lok-sabha/18/3,2024-12-19,UNSTARRED,Development of Vijayapura Airport,civil-aviation,ls-170,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/3/unstarred/4017,2026-10-10
+lok-sabha/18/3/unstarred/3552,lok-sabha,lok-sabha/18/3,2024-12-17,UNSTARRED,Schemes for Farmer Welfare,agriculture-and-farmers-welfare,ls-170,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/3/unstarred/3552,2026-10-10
+lok-sabha/18/3/unstarred/3229,lok-sabha,lok-sabha/18/3,2024-12-16,UNSTARRED,Improve Quality Education in Vijayapura,human-resource-development,ls-170,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/3/unstarred/3229,2026-10-10
+lok-sabha/18/3/unstarred/3007,lok-sabha,lok-sabha/18/3,2024-12-13,UNSTARRED,Healthcare Infrastructure in Vijayapura,health-and-family-welfare,ls-170,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/3/unstarred/3007,2026-10-10

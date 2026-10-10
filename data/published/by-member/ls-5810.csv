@@ -1,0 +1,5 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/18/8/unstarred/1109,lok-sabha,lok-sabha/18/8,2026-07-24,UNSTARRED,Service Condition  of AWWs and AWHs,women-and-child-development,ls-5810,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/8/unstarred/1109,2026-10-10
+lok-sabha/18/8/unstarred/515,lok-sabha,lok-sabha/18/8,2026-07-22,UNSTARRED,Status of Rajkharsawan Railway Station under ABSS,railways,ls-5810,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/8/unstarred/515,2026-10-10
+lok-sabha/18/6/unstarred/2995,lok-sabha,lok-sabha/18/6,2025-12-18,UNSTARRED,Status of EMRS in Jharkhand,tribal-affairs,ls-5810,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/6/unstarred/2995,2026-10-10
+lok-sabha/18/6/unstarred/2746,lok-sabha,lok-sabha/18/6,2025-12-16,UNSTARRED,Projects under National Bee Board and National Bamboo Mission,agriculture-and-farmers-welfare,ls-5810,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/6/unstarred/2746,2026-10-10

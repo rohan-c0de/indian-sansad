@@ -1,0 +1,6 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/3/unstarred/3179,lok-sabha,lok-sabha/17/3,2020-03-12,UNSTARRED,Helicopter Service from Bandipur to Quazigund,civil-aviation,ls-5005,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/3179,2026-10-10
+lok-sabha/17/3/unstarred/2748,lok-sabha,lok-sabha/17/3,2020-03-06,UNSTARRED,Lack of Ambulance Service in Jammu and Kashmir,health-and-family-welfare,ls-5005,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/2748,2026-10-10
+lok-sabha/17/3/starred/185,lok-sabha,lok-sabha/17/3,2020-03-04,STARRED,Baramulla-Kupwara Rail Link,railways,ls-5005,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/starred/185,2026-10-10
+lok-sabha/17/3/unstarred/2057,lok-sabha,lok-sabha/17/3,2020-03-03,UNSTARRED,Review of Detained Persons,home-affairs,ls-5005,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/2057,2026-10-10
+lok-sabha/17/3/unstarred/1769,lok-sabha,lok-sabha/17/3,2020-03-02,UNSTARRED,Control Over Dal Lake and Mansabal Lake,tourism,ls-5005,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/1769,2026-10-10

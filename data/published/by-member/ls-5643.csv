@@ -1,0 +1,3 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/18/8/starred/112,lok-sabha,lok-sabha/18/8,2026-07-27,STARRED,Employment Generation and Participation of Women in Workforce,labour-and-employment,ls-5643,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/8/starred/112,2026-10-10
+lok-sabha/18/7/unstarred/2510,lok-sabha,lok-sabha/18/7,2026-02-13,UNSTARRED,Recruitment of Specialist Doctors,health-and-family-welfare,ls-5643,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/7/unstarred/2510,2026-10-10

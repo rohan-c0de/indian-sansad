@@ -1,0 +1,2 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/8/unstarred/2212,lok-sabha,lok-sabha/17/8,2022-03-15,UNSTARRED,Welfare Schemes for Fisherfolk in Tamil Nadu,fisheries-animal-husbandry-and-dairying,ls-5207,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/8/unstarred/2212,2026-10-10

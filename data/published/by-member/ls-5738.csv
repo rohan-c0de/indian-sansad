@@ -1,0 +1,2 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/18/6/unstarred/3188,lok-sabha,lok-sabha/18/6,2025-12-18,UNSTARRED,"Contaminated Water in Faridkot, Punjab",jal-shakti,ls-5738,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/6/unstarred/3188,2026-10-10

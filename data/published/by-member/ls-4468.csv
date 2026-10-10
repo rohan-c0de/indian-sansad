@@ -1,0 +1,7 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/18/6/unstarred/971,lok-sabha,lok-sabha/18/6,2025-12-05,UNSTARRED,Non-Functional AIIMS,health-and-family-welfare,ls-4468,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/6/unstarred/971,2026-10-10
+lok-sabha/18/6/unstarred/806,lok-sabha,lok-sabha/18/6,2025-12-04,UNSTARRED,Status of PMAY-U,housing-and-urban-affairs,ls-4468,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/6/unstarred/806,2026-10-10
+lok-sabha/18/6/unstarred/755,lok-sabha,lok-sabha/18/6,2025-12-04,UNSTARRED,Women-led MSMEs,micro-small-and-medium-enterprises,ls-4468|ls-5768|ls-5599,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/6/unstarred/755,2026-10-10
+lok-sabha/18/6/unstarred/649,lok-sabha,lok-sabha/18/6,2025-12-03,UNSTARRED,Overcrowding in Kolkata Metro,railways,ls-4468,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/6/unstarred/649,2026-10-10
+lok-sabha/18/6/unstarred/262,lok-sabha,lok-sabha/18/6,2025-12-02,UNSTARRED,Census Proforma,home-affairs,ls-4468,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/6/unstarred/262,2026-10-10
+lok-sabha/18/6/unstarred/75,lok-sabha,lok-sabha/18/6,2025-12-01,UNSTARRED,ED Cases,finance,ls-4468,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/6/unstarred/75,2026-10-10

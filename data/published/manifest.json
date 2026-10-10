@@ -1,0 +1,73 @@
+{
+ "attribution": "Contains data from Indian Sansad (https://github.com/rohan-c0de/indian-sansad), licensed CC BY 4.0, built over records published by the Lok Sabha.",
+ "corrections_url": "https://github.com/rohan-c0de/indian-sansad/issues",
+ "duplicate_records_declared": [
+  "lok-sabha/17/4/unstarred/2204"
+ ],
+ "last_refreshed": "2026-10-10",
+ "license": "CC-BY-4.0",
+ "license_file": "DATA-LICENSE.md",
+ "license_scope": "CC BY 4.0 covers the added work only -- identity resolution, joins, ministry identity, aggregates and indexes. The underlying parliamentary records are not covered and remain subject to their source's terms; see DATA-LICENSE.md.",
+ "project_url": "https://github.com/rohan-c0de/indian-sansad",
+ "question_source_by_term": [
+  {
+   "checkpoint_written_at": null,
+   "mode": "fetched",
+   "term": 17
+  },
+  {
+   "checkpoint_written_at": null,
+   "mode": "fetched",
+   "term": 18
+  }
+ ],
+ "resolution_rate_automatic": 0.947831,
+ "resolution_rate_including_assertions": 0.963555,
+ "resumed_terms": [],
+ "search_sets_note": "Everything under search/ -- subject-index.json, digest/ and asker-names.jsonl -- is an aid for this project's own page, not a separate claim about the record. A consumer can skip it entirely: every field in digest/ is a copy of a by-session field and every name in asker-names.jsonl is a copy of a reference/members field, both of which are published in NDJSON and CSV. These three are the only published sets not in both formats.",
+ "sets": {
+  "aggregates": {
+   "files": 10,
+   "records": 95163
+  },
+  "by-member": {
+   "files": 1592,
+   "records": 155003
+  },
+  "by-ministry": {
+   "files": 112,
+   "records": 95268
+  },
+  "by-session": {
+   "files": 42,
+   "records": 95268
+  },
+  "coverage": {
+   "files": 2,
+   "records": 2
+  },
+  "reference": {
+   "files": 8,
+   "records": 6048
+  },
+  "resolution-records": {
+   "files": 2,
+   "records": 972
+  },
+  "search": {
+   "files": 1,
+   "records": 16979
+  },
+  "search/asker-names": {
+   "files": 1,
+   "records": 796
+  },
+  "search/digest": {
+   "files": 21,
+   "records": 95268
+  }
+ },
+ "source": "upstream",
+ "source_terms": "Not determined. The maintainer has not established the terms under which the Lok Sabha publishes these records and publishes this dataset without that determination. See DATA-LICENSE.md.",
+ "window_questions": 95268
+}

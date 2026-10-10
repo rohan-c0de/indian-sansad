@@ -1,0 +1,8 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/18/4/unstarred/3167,lok-sabha,lok-sabha/18/4,2025-03-19,UNSTARRED,Staff Deployed under Akashwani and Doordarshan at Nagaland,information-and-broadcasting,ls-5567,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/4/unstarred/3167,2026-10-10
+lok-sabha/18/4/unstarred/2367,lok-sabha,lok-sabha/18/4,2025-03-13,UNSTARRED,Protection of Tribal Rights,tribal-affairs,ls-5567,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/4/unstarred/2367,2026-10-10
+lok-sabha/18/4/unstarred/2282,lok-sabha,lok-sabha/18/4,2025-03-12,UNSTARRED,Combined Recruitment Examination,information-and-broadcasting,ls-5567,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/4/unstarred/2282,2026-10-10
+lok-sabha/18/4/unstarred/1626,lok-sabha,lok-sabha/18/4,2025-03-10,UNSTARRED,Growing Economic Inequality,finance,ls-5567,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/4/unstarred/1626,2026-10-10
+lok-sabha/18/3/unstarred/3457,lok-sabha,lok-sabha/18/3,2024-12-17,UNSTARRED,Deep Tech Startups,commerce-and-industry,ls-5567,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/3/unstarred/3457,2026-10-10
+lok-sabha/18/3/unstarred/3308,lok-sabha,lok-sabha/18/3,2024-12-16,UNSTARRED,Unemployment in Nagaland,labour-and-employment,ls-5567,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/3/unstarred/3308,2026-10-10
+lok-sabha/18/3/unstarred/3047,lok-sabha,lok-sabha/18/3,2024-12-13,UNSTARRED,Malnutrition,women-and-child-development,ls-5642|ls-5567,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/3/unstarred/3047,2026-10-10

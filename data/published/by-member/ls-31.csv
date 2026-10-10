@@ -1,0 +1,6 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/3/unstarred/3643,lok-sabha,lok-sabha/17/3,2020-03-16,UNSTARRED,Christian Cemeteries in Agra,culture,ls-31,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/3643,2026-10-10
+lok-sabha/17/3/unstarred/2733,lok-sabha,lok-sabha/17/3,2020-03-06,UNSTARRED,Spreading of Prosopis Juliflora,environment-forests-and-climate-change,ls-31,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/2733,2026-10-10
+lok-sabha/17/3/unstarred/2484,lok-sabha,lok-sabha/17/3,2020-03-05,UNSTARRED,Stadium in Agra,youth-affairs-and-sports,ls-31,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/2484,2026-10-10
+lok-sabha/17/3/starred/199,lok-sabha,lok-sabha/17/3,2020-03-04,STARRED,Passport Office in Agra,external-affairs,ls-31,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/starred/199,2026-10-10
+lok-sabha/17/3/unstarred/1782,lok-sabha,lok-sabha/17/3,2020-03-02,UNSTARRED,Overnight Stay of Tourists in Agra,tourism,ls-31,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/1782,2026-10-10

@@ -1,0 +1,3 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/1/unstarred/5367,lok-sabha,lok-sabha/17/1,2019-07-25,UNSTARRED,Four-laning of Ludhiana-Talwandi Bhai Section,road-transport-and-highways,ls-5168,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/1/unstarred/5367,2026-10-10
+lok-sabha/17/1/starred/342,lok-sabha,lok-sabha/17/1,2019-07-17,STARRED,Doubling/Electrification of Railway Lines,railways,ls-5168,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/1/starred/342,2026-10-10

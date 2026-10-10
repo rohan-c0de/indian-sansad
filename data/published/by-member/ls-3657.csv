@@ -1,0 +1,2 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/9/unstarred/3660,lok-sabha,lok-sabha/17/9,2022-08-08,UNSTARRED,Representation of Reserved Categories in Central Universities,human-resource-development,ls-3657,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/9/unstarred/3660,2026-10-10

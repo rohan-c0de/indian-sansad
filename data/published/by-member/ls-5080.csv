@@ -1,0 +1,7 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/3/unstarred/4782,lok-sabha,lok-sabha/17/3,2020-03-23,UNSTARRED,Funds for Popular Schemes,finance,ls-5080,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/4782,2026-10-10
+lok-sabha/17/3/unstarred/4434,lok-sabha,lok-sabha/17/3,2020-03-20,UNSTARRED,Seats in Medical Colleges,health-and-family-welfare,ls-5080|ls-5048,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/4434,2026-10-10
+lok-sabha/17/3/unstarred/3912,lok-sabha,lok-sabha/17/3,2020-03-18,UNSTARRED,Public Enterprises Selection Board,personnel-public-grievances-and-pensions,ls-5080,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/3912,2026-10-10
+lok-sabha/17/3/unstarred/3887,lok-sabha,lok-sabha/17/3,2020-03-17,UNSTARRED,Welfare Schemes for SCs and OBCs,social-justice-and-empowerment,ls-5080,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/3887,2026-10-10
+lok-sabha/17/3/unstarred/3558,lok-sabha,lok-sabha/17/3,2020-03-16,UNSTARRED,Inclusion of Jogulamba Town under Heritage Circuit,tourism,ls-5080,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/3558,2026-10-10
+lok-sabha/17/3/unstarred/3247,lok-sabha,lok-sabha/17/3,2020-03-13,UNSTARRED,CGHS Wellness Centres in Telangana,health-and-family-welfare,ls-5080,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/3/unstarred/3247,2026-10-10

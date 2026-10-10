@@ -1,0 +1,6 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/5/unstarred/3169,lok-sabha,lok-sabha/17/5,2021-03-15,UNSTARRED,Syllabus on Freedom Fighters,human-resource-development,ls-4763,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/5/unstarred/3169,2026-10-10
+lok-sabha/17/5/unstarred/2959,lok-sabha,lok-sabha/17/5,2021-03-12,UNSTARRED,Certification of Film by CBFC,information-and-broadcasting,ls-4763,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/5/unstarred/2959,2026-10-10
+lok-sabha/17/2/unstarred/3804,lok-sabha,lok-sabha/17/2,2019-12-11,UNSTARRED,Data Collected by Social Networking Companies,electronics-and-information-technology,ls-4763,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/2/unstarred/3804,2026-10-10
+lok-sabha/17/2/unstarred/3583,lok-sabha,lok-sabha/17/2,2019-12-10,UNSTARRED,Prevention of Drug Abuse,social-justice-and-empowerment,ls-4763,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/2/unstarred/3583,2026-10-10
+lok-sabha/17/2/unstarred/2870,lok-sabha,lok-sabha/17/2,2019-12-05,UNSTARRED,Standard Brightness Level of Lights in Vehicles,road-transport-and-highways,ls-4763,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/2/unstarred/2870,2026-10-10

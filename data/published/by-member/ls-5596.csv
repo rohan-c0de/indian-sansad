@@ -1,0 +1,4 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/18/8/unstarred/3139,lok-sabha,lok-sabha/18/8,2026-08-06,UNSTARRED,"Schemes for the Development of STs in Alipurduar, West Bengal",tribal-affairs,ls-5596,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/8/unstarred/3139,2026-10-10
+lok-sabha/18/4/unstarred/1319,lok-sabha,lok-sabha/18/4,2025-02-11,UNSTARRED,Status of Tea Gardens in India,commerce-and-industry,ls-5596,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/4/unstarred/1319,2026-10-10
+lok-sabha/18/3/unstarred/3374,lok-sabha,lok-sabha/18/3,2024-12-16,UNSTARRED,Non deposit of EPF Contribution by Tea Garden Owners,labour-and-employment,ls-5596,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/18/3/unstarred/3374,2026-10-10

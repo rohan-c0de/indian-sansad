@@ -1,0 +1,2 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/12/unstarred/2852,lok-sabha,lok-sabha/17/12,2023-08-07,UNSTARRED,GST on Health Insurance,finance,ls-4921,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/12/unstarred/2852,2026-10-10

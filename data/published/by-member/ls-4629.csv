@@ -1,0 +1,2 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/12/unstarred/1168,lok-sabha,lok-sabha/17/12,2023-07-27,UNSTARRED,Production of CBG,petroleum-and-natural-gas,ls-5186|ls-5196|ls-5131|ls-4629|ls-4659|ls-4787,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/12/unstarred/1168,2026-10-10

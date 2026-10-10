@@ -1,0 +1,6 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/14/unstarred/3090,lok-sabha,lok-sabha/17/14,2023-12-21,UNSTARRED,Products of Khadi and Village Industry Commission,micro-small-and-medium-enterprises,ls-4013,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/14/unstarred/3090,2026-10-10
+lok-sabha/17/14/unstarred/3032,lok-sabha,lok-sabha/17/14,2023-12-21,UNSTARRED,PM Vishwakarma Scheme,micro-small-and-medium-enterprises,ls-4751|ls-4013,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/14/unstarred/3032,2026-10-10
+lok-sabha/17/14/starred/252,lok-sabha,lok-sabha/17/14,2023-12-20,STARRED,Establishment of DMF,mines,ls-4013,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/14/starred/252,2026-10-10
+lok-sabha/17/9/unstarred/2688,lok-sabha,lok-sabha/17/9,2022-08-02,UNSTARRED,PM-KISAN in Chhattisgarh,agriculture-and-farmers-welfare,ls-4013,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/9/unstarred/2688,2026-10-10
+lok-sabha/17/7/unstarred/2942,lok-sabha,lok-sabha/17/7,2021-12-15,UNSTARRED,Jiribam-Imphal Railway Line Project,railways,ls-4013|ls-4879|ls-5150|ls-5144|ls-4615|ls-5192|ls-4373|ls-4606|ls-4705,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/7/unstarred/2942,2026-10-10

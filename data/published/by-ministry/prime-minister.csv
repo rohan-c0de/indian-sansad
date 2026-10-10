@@ -1,0 +1,2 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/1/unstarred/2897,lok-sabha,lok-sabha/17/1,2019-07-10,UNSTARRED,New Committees,prime-minister,ls-4615|ls-4922|ls-4705,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/1/unstarred/2897,2026-10-10

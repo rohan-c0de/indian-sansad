@@ -1,0 +1,7 @@
+question_id,house,session,date,type,subject,ministry_id,asking_members,resolution_status,source_record_ref,last_refreshed
+lok-sabha/17/12/unstarred/3816,lok-sabha,lok-sabha/17/12,2023-08-11,UNSTARRED,Upgradation of Medical Colleges and Dispensaries,health-and-family-welfare,ls-4642,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/12/unstarred/3816,2026-10-10
+lok-sabha/17/12/unstarred/3599,lok-sabha,lok-sabha/17/12,2023-08-10,UNSTARRED,Works under JJM in Uttar Pradesh,jal-shakti,ls-4642,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/12/unstarred/3599,2026-10-10
+lok-sabha/17/12/unstarred/3309,lok-sabha,lok-sabha/17/12,2023-08-09,UNSTARRED,Upgradation/Modernisation of Stations,railways,ls-4642,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/12/unstarred/3309,2026-10-10
+lok-sabha/17/12/unstarred/2851,lok-sabha,lok-sabha/17/12,2023-08-07,UNSTARRED,Allocation of Funds and Setting up of IITs/ IIMs,human-resource-development,ls-4642|ls-4295,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/12/unstarred/2851,2026-10-10
+lok-sabha/17/7/unstarred/3653,lok-sabha,lok-sabha/17/7,2021-12-20,UNSTARRED,New Kendriya Vidyalayas in Uttar Pradesh,human-resource-development,ls-4642|ls-5147,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/7/unstarred/3653,2026-10-10
+lok-sabha/17/7/starred/283,lok-sabha,lok-sabha/17/7,2021-12-17,STARRED,M.D. Seats in Medical Colleges,health-and-family-welfare,ls-4642,resolved,/api_ls/question/qetFilteredQuestionsAns#lok-sabha/17/7/starred/283,2026-10-10
