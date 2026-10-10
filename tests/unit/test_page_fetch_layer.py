@@ -14,6 +14,7 @@ that nothing in `web/` names another host at all.
 
 from __future__ import annotations
 
+import importlib.util
 import re
 import shutil
 import subprocess
@@ -24,19 +25,21 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WEB = REPO_ROOT / "web"
 PAGE_TESTS = sorted((REPO_ROOT / "tests" / "page").glob("*.test.mjs"))
+LIST_PAGE_URLS = REPO_ROOT / "tools" / "list_page_urls.py"
 
-#: Every text file that ships as part of the page.
-PAGE_FILES = (
-    "index.html",
-    "style.css",
-    "app.js",
-    "lib/fetch.js",
-    "lib/format.js",
-    "lib/coverage.js",
-    "lib/profile.js",
-    "lib/chart.js",
-    "lib/licence.js",
-)
+#: Suffixes these checks can read. A file under `web/` with any other suffix
+#: fails `test_every_file_under_web_is_scanned` rather than being skipped.
+PAGE_SUFFIXES = frozenset({".html", ".css", ".js"})
+
+#: Every file that ships as part of the page. GLOBBED, never listed.
+#:
+#: This was a hand-kept tuple, and the hand-kept copy in
+#: `tools/list_page_urls.py` proved the failure mode: it named five files while
+#: `web/` held nine, so `lib/coverage.js`, `lib/profile.js`, `lib/chart.js` and
+#: `lib/licence.js` went unscanned by that tool and nothing failed when each was
+#: added. Collected at import time so `@pytest.mark.parametrize` can name each
+#: file, and asserted complete below.
+PAGE_FILES = tuple(sorted(str(p.relative_to(WEB)) for p in WEB.rglob("*") if p.is_file()))
 
 
 def test_node_is_available_and_the_page_tests_exist() -> None:
@@ -44,6 +47,44 @@ def test_node_is_available_and_the_page_tests_exist() -> None:
     that exercise the refusal."""
     assert shutil.which("node"), "Node is required to run the page's tests"
     assert PAGE_TESTS, "no tests/page/*.test.mjs found"
+
+
+def test_every_file_under_web_is_scanned() -> None:
+    """Nothing ships in `web/` without these checks reading it.
+
+    Three separate ways the scans could go blind, all closed here:
+
+    1. **A file nobody added to a list.** `PAGE_FILES` is a glob now, so this
+       asserts the glob matched something plausible rather than silently
+       nothing -- a glob that stopped matching would turn every parametrised
+       scan below into zero tests, which pytest reports as a pass.
+    2. **A file these checks cannot read.** An image, a font or a wasm blob is
+       a request the text scans cannot see. It fails here instead of being
+       skipped.
+    3. **`tools/list_page_urls.py` disagreeing.** The maintainer-facing tool
+       does its own host scan, and it is the one that was stale: it named five
+       files while `web/` held nine. Its list is a glob now too, and this pins
+       the two together so they cannot drift apart again.
+    """
+    on_disk = sorted(str(p.relative_to(WEB)) for p in WEB.rglob("*") if p.is_file())
+    assert on_disk, "web/ is empty, or the glob stopped matching"
+    assert len(on_disk) >= 9, f"only {len(on_disk)} file(s) under web/; the glob looks wrong"
+    assert sorted(PAGE_FILES) == on_disk
+
+    unreadable = [name for name in on_disk if (WEB / name).suffix not in PAGE_SUFFIXES]
+    assert unreadable == [], (
+        f"these files ship in web/ but no check here can read them: {unreadable}. "
+        "Add the suffix to PAGE_SUFFIXES deliberately, or do not ship the file."
+    )
+
+    spec = importlib.util.spec_from_file_location("sansad_list_page_urls", LIST_PAGE_URLS)
+    assert spec and spec.loader
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    assert sorted(tool.page_files()) == on_disk, (
+        "tools/list_page_urls.py scans a different set of files than these tests do"
+    )
+    assert tool.PAGE_SUFFIXES == PAGE_SUFFIXES
 
 
 def test_the_page_test_suite_passes() -> None:

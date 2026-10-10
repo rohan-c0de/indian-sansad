@@ -28,9 +28,42 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WEB = REPO_ROOT / "web"
 
-PAGE_FILES = ("index.html", "style.css", "app.js", "lib/fetch.js", "lib/format.js")
+#: Suffixes this check can read. A file under `web/` with any other suffix is
+#: reported as a FAILURE rather than skipped -- an image, a font or a wasm
+#: blob shipping in `web/` is a request this scan cannot read, and silently
+#: not reading it is how the check would come to pass on a page it had not
+#: seen.
+PAGE_SUFFIXES = frozenset({".html", ".css", ".js"})
+
+
+def page_files() -> tuple[str, ...]:
+    """Every file under `web/`, relative to it, sorted. GLOBBED, never listed.
+
+    The hand-kept tuple this replaces named five files while `web/` held
+    nine: `lib/coverage.js`, `lib/profile.js`, `lib/chart.js` and
+    `lib/licence.js` were never scanned by this tool, and nothing failed when
+    each was added, because nothing was watching the list. A glob has no such
+    failure mode. `tests/unit/test_page_fetch_layer.py` asserts this returns
+    every file under `web/`, so the one way it could go wrong -- a glob that
+    quietly stopped matching -- is itself checked.
+    """
+    return tuple(sorted(str(path.relative_to(WEB)) for path in WEB.rglob("*") if path.is_file()))
+
 
 PUBLISHED_BASE_PREFIX = "./data/published/"
+
+#: The ONE exempt string, and it is exempt as an exact STRING rather than as a
+#: host: it is an XML namespace IDENTIFIER required by
+#: `document.createElementNS`, not a URL. A browser never dereferences it, so
+#: there is no request. Anything else on w3.org is still a finding.
+#:
+#: This exemption is new here only because the glob above is: `lib/chart.js`
+#: was not in the hand-kept list this tool used, so the tool had never read the
+#: one file that names the namespace. `tests/unit/test_page_fetch_layer.py`
+#: already carried the same exemption, and keeps it honest by asserting the
+#: string appears exactly once in `chart.js`, as the argument to
+#: `createElementNS` and never in a fetch, an href or a src.
+SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 
 _OFF_HOST = re.compile(r"(?:https?:)?//[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _BASE = re.compile(r"""PUBLISHED_BASE\s*=\s*["']([^"']+)["']""")
@@ -136,16 +169,23 @@ def main() -> int:
     print("Scan for any other host named in page code")
     print("=" * 64)
     found = False
-    for name in PAGE_FILES:
+    names = page_files()
+    for name in names:
         path = WEB / name
+        if path.suffix not in PAGE_SUFFIXES:
+            problems.append(f"{name}: not a readable text file, so it was NOT scanned")
+            print(f"  {name}  NOT SCANNED -- suffix {path.suffix!r} is not one this check reads")
+            continue
         text = strip_comments(path.read_text(encoding="utf-8"), html=name.endswith(".html"))
         for number, line in enumerate(text.splitlines(), start=1):
             for match in _OFF_HOST.finditer(line):
+                if SVG_NAMESPACE in line and match.group(0) in SVG_NAMESPACE:
+                    continue
                 found = True
                 problems.append(f"{name}: names host {match.group(0)}")
                 print(f"  {name}:{number}  {match.group(0)}")
     if not found:
-        print("  none -- no page file names another host in code")
+        print(f"  none -- no page file names another host in code ({len(names)} file(s) scanned)")
     print()
 
     css = strip_comments((WEB / "style.css").read_text(encoding="utf-8"))

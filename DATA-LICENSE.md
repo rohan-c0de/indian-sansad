@@ -46,17 +46,19 @@ first workflow run, and GitHub Pages can only be pointed at it afterwards. The
 URL above is the repository, which does exist.
 
 **Once a Pages URL exists, every one of these needs updating. The list is here
-so none is missed.** One row is done; the rest are not.
+so none is missed.** A row marked **DONE** is done; the rest are not. The count
+is deliberately not stated — it moved twice in two days.
 
 | Where | What changes |
 |---|---|
 | `DATA-LICENSE.md` — the attribution line above | the canonical link becomes the site, or names both |
-| `README.md` | carries **no URL at all** today; wants the site link, at least in the Licence section |
+| `README.md` | carries one URL today — the corrections link in *Source terms: not determined* — and **no site link at all**; wants the site link, at least in the Licence section |
 | `contracts/published-dataset.md` → "Where it is published" | says paths resolve "relative to wherever the branch is served"; can name the origin |
 | `spike/free-tiers.md` lines ~258-259 | `https://rohan-c0de.github.io/indian-sansad/...` is written there as a **prediction**; T015's verdict is "VERIFIED by construction, not by execution" and becomes observed |
 | `spike/free-tiers.md` line ~287 | records that the URL is derived from the maintainer's handle — the live Attribution deviation; the decision to transfer to an organisation would change the URL again |
 | `specs/001-resolved-metadata-layer/mockup/README.md` lines ~224-225 | the same predicted URLs |
 | `data/published/coverage.jsonl`/`.csv` and `manifest.json` | **DONE 2026-10-10.** Both now carry `license`, `attribution`, `project_url`, `license_file` and `license_scope` — and, since the source-terms decision of the same date, `source_terms` and `corrections_url` — so a consumer who takes a single file has the terms, the gap in them, the link and the corrections channel in hand. **The update site is now one module — `src/sansad/publish/attribution.py`** — which both writers spread and which `tests/contract/test_attribution.py` asserts is character-for-character the attribution line above, so the file and the data cannot drift. Changing the URL means changing that module; the published files follow on the next refresh. Cost: **+2,549 bytes**, 0.001% of the dataset; the two source-terms fields added **+1,155 bytes** more (manifest +281, `coverage.jsonl` +369, `coverage.csv` +505), **0.000414%** of the 278,684,386-byte dataset, measured by re-emitting the three files without them |
+| `src/sansad/publish/attribution.py` — `SOURCE_TERMS` and `CORRECTIONS_URL` | **NOT DONE, and easy to miss.** Both are built from `PROJECT_URL`: `corrections_url` is `{PROJECT_URL}/issues`, so a Pages URL or a transfer to an organisation **moves the corrections channel a rightsholder is told to use**. Re-check both when the URL changes — the issue tracker may well stay on the repository while the canonical link becomes the site, which is a decision rather than a find-and-replace. `source_terms` names `DATA-LICENSE.md` by filename, which the refresh workflow copies to the branch root, so that half holds as long as the file keeps its name |
 | `web/index.html`, `web/app.js`, `web/lib/licence.js` (T074, T076) | **DONE 2026-10-10.** The footer renders the licence, the attribution, the `source_terms` line and the corrections link, every one of them read from `manifest.json` at runtime rather than typed into the page — so the URL changes in `attribution.py` and the page follows on the next refresh |
 
 Changing the URL later does not invalidate anything already distributed under

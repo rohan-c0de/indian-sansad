@@ -41,8 +41,9 @@ five principles that gate the work.
 
 ## Current status
 
-**73 of 100 tasks are done** ([`tasks.md`](specs/001-resolved-metadata-layer/tasks.md)). The
-pipeline is built and the dataset is built. **The reader page is not built, and nothing has been
+**The ticked boxes in [`tasks.md`](specs/001-resolved-metadata-layer/tasks.md) are the count** —
+no total is typed here, because the one that was went stale by seven tasks. The pipeline is built
+and the dataset is built. **The reader page is built except subject search, and nothing has been
 published to GitHub.**
 
 ### Done
@@ -50,14 +51,24 @@ published to GitHub.**
 - **Phases 1–5 complete** — guard rails (T001–T003), the blocking spike (T004–T020), the
   foundational layer (T021–T035), User Story 1 (T036–T061) and User Story 4 (T062–T069).
 - **Phase 6's dataset side complete** — T070–T073: per-ministry profiles and the subject-search
-  index, with their contract tests.
+  index, with their contract tests; and T079's dataset side, the per-session search digest and
+  the asker-name lookup, which are built and published even though the view they were built for
+  is not (see below).
 - **The pipeline has been run end to end once against the live upstream** — 2026-10-10,
   **52m 38s measured**, fetching, resolving and publishing all **95,268** questions. That is the
   only end-to-end timing that exists.
-- **The dataset is built**: **1,768 files, 257,804,931 bytes (245.9 MiB)** — 24.0% of the 1 GiB
-  GitHub Pages ceiling — across the by-session, by-ministry and by-member partitions, the
-  reference sets, the aggregates, the 2.37 MiB subject-search index and the coverage statement,
-  each in both NDJSON and CSV.
+- **The dataset is built** — the by-session, by-ministry and by-member partitions, the reference
+  sets, the aggregates, the subject-search index, the per-session search digest and the coverage
+  statement, each in both NDJSON and CSV except the three `search/` sets, which say so in the
+  manifest. **The file and record counts live in `data/published/manifest.json` → `sets`**,
+  written by the refresh that built the tree and described in
+  [the dataset contract](specs/001-resolved-metadata-layer/contracts/published-dataset.md).
+  `make refresh` prints the total it wrote; the bytes are `du -sh data/published/`. Neither is
+  typed here: both moved as sets were added, and the figures that were typed here went stale
+  within a day. The headroom is the part worth stating, and it is not close — the last measured
+  build sat at **26% of the 1 GiB GitHub Pages ceiling** (2026-10-10), against T017's 31.8%
+  projection; both are in
+  [`spike/size-budget.md`](specs/001-resolved-metadata-layer/spike/size-budget.md).
 - **Resolution meets SC-002**: **96.36%** (91,796 of 95,268 questions) with four owner-confirmed
   maintainer assertions; **94.78%** automatic. Both are published separately, because the
   automatic rate is below the 95% target.
@@ -68,11 +79,15 @@ published to GitHub.**
 
 ### Not done
 
-- **The reader page is half built.** The shell, the stylesheet, the fetch layer, the coverage
-  display and `make serve-local` are done (T074–T077, T081). **The ministry-profile view
-  (T078), subject search (T079) and two-ministry comparison (T080) are not** — the page shows
-  a region saying so for each. The browser proof and the real first-load measurement
-  (T082–T085) have not been run.
+- **One of the reader page's views is missing, and that is a measurement result rather than
+  unfinished work.** The shell, the stylesheet, the fetch layer, the coverage display, the
+  licence and source-terms footer, the ministry-profile view (T078), two-ministry comparison
+  (T080) and `make serve-local` (T081) are all done. **Subject search (T079) is NOT** — it
+  **STOPPED at its own gate**: rendering the first 25 results for a common word costs
+  4,348,529 B against T019's 4,183,979 B first-load budget, and a two-word query 7,236,751 B.
+  Its dataset side is built and published (the per-session digest and the asker-name lookup);
+  the view is not, and the page shows one region saying so. The browser proof and the real
+  first-load measurement (T082–T085) have not been run.
 - **The refresh workflow has never run on GitHub.** `.github/workflows/refresh.yml` is written
   and statically checked (`make yamllint`, 0 findings) but unproven: the daily schedule, the
   force-push to the `published` branch and the 60-day keep-alive are all unobservable locally.
