@@ -230,11 +230,49 @@ them had been retrieved first-hand before.
 
 | Route | Purpose |
 |---|---|
-| `GET /api_ls/question/getMinistry?lkNo=<n>&locale=en` | Ministry reference set. 17 distinct `ministry` values appeared in the 250-record sample. |
+| `GET /api_ls/question/getMinistry?lkNo=<n>&locale=en` | Ministry reference set. 17 distinct `ministry` values appeared in the 250-record sample. **Captured 2026-10-09 — see the note below: it serves `minCode`, `minName`, `minNameHindi`, and `minCode` is NOT a stable identity.** |
 | `GET /api_ls/question/getMembers?lkNo=<n>` | Member list as the question UI uses it — a second name-form source to diff against the roster. |
 | `GET /api_ls/business/getAllLoksabhaAndSession?locale=en` | Session enumeration. Root is an array of `{loksabha, sessions[{sessionNo, sessionPeriod, dates[]}]}`. |
 | `GET /api_ls/business/AllLoksabhaAndSessionDates` | Session dates. |
 | `GET /api_ls/public/officer-responsible/officer-list?module=13&locale=en` | Not needed by this feature. Recorded only so it is not re-discovered later. |
+
+### NOTE 2026-10-09 — `getMinistry` captured: it serves an id, and the id is not an identity
+
+**Task**: the T052 gate. **Method**: one `GET` per term, bodies written only under
+`$SANSAD_SCRATCH/t052/`. Field *names*, *shapes* and *counts* only — the same discipline as the
+rest of this file.
+
+| | 18th LS | 17th LS |
+|---|---|---|
+| Root | `array[56]` of records | `array[69]` of records |
+| Field names (3) | `minCode`, `minName`, `minNameHindi` | same |
+| `minCode` | int, non-null 56/56, **56 distinct** | int, non-null 69/69, **69 distinct** |
+| `minName` | str, 56 distinct | str, **68 distinct** — one name appears twice |
+
+**So the route does answer the gate with an id. The id is per-term and cannot carry identity:**
+
+- **10 of the 52 names present in both terms carry a different `minCode` in each.**
+- **14 of the 56 codes shared between the terms name a different ministry in each** — a mix of
+  genuine renames and the code being reused for an unrelated ministry.
+- `HOUSING AND URBAN AFFAIRS` appears **twice** in the 17th's set, under codes 64 and 71, so
+  name→code is ambiguous *within* a term.
+- The question route carries only the ministry **name**, never a code, so a name is the only
+  join key available regardless.
+
+This closes T006's ministry derivation as *answered but not solved*: `ministry_id` must be
+minted by this feature, and it cannot be minted from `minCode`.
+
+**Owner decision of 2026-10-09 and the PROPOSED rename table**:
+[ministry-identity.md](./ministry-identity.md). In short — `ministry_id` is the slug of the first
+name a ministry was seen under, assigned once and never changed; renames are recorded by
+owner-confirmed mappings in `data/assertions/ministries.json`; an unmapped name mints its own id
+and the Coverage Statement reports how many await adjudication; `minCode` is not published.
+
+**Also closed by the same pass: T006 open item 1, the `date` format.** It was recorded as
+unasserted ("the pipeline must assert the format on first ingest rather than assume ISO-8601").
+Asserted over the full window: **`DD.MM.YYYY` on 34,720 of 34,720 and 60,549 of 60,549 records**,
+no other shape and no empty value. The format is uniform for this window; the upstream still
+promises nothing, so the ingest should keep asserting it rather than trusting this.
 
 ### Sitting days, from the session route
 

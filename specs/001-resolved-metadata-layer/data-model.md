@@ -82,11 +82,20 @@ The audit link between a written name form and the identity it resolved to. This
 
 | Field | Notes |
 |---|---|
-| `ministry_id` | Stable identity. |
-| `canonical_name` | One display form. |
+| `ministry_id` | Stable identity: the slug of the **first** name under which this ministry was seen. Assigned once, never changed, never reused (owner decision 2026-10-09). |
+| `canonical_name` | One display form — the current name once a rename has been mapped. |
 | `name_variants` | Forms used by the source. |
+| `former_names` | Names this ministry was previously seen under, from confirmed rename mappings. |
 
-**Validation rules**: ministries are reconciled by the same stability rule as members — renaming upstream MUST NOT create a second ministry identity.
+**Validation rules** — **softened 2026-10-09, and the softening is deliberate** (`spike/ministry-identity.md`):
+
+- A `ministry_id` MUST NOT change once assigned, and MUST NOT be reused.
+- **One ministry MAY carry two ids until a rename is mapped.** This is weaker than the earlier rule ("renaming upstream MUST NOT create a second ministry identity") and it replaces it, because that rule cannot be kept unaided: question records carry only the ministry **name**, and the reference set's `minCode` is per-term — 10 of 52 shared names change code between terms and 14 of 56 shared codes name a different ministry in each. Claiming the stronger rule would have meant either splitting renamed ministries while promising not to, or merging unrelated ones.
+- A rename MUST be recorded by a **maintainer-confirmed** mapping in `data/assertions/ministries.json`, which **keeps the older id**, makes the new name the `canonical_name`, and moves the previous name into `former_names`. Only owner-confirmed pairs; never generated.
+- A name with no mapping MUST mint its own id rather than be guessed into an existing one.
+- Trivial spelling variants — case, punctuation, and a trailing plural — are resolved by **name normalisation**, not by assertion.
+- The Coverage Statement MUST report how many ministry names are awaiting adjudication (FR-013). This is **not** a maintainer signal; the four signals stay four.
+- `minCode` is NOT published and is NOT used for identity.
 
 ## Session
 

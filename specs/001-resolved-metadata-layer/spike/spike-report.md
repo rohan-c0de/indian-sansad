@@ -556,3 +556,42 @@ at 95%, four assertions seeded, a fifth dropped). The answer is recorded above, 
 assertions, and at **94.78% without them**. The automatic rate is **below** the threshold. That is
 why T053 publishes both figures, and why the published record will show the shortfall rather than
 conceal it.
+
+---
+
+# NOTE 2026-10-09 — ministry identity: the T052 gate, and the owner's decision
+
+**Why this is in the spike report**: spike item 1 recorded `ministry` as "a name string, not an
+id" and named `/api_ls/question/getMinistry` as the reference set, leaving the impression that
+the reference set would supply the identity. **It does not.** The route was captured on
+2026-10-09 and serves `minCode`, `minName`, `minNameHindi` — and `minCode` is a **per-term**
+code, not an identity:
+
+- 10 of the 52 ministry names present in both terms carry a **different** `minCode` in each;
+- 14 of the 56 codes shared between the terms **name a different ministry** in each — part
+  genuine renames, part the code reused for something unrelated;
+- four of those pairs have both names carrying questions **simultaneously for years**, which is
+  what code reuse looks like and what would have been mis-proposed as a rename had the shared
+  code been treated as evidence.
+
+Measured over all 95,269 records: a name-slug identity leaves **20,920** questions under a split
+identity; `minCode` would put **22,521** under a shared code and leave **325** records with no
+code at all.
+
+**Owner decision of 2026-10-09** (full text and the PROPOSED rename table in
+[ministry-identity.md](./ministry-identity.md)): `ministry_id` is the slug of the **first** name
+a ministry was seen under — assigned once, never changed, never reused. Renames are recorded by
+**owner-confirmed** mappings in `data/assertions/ministries.json`, which keep the older id and
+move the former name to `former_names`. An unmapped name mints its own id, and the Coverage
+Statement reports how many names await adjudication. **No fifth maintainer signal.** `minCode`
+is not published.
+
+**Four renames are PROPOSED on date-handoff evidence and await confirmation**; four trivial
+spelling variants are resolved by name normalisation instead, including the
+`COMMUNICATION`/`COMMUNICATIONS` pair (325 records) and `ENVIRONMENT … FORESTS`/`FOREST`
+(3,010 records). **Nothing has been written to `data/assertions/ministries.json`.**
+
+**What this costs the contract**: the promise is now that an id never changes once assigned, not
+that one ministry always has one id. One ministry can carry two ids until a rename is mapped.
+`data-model.md` and `contracts/published-dataset.md` have been softened to say so rather than
+continue to claim a guarantee the pipeline cannot keep unaided.
