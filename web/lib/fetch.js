@@ -182,7 +182,19 @@ export const PUBLISHED_FILES = Object.freeze({
   // T079, both fetched on the FIRST SEARCH only -- see below.
   searchIndex: "search/subject-index.json",
   askerNames: "search/asker-names.jsonl",
+  // T088, both fetched on FIRST USE OF THE STATE VIEW only -- see below.
+  // 252,226 B and 181,347 B; neither is touched by a visitor who never opens
+  // the view, which `boot()` asserts.
+  constituencies: "reference/constituencies.jsonl",
+  stateSubjects: "aggregates/state-subjects.jsonl",
 });
+
+/* `reference/members.jsonl` is NOT in the object above, and its absence is the
+ * decision rather than an omission. It is 3,447,794 B -- 1.4x the search index
+ * -- and T086 put each member's name, party and sitting status onto the
+ * constituency set's representations so this page would never need it. An
+ * entry here would overstate the page's request surface, which is the thing
+ * T082 checks against a real network log. */
 
 /* The 21 per-session search digests are NOT in the object above, because they
  * are not a fixed list of files: which ones a search fetches depends on which
@@ -196,6 +208,25 @@ export function digestRelativePath(sessionId) {
   return DIGEST_BASE + digestFileName(sessionId);
 }
 
+/* The 1,592 per-member question files are a PATTERN too, for the same reason:
+ * which one the state view fetches depends on which member the visitor opens,
+ * and it opens one at a time. */
+export const MEMBER_BASE = "by-member/";
+
+/** A `member_id` is `ls-<digits>` (`src/sansad/resolve/identity.py`). Anything
+ * else is refused HERE rather than at `publishedPath`, so the message names the
+ * member id instead of the path it would have built -- and so a value taken
+ * from a published record can never compose a path at all. */
+const MEMBER_ID = /^[a-z]{2}-\d+$/;
+
+export function memberRelativePath(memberId) {
+  const id = String(memberId ?? "");
+  if (!MEMBER_ID.test(id)) {
+    throw new CrossOriginRefused(`refused: ${id || "(empty)"} is not a member id`);
+  }
+  return `${MEMBER_BASE}${id}.jsonl`;
+}
+
 /** Every URL this page can request, as it would be resolved. For the record,
  * and for `tools/list_page_urls.py` to print without running a browser. The
  * digest pattern is appended as a pattern, not as 21 entries: listing them
@@ -204,6 +235,7 @@ export function requestableUrls() {
   return [
     ...Object.values(PUBLISHED_FILES).map(publishedPath),
     publishedPath(DIGEST_BASE) + "<house>-<term>-<session>.jsonl",
+    publishedPath(MEMBER_BASE) + "<member-id>.jsonl",
   ];
 }
 
@@ -304,4 +336,80 @@ export function resetSearchIndex() {
   searchIndexPromise = null;
   askerNamesPromise = null;
   digestPromises.clear();
+}
+
+/* ------------------------------------------------------------------------ */
+/* T088 -- the state and constituency view, fetched LAZILY.                 */
+/* ------------------------------------------------------------------------ */
+
+/* Owner decision 2026-10-10: "Nothing for this view loads on page load. The
+ * reference set is fetched when the visitor first opens the view, like search."
+ *
+ * Two files on first use -- the seat set (252,226 B) and the state subject
+ * summary (181,347 B) -- then ONE member file per member the visitor opens.
+ * The member files are the reason the state summary is a published aggregate
+ * rather than something this page derives: a state's own members' files come
+ * to 10,489,198 B for Maharashtra, and the summary is 181,347 B for all 36
+ * states (`spike/size-budget.md` -> T086).
+ *
+ * Promises are memoised, not values: two interactions before the first
+ * resolves must share ONE request rather than race two.
+ */
+let seatsPromise = null;
+let stateSubjectsPromise = null;
+/** One memoised promise per member id. Re-opening a member costs nothing. */
+const memberPromises = new Map();
+
+export function loadSeats(options = {}) {
+  if (seatsPromise === null) {
+    seatsPromise = fetchNdjson(PUBLISHED_FILES.constituencies, options).catch((error) => {
+      seatsPromise = null; // a failed load must not poison every later attempt
+      throw error;
+    });
+  }
+  return seatsPromise;
+}
+
+export function loadStateSubjects(options = {}) {
+  if (stateSubjectsPromise === null) {
+    stateSubjectsPromise = fetchNdjson(PUBLISHED_FILES.stateSubjects, options).catch((error) => {
+      stateSubjectsPromise = null;
+      throw error;
+    });
+  }
+  return stateSubjectsPromise;
+}
+
+/** One member's published questions. Called when the visitor OPENS that
+ * member, and from nowhere else -- a view that fetched every member of a state
+ * up front would cost 10,489,198 B in Maharashtra. */
+export function loadMemberQuestions(memberId, options = {}) {
+  const key = String(memberId);
+  if (!memberPromises.has(key)) {
+    const promise = fetchNdjson(memberRelativePath(key), options).catch((error) => {
+      memberPromises.delete(key);
+      throw error;
+    });
+    memberPromises.set(key, promise);
+  }
+  return memberPromises.get(key);
+}
+
+/** Whether ANY file this view needs has been requested. `boot()` asserts this
+ * is false, the same assertion that keeps search lazy. */
+export function seatAssetsRequested() {
+  return seatsPromise !== null || stateSubjectsPromise !== null || memberPromises.size > 0;
+}
+
+/** Which member files have been requested. For tests, and for the page to
+ * report what opening a member actually cost. */
+export function requestedMembers() {
+  return [...memberPromises.keys()];
+}
+
+/** Test seam only: forget every state-view request. */
+export function resetSeatData() {
+  seatsPromise = null;
+  stateSubjectsPromise = null;
+  memberPromises.clear();
 }

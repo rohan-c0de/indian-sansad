@@ -20,6 +20,7 @@ from sansad.publish.formats import write_both
 from sansad.views.basis import basis_rows
 from sansad.views.composition import Composition
 from sansad.views.ministry_profile import MinistryProfile
+from sansad.views.state_subjects import StateSubjects
 from sansad.views.subject_trends import SubjectTrends
 
 __all__ = [
@@ -27,6 +28,7 @@ __all__ = [
     "COMPOSITION_STEM",
     "COUNTING_BASIS_STEM",
     "MINISTRY_PROFILE_STEM",
+    "STATE_SUBJECTS_STEM",
     "SUBJECT_TRENDS_STEM",
     "AggregateWriteResult",
     "write_aggregates",
@@ -40,6 +42,8 @@ SUBJECT_TRENDS_STEM = "subject-trends"
 COUNTING_BASIS_STEM = "counting-basis"
 #: T070 -- per-ministry x per-session counts, type mix and link status.
 MINISTRY_PROFILE_STEM = "ministry-profile"
+#: T088 -- the top subject lines per state, for US3 acceptance scenario 2.
+STATE_SUBJECTS_STEM = "state-subjects"
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +58,7 @@ def write_aggregates(
     compositions: Sequence[Composition],
     trends: SubjectTrends,
     profiles: Sequence[MinistryProfile] = (),
+    state_subjects: StateSubjects | None = None,
     unresolved: int | None = None,
     partly_resolved: int | None = None,
     co_asked: int | None = None,
@@ -82,6 +87,10 @@ def write_aggregates(
     files.extend(write_both(root, MINISTRY_PROFILE_STEM, profile_rows))
     records[MINISTRY_PROFILE_STEM] = len(profile_rows)
 
+    state_rows = state_subjects.as_rows() if state_subjects is not None else []
+    files.extend(write_both(root, STATE_SUBJECTS_STEM, state_rows))
+    records[STATE_SUBJECTS_STEM] = len(state_rows)
+
     # The basis, once per unit. Every row above names the unit that applies to
     # it, so this file is what those references resolve to.
     rows = basis_rows(
@@ -89,6 +98,10 @@ def write_aggregates(
         partly_resolved=partly_resolved,
         co_asked=co_asked,
         max_askers=max_askers,
+        unattributable=state_subjects.unattributable if state_subjects else None,
+        multi_state=state_subjects.multi_state if state_subjects else None,
+        states=len(state_subjects.state_totals) if state_subjects else None,
+        top_n=state_subjects.top_n if state_subjects else None,
     )
     files.extend(write_both(root, COUNTING_BASIS_STEM, rows))
     records[COUNTING_BASIS_STEM] = len(rows)

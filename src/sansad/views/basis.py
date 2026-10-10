@@ -40,6 +40,7 @@ __all__ = [
     "basis_rows",
     "member_basis",
     "question_basis",
+    "state_subject_basis",
 ]
 
 #: Bumped when the wording changes in a way that changes what the numbers mean.
@@ -118,12 +119,79 @@ def member_basis(*, not_stated_is_a_category: bool = True) -> str:
     )
 
 
+def state_subject_basis(
+    *,
+    unattributable: int | None = None,
+    multi_state: int | None = None,
+    states: int | None = None,
+    top_n: int | None = None,
+) -> str:
+    """The basis for `aggregates/state-subjects`, whose unit is a question
+    attributed to a state.
+
+    A third unit beside `question` and `member`, because neither of those
+    states the **attribution rule**: a question is attached to askers, an asker
+    holds a seat in a state, so "a state's questions" is a derived claim and the
+    derivation is the thing a reader cannot guess. Owner's requirement,
+    2026-10-10: publish the attribution rule in the counting basis, as every
+    other aggregate does.
+
+    Three things a reader would otherwise reach a different number from:
+
+    1. the question counts once per STATE, not once per asker;
+    2. a question co-asked across two states counts for BOTH, so the states do
+       not sum to the window's total;
+    3. a question with no identified asker has no state and is EXCLUDED, with
+       its number stated here.
+
+    And a fourth that is about what a subject *is*: these are exact subject
+    lines, not topics.
+    """
+    unattributable = 0 if unattributable is None else unattributable
+    multi_state = 0 if multi_state is None else multi_state
+    states = 0 if states is None else states
+    top_n = 25 if top_n is None else top_n
+
+    return (
+        "What is counted: QUESTIONS ATTRIBUTED TO A STATE. A question counts "
+        "ONCE toward a state if at least one of its IDENTIFIED asking members "
+        "holds a seat in that state -- once for the state, not once per asker, "
+        "so a question asked by three members of one state is one question "
+        "there. "
+        f"A question co-asked by members of two different states counts for "
+        f"BOTH, which is why adding these {states:,} states together gives more "
+        f"than the window's question total: {multi_state:,} questions are "
+        "counted for more than one state. Do not sum the states and compare the "
+        "result with the published total. "
+        f"Questions with NO identified asking member cannot be attributed to any "
+        f"state and are EXCLUDED here: {unattributable:,} questions in this "
+        "window. They are still published in full in the question record and are "
+        "still counted by every other aggregate; there is simply no state to "
+        "attach them to, and inventing one would be worse than declaring the "
+        "gap. "
+        "Subjects are EXACT SUBJECT LINES as the source records them, not "
+        "topics: no stemming, no case folding and no merging of near-identical "
+        "lines, so two subjects differing by a word or by capitalisation are "
+        "counted separately. That is what makes these counts reproducible by "
+        "string equality from the published question records; grouping them "
+        "into topics is a reader's judgement and would not be. "
+        f"Only the top {top_n} subject lines of each state are published; every "
+        "row carries that state's whole attributable total and its distinct "
+        "subject count beside it, so the figure is never read without its "
+        "denominator."
+    )
+
+
 def basis_rows(
     *,
     unresolved: int | None = None,
     partly_resolved: int | None = None,
     co_asked: int | None = None,
     max_askers: int | None = None,
+    unattributable: int | None = None,
+    multi_state: int | None = None,
+    states: int | None = None,
+    top_n: int | None = None,
 ) -> list[dict[str, object]]:
     """The basis stamps as published records -- one per unit counted.
 
@@ -159,5 +227,15 @@ def basis_rows(
             "unit": "member",
             "basis_version": BASIS_VERSION,
             "counting_basis": member_basis(),
+        },
+        {
+            "unit": "state-question",
+            "basis_version": BASIS_VERSION,
+            "counting_basis": state_subject_basis(
+                unattributable=unattributable,
+                multi_state=multi_state,
+                states=states,
+                top_n=top_n,
+            ),
         },
     ]

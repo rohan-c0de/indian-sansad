@@ -199,11 +199,11 @@ def test_no_region_of_the_page_is_unbuilt() -> None:
     in the shell is a region that silently stopped working.
     """
     html = (WEB / "index.html").read_text(encoding="utf-8")
-    for built in ("T078", "T079", "T080"):
+    for built in ("T078", "T079", "T080", "T088"):
         assert f'data-task="{built}"' not in html, f"{built} is built; its region should be gone"
     assert "Not built yet" not in html
     assert "measurement gate failed" not in html
-    # The real containers the three built views render into.
+    # The real containers the four built views render into.
     for node_id in (
         "profile-picker",
         "profile-result",
@@ -211,6 +211,10 @@ def test_no_region_of_the_page_is_unbuilt() -> None:
         "search-result",
         "compare-picker",
         "compare-result",
+        # T088
+        "seat-picker",
+        "seat-result",
+        "state-summary",
     ):
         assert f'id="{node_id}"' in html, f"{node_id} is missing"
 
@@ -651,3 +655,125 @@ def test_every_class_the_page_sets_has_a_rule_or_is_a_known_hook() -> None:
 
     missing = sorted(name for name in used - styled - hooks)
     assert missing == [], f"classes the page sets but style.css never styles: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# T088 — the state and constituency view
+# ---------------------------------------------------------------------------
+def test_no_seat_file_is_fetched_on_load() -> None:
+    """Owner decision 2026-10-10: "Nothing for this view loads on page load."
+
+    The same shape as the search assertion above, and for the same reason: the
+    seat set is 252,226 B and the state subject summary 181,347 B, and a
+    visitor who never looks up a constituency must pay for neither.
+    """
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+
+    assert "seatAssetsRequested()" in body, "boot must assert NO seat file is requested"
+    assert "a seat file was requested during boot" in body, (
+        "the boot assertion has lost its message"
+    )
+
+    for loader in ("loadSeats", "loadStateSubjects", "loadMemberQuestions"):
+        assert loader in body, f"{loader} is never called; the view cannot work"
+        for runs_on_load in ("boot", "bootViews"):
+            called = _function_body(body, runs_on_load)
+            assert loader not in called, f"{runs_on_load}() calls {loader}; it must be lazy"
+
+    # Each is loaded in exactly one place, so there is one thing to reason
+    # about when asking what opening the view costs.
+    assert body.count("loadSeats(") == 1
+    assert body.count("loadStateSubjects(") == 1
+    assert body.count("loadMemberQuestions(") == 1
+
+    # `buildConstituencyView` runs on load and must fetch nothing itself.
+    built = _function_body(body, "buildConstituencyView")
+    for loader in ("loadSeats", "loadStateSubjects", "loadMemberQuestions"):
+        assert loader not in built, f"buildConstituencyView calls {loader}"
+
+
+def test_the_page_never_fetches_the_member_reference_set() -> None:
+    """3,447,794 B, and the reason T086 copied three fields onto the seat set.
+
+    Asserted against the page's own files rather than against the fetch layer's
+    frozen object alone, because a string anywhere in `web/` would be a path
+    some handler could build.
+    """
+    for name in PAGE_FILES:
+        body = re.sub(r"/\*.*?\*/", "", (WEB / name).read_text(encoding="utf-8"), flags=re.S)
+        body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+        assert "reference/members" not in body, (
+            f"{name} names the 3.4 MB member set; T086 exists so the page does not need it"
+        )
+
+
+def test_the_state_view_is_keyboard_operable_and_labelled() -> None:
+    """A finder reachable only by mouse is one most readers of a public record
+    cannot use. Every control is a real button, select or input with a label."""
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    view = _function_body(app, "buildConstituencyView") + _function_body(app, "renderSeatPickers")
+
+    # The opener and the name box are real controls, not click handlers on a div.
+    assert 'el("button"' in view
+    assert 'open.type = "button"' in view
+    assert 'input.type = "search"' in view
+    assert "labelledSelect(" in view, "the state picker must carry a real label"
+    assert 'label.htmlFor = "seat-name"' in view
+    assert 'input.setAttribute("aria-describedby", "seat-name-help")' in view
+    # Results are announced politely rather than stealing focus.
+    assert 'seatResult.setAttribute("aria-live", "polite")' in view
+
+    # The member opener is a button too.
+    card = _function_body(app, "representativeCard")
+    assert 'el("button", "rep-open"' in card
+    assert 'open.type = "button"' in card
+
+
+def test_the_state_view_renders_no_position_number() -> None:
+    """No charts, no rankings, no leaderboards (owner, Phase 7). The one
+    ranking the owner lifted the rule for is the published state subject
+    summary, and even there the ORDER carries it -- the page adds no index."""
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    for fn in ("renderStateSummary", "renderSeat", "renderMemberQuestions", "renderNameMatches"):
+        # Comments out first: prose about where a flag sits is documentation,
+        # a position rendered into a node is a ranking. A check that cannot
+        # tell them apart is unusable in a codebase that explains itself --
+        # the same line `_code_lines` takes for off-host URLs.
+        body = re.sub(
+            r"//[^\n]*", "", re.sub(r"/\*.*?\*/", "", _function_body(app, fn), flags=re.S)
+        )
+        for banned in ("position", "rank", "#${", "index + 1", "idx + 1"):
+            assert banned not in body, f"{fn} renders a {banned!r}"
+
+
+def test_the_state_always_accompanies_a_constituency_name() -> None:
+    """Three names in the window name a different seat in each of two states,
+    so a name shown without its state is a seat a reader cannot identify."""
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    seat_head = _function_body(app, "renderSeat")
+    assert 'el("p", "seat-state", stated(seat.state))' in seat_head, (
+        "the seat panel must print the state"
+    )
+    matches = _function_body(app, "renderNameMatches")
+    assert 'el("span", "match-state", stated(seat.state))' in matches, (
+        "every name match must carry its state"
+    )
+
+
+def test_the_view_reads_the_state_basis_from_the_published_file() -> None:
+    """The attribution rule is published prose; the page renders it and never
+    retypes it."""
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+    assert "basisBlockForUnit(summary.basisUnit" in body
+    assert "STATE_BASIS_UNIT" in body
+    # The rule's own sentences must NOT appear in the page source.
+    for sentence in (
+        "counts ONCE toward a state",
+        "do not sum the states",
+        "no stemming",
+    ):
+        assert sentence.lower() not in body.lower(), (
+            f"the page retypes the published basis: {sentence!r}"
+        )

@@ -1458,3 +1458,253 @@ input[type="search"]:focus-visible,
     width: auto;
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* T088 — the state and constituency entry point                          */
+/*                                                                        */
+/* Reuses the existing vocabulary wherever one exists: `.status-list` and  */
+/* its items come straight from the ministry profile's four-way split, so  */
+/* the three views look the same because they ARE the same rule, and       */
+/* `.basis`, `.fact`, `.flag-word` and `.picker-note` are untouched.       */
+/*                                                                        */
+/* 390 px first: every grid below is one column until it has room, and no  */
+/* rule here depends on a viewport wider than that to be readable.         */
+/* ---------------------------------------------------------------------- */
+
+.seat-head {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.seat-name {
+  font-family: var(--font-head);
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+/* The state, always beside the name. Three names in the window are ambiguous
+   without it, so this is not a subtitle -- it is part of the identity. */
+.seat-state {
+  margin: 2px 0 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.seat-id {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.seat-history {
+  margin: 0 0 14px;
+  color: var(--ink);
+}
+
+.rep-list,
+.question-list,
+.subject-list,
+.match-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rep {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px;
+  margin: 0 0 12px;
+}
+
+.rep-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.rep-name {
+  font-family: var(--font-head);
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+/* A member the seat record names but does not name. The id is shown instead,
+   in the monospace the page uses for every id, and the `.flag-word` beside it
+   carries the meaning without colour. */
+.rep-name-missing {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+.rep-meta,
+.question-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px 12px;
+  margin: 10px 0 0;
+}
+
+.rep-meta dt,
+.question-meta dt {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.rep-meta dd,
+.question-meta dd {
+  margin: 0;
+}
+
+.rep-id {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.rep-open {
+  margin: 12px 0 0;
+  min-height: var(--tap);
+  padding: 0 16px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.rep-open:hover {
+  border-color: var(--accent);
+}
+
+.rep-questions[data-state="empty"] {
+  display: none;
+}
+
+.rep-questions {
+  margin-top: 14px;
+  border-top: 1px solid var(--rule);
+  padding-top: 14px;
+}
+
+.member-totals {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.member-questions {
+  margin-top: 14px;
+}
+
+.question-list li {
+  border-top: 1px solid var(--rule);
+  padding: 12px 0;
+}
+
+.question-subject {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 1rem;
+}
+
+.subject-tally {
+  margin-top: 14px;
+}
+
+.subject-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  border-top: 1px solid var(--rule);
+  padding: 8px 0;
+}
+
+.subject-text {
+  flex: 1 1 auto;
+}
+
+.subject-count {
+  flex: 0 0 auto;
+  font-family: var(--font-head);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.match-host:empty {
+  display: none;
+}
+
+.match-host {
+  margin-top: 12px;
+}
+
+.match-list li {
+  border-top: 1px solid var(--rule);
+}
+
+/* One button per match, and the state is inside the button's label rather
+   than beside it: a reader choosing between two seats called Aurangabad is
+   choosing a state, so the state has to be part of what they click. */
+.match-button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 4px;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.match-button:hover .match-name {
+  text-decoration: underline;
+}
+
+.match-name {
+  font-weight: 700;
+}
+
+.match-state {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+@media (min-width: 40rem) {
+  .rep-meta,
+  .question-meta {
+    grid-template-columns: 9rem 1fr;
+  }
+
+  .rep-meta dt,
+  .question-meta dt {
+    margin: 0;
+  }
+
+  .member-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The same vertical rhythm the other three result regions use. */
+#state-summary > *,
+#seat-result > * {
+  margin-top: 16px;
+}

@@ -1,0 +1,43 @@
+{
+  "_policy": "HAND-WRITTEN. No upstream response. All identities fictional; see README.md.",
+  "_shape": "Roster records as `sansad.ingest.members.load_members` reads them. `lsExpr` is the comma-separated enumeration of every Lok Sabha a member served in, which is what the real roster serves and what T086's window filter reads.",
+  "_cases": {
+    "fx-c001 / fx-c002": "Constituency Theta, State Alpha -- TWO DIFFERENT HOLDERS across the covered terms (17 then 18). US3 acceptance scenario 3.",
+    "fx-c003": "Constituency Iota, State Alpha -- ONE member holding BOTH covered terms. Must produce TWO representations, not one; this is the case the old (member_id, start_date) key collapsed, and it is the majority case in the real data (216 of 545 seats).",
+    "fx-c004": "Constituency Kappa, State Alpha -- a holder in the 17th only; the seat has no 18th-term representation at all.",
+    "fx-c005": "Constituency Theta, State BETA -- the SAME SEAT NAME in a different state. Must be a separate row with its own state, never merged with fx-c001/fx-c002.",
+    "fx-c006": "Constituency Lambda, State Gamma -- terms 15 and 16 ONLY, both outside the covered window. The seat must not appear in the set at all.",
+    "fx-c007": "Constituency Mu, State Gamma -- terms 16 AND 17: the out-of-window term is dropped and the in-window one kept, on one member.",
+    "fx-c008": "State Delta -- the seat carries the state's own name, so the id's two halves are one slug and are not repeated.",
+    "fx-c009": "Constituency Nu, State Alpha -- party and state recorded as empty, so the published row must carry an explicit 'not stated' rather than a blank."
+  },
+  "members": [
+    {"memberId": "fx-c001", "memberName": "Theta Holder Seventeen", "party": "Party A",
+     "state": "State Alpha", "constituency": "Constituency Theta", "house": "Lok Sabha",
+     "lsExpr": "17", "sittingStatus": "former"},
+    {"memberId": "fx-c002", "memberName": "Theta Holder Eighteen", "party": "Party B",
+     "state": "State Alpha", "constituency": "Constituency Theta", "house": "Lok Sabha",
+     "lsExpr": "18", "sittingStatus": "sitting"},
+    {"memberId": "fx-c003", "memberName": "Iota Holder Both Terms", "party": "Party C",
+     "state": "State Alpha", "constituency": "Constituency Iota", "house": "Lok Sabha",
+     "lsExpr": "17,18", "sittingStatus": "sitting"},
+    {"memberId": "fx-c004", "memberName": "Kappa Holder Seventeen", "party": "Party A",
+     "state": "State Alpha", "constituency": "Constituency Kappa", "house": "Lok Sabha",
+     "lsExpr": "17", "sittingStatus": "former"},
+    {"memberId": "fx-c005", "memberName": "Theta Holder Other State", "party": "Party D",
+     "state": "State Beta", "constituency": "Constituency Theta", "house": "Lok Sabha",
+     "lsExpr": "18", "sittingStatus": "sitting"},
+    {"memberId": "fx-c006", "memberName": "Lambda Holder Before The Window", "party": "Party E",
+     "state": "State Gamma", "constituency": "Constituency Lambda", "house": "Lok Sabha",
+     "lsExpr": "15,16", "sittingStatus": "former"},
+    {"memberId": "fx-c007", "memberName": "Mu Holder Across The Boundary", "party": "Party E",
+     "state": "State Gamma", "constituency": "Constituency Mu", "house": "Lok Sabha",
+     "lsExpr": "16,17", "sittingStatus": "former"},
+    {"memberId": "fx-c008", "memberName": "Delta Single Seat Holder", "party": "Party F",
+     "state": "State Delta", "constituency": "State Delta", "house": "Lok Sabha",
+     "lsExpr": "18", "sittingStatus": "sitting"},
+    {"memberId": "fx-c009", "memberName": "Nu Holder Without Party", "party": "",
+     "state": "State Alpha", "constituency": "Constituency Nu", "house": "Lok Sabha",
+     "lsExpr": "18", "sittingStatus": ""}
+  ]
+}

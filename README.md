@@ -76,18 +76,27 @@ published to GitHub.**
   `make audit-fields` are clean. No count is quoted here on purpose: a hand-typed
   figure beside a growing suite went stale twice in two days, and a number nobody
   re-measures is worse than no number.
-- **All three reader-page views are built, and the page has been driven in a real browser.**
+- **All four reader-page views are built, and the page has been driven in a real browser.**
   The shell, the stylesheet, the fetch layer, the coverage display, the licence and
   source-terms footer, the ministry-profile view (T078), **subject search (T079)**,
-  two-ministry comparison (T080), `make serve-local` (T081), `make test-page` (T082) and
-  `make report` (T085) are done. T079's gate was **re-measured against the published search
+  two-ministry comparison (T080), **the state and constituency entry point (T088)**,
+  `make serve-local` (T081), `make test-page` (T082), `make report` (T085) and
+  `make lookup` (T089) are done. T079's gate was **re-measured against the published search
   digest and passed**, where the earlier attempt through the `by-session` partitions had
   failed it; the figures are in
-  [`spike/size-budget.md`](specs/001-resolved-metadata-layer/spike/size-budget.md) → *T079*
-  and → *T083*, which is where they stay rather than being retyped here — the last two
-  figures quoted in this bullet went stale within a day. The remaining first-load unknown is
-  the real **compressed** figure, which can only be read from the live site's response
+  [`spike/size-budget.md`](specs/001-resolved-metadata-layer/spike/size-budget.md) → *T079*,
+  → *T083* and → *T090*, which is where they stay rather than being retyped here — the last
+  two figures quoted in this bullet went stale within a day. The remaining first-load unknown
+  is the real **compressed** figure, which can only be read from the live site's response
   headers once Pages is serving the `published` branch.
+- **A visitor who knows only where they live can reach their members (SC-008).** Pick a state,
+  then a constituency; a seat held by different members across the two covered terms shows
+  **both, with their own terms, never merged**, and a constituency name that names a different
+  seat in two states shows both with their states rather than picking one. The view fetches
+  **nothing on page load** — its two files are read on first use, and one `by-member` file when
+  a member is opened. Building it found **three defects already in the published constituency
+  reference set**, all fixed in T086 and recorded in
+  [`spike/size-budget.md`](specs/001-resolved-metadata-layer/spike/size-budget.md) → *T086*.
 
 ### Not done
 
@@ -104,9 +113,9 @@ published to GitHub.**
   *`main` must stay unprotected*.
 - **Lok Sabha only.** No Rajya Sabha data is published — see *What is still unknown* below. The
   coverage statement declares this rather than implying both Houses.
-- **Phases 7, 8 and 9 have not started** — the state and constituency entry point (T086–T090),
-  polish and gate evidence (T091–T097), and the Rajya Sabha route investigation (T098–T100).
-  `make validate` is still a deliberately-failing stub, owned by T091.
+- **Phases 8 and 9 have not started** — polish and gate evidence (T091–T097) and the Rajya
+  Sabha route investigation (T098–T100). `make validate` is still a deliberately-failing stub,
+  owned by T091. **Phase 7 (T086–T090) is done.**
 
 ### What the spike established
 
