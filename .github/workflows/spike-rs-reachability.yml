@@ -1,0 +1,98 @@
+---
+# THROWAWAY. Phase 9 / T099 only -- delete this file once the result is recorded
+# in specs/001-resolved-metadata-layer/spike/rs-route.md, exactly as T010 deleted
+# the T009 workflow it is modelled on.
+#
+# WHY IT EXISTS. T098 found a reachable Rajya Sabha route from a laptop. T099:
+# "If a route is found, confirm it is reachable from the T007 CI runner too,
+# since T010 may have shown a laptop and a runner are not equivalent." A
+# datacentre IP is one of the things that can differ, and rsdoc.nic.in is a
+# nic.in host on a different stack (HTTP/2, IIS) from anything T010 checked.
+#
+# WHAT IT DOES AND DOES NOT DO.
+#   * One GET per found route, plus the Lok Sabha route as the control.
+#   * Prints status code, elapsed time and response headers. Asserts HTTP 200.
+#   * WRITES NO RESPONSE BODY ANYWHERE -- every request is `-o /dev/null`, so
+#     not one byte of any payload reaches the runner's disk, its logs, or this
+#     repository. Constitution Principle V: the roster route serves phone
+#     numbers, addresses and birth dates for named people, and a CI log is
+#     something a third party can reach.
+#   * Fetches NO document. The question route carries document pointers; they
+#     are never followed (Principle III).
+#   * `workflow_dispatch` ONLY -- no schedule. This must never run unattended.
+#   * `contents: read`. It needs no write access and is given none.
+#
+# It builds no ingest, no partition and no page. Phase 9 investigates and stops.
+name: spike-rs-reachability
+
+"on":
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Runner identity, for the laptop-vs-runner comparison
+        run: |
+          set -u
+          echo "runner os     : $(uname -srm)"
+          echo "curl version  : $(curl --version | head -1)"
+          echo "egress IP     : $(curl -s --max-time 30 https://api.ipify.org || echo UNAVAILABLE)"
+
+      - name: One GET per route -- status, elapsed, headers. No body kept.
+        run: |
+          set -u
+          fail=0
+          probe() {
+            label="$1"; url="$2"
+            echo ""
+            echo "=============================================================="
+            echo "## $label"
+            echo "## $url"
+            hdr="$(mktemp)"
+            out="$(curl -s -o /dev/null -D "$hdr" --max-time 180 \
+                    -w '%{http_code} %{size_download} %{time_total}' "$url" || echo 'ERR 0 0')"
+            code="$(echo "$out" | cut -d' ' -f1)"
+            echo "status line : $(head -1 "$hdr" | tr -d '\r')"
+            echo "http_code   : $code"
+            echo "size_download: $(echo "$out" | cut -d' ' -f2) bytes (discarded, not written)"
+            echo "time_total  : $(echo "$out" | cut -d' ' -f3) s"
+            echo "-- response headers --"
+            tr -d '\r' < "$hdr" | sed '/^$/d'
+            rm -f "$hdr"
+            if [ "$code" != "200" ]; then
+              echo "RESULT: FAIL -- expected 200, got $code"
+              fail=1
+            else
+              echo "RESULT: 200"
+            fi
+          }
+
+          probe "CONTROL -- Lok Sabha member roster (T005 measured 200 from a laptop)" \
+            "https://sansad.in/api_ls/member"
+          probe "RS roster, one record -- the T098 route" \
+            "https://sansad.in/api_rs/member/sitting-members?page=1&size=1&mpFlag=1&locale=en"
+          probe "RS asker-name list" \
+            "https://sansad.in/api_rs/member/member-list"
+          probe "RS session list (rsdoc.nic.in, HTTP/2, IIS)" \
+            "https://rsdoc.nic.in/question/Get_sessionforQuestionSearch"
+          probe "RS ministry list (rsdoc.nic.in)" \
+            "https://rsdoc.nic.in/question/GetAllministary"
+          probe "RS question metadata, ONE session -- 4.26 MB on a laptop, body discarded" \
+            "https://rsdoc.nic.in/Question/Search_Questions?whereclause=ses_no=271"
+
+          echo ""
+          echo "=============================================================="
+          if [ "$fail" -ne 0 ]; then
+            echo "spike-rs-reachability: FAIL -- at least one route did not answer 200"
+            echo "from this runner. That is a VERIFIED BROKEN gate on a Rajya Sabha"
+            echo "follow-on, not a flake to retry: record it in rs-route.md with the"
+            echo "status lines above before anything else."
+            exit 1
+          fi
+          echo "spike-rs-reachability: every route answered 200 from this runner."
+          echo "Record the pasted output in rs-route.md, then DELETE this workflow."

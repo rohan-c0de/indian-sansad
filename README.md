@@ -208,9 +208,10 @@ not been observed serving the site**, and no unattended run has happened.
 - **T095 is deliberately not done, and Phase 9 has not started.** T095 records the *measured*
   upkeep figure after the refresh has run unattended for two cycles; the owner chose not to wait
   for two unattended scheduled runs, so the Upkeep gate carries **PENDING** rather than an
-  estimate dressed as a measurement. Phase 9 is the Rajya Sabha route investigation
-  (T098–T100), which investigates and stops. **Phases 7 and 8 are otherwise done** — `make
-  validate` is implemented (T091) and the gate evidence is written (T094).
+  estimate dressed as a measurement. **Phases 7, 8 and 9 are otherwise done** — `make
+  validate` is implemented (T091), the gate evidence is written (T094), and Phase 9 (T098–T100)
+  investigated the Rajya Sabha route and stopped, which is all it was ever allowed to do. T095
+  is now the only unticked box in `tasks.md`.
 
 ### What the spike established
 
@@ -234,10 +235,21 @@ not been observed serving the site**, and no unattended run has happened.
 
 ### What is still unknown
 
-- **Rajya Sabha material is not obtainable yet.** `GET /api_rs/members` returns HTTP 403 where
-  every sibling path returns 404. The cause is narrowed — a request-shape or path filter rather
-  than authorisation or IP reputation — but **unverified**. First release is **Lok Sabha only**,
-  and the coverage statement will say so rather than implying both Houses.
+- **Rajya Sabha material IS obtainable — and the 403 that said otherwise was never about the
+  Rajya Sabha.** Settled 2026-10-10 by Phase 9's browser capture and one control request:
+  `GET /api_ls/members` — the **Lok Sabha** side, plural — returns the same HTTP 403, from the
+  same client that had just had 200 from `/api_ls/member`. It is a **wrong-path 403, not a
+  block**. The real routes answer a plain unauthenticated `GET`:
+  `/api_rs/member/sitting-members` (2,547 members, 243 sitting and 2,304 former) and
+  `https://rsdoc.nic.in/Question/Search_Questions?whereclause=ses_no=<n>` (3,325 question
+  records for one session). Full evidence, the request-by-request diff against Lok Sabha, and
+  the seven things a follow-on must settle first — including **three prohibited attribute
+  spellings the field guard does not yet catch** — are in
+  [`spike/rs-route.md`](specs/001-resolved-metadata-layer/spike/rs-route.md). **Nothing was
+  built on it**: Phase 9 investigates and stops, so this release is still **Lok Sabha only** and
+  the coverage statement still says so. Two things remain unverified — whether those routes are
+  reachable from a **CI runner** (the check is written and unpushed), and *which* rule denies
+  that one path, which no follow-on needs to know.
 - **Question and answer text is out of scope by principle.** It is served only behind document
   files, which this project never opens. It is a declared gap, not an omission.
 - **Three session-level coverage anomalies**, all causes unverified: the 18th Lok Sabha's session
