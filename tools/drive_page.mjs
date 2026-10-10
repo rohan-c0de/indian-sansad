@@ -45,6 +45,13 @@ const QUERY = argValue("query", "water");
  * overrun, measured rather than assumed. */
 const QUERY_TWO = argValue("query-two", "drinking water");
 
+/* T088. A NAME, not a figure: `Aurangabad` is one of the three constituency
+ * names in the covered window that name a different seat in each of two
+ * states, which is the case the view has to get right. The driver derives
+ * everything else -- the state, the seat id and the members -- from the page,
+ * so nothing the published record owns is typed here. */
+const SEAT_NAME = argValue("seat-name", "Aurangabad");
+
 /* ---------------------------------------------------------------------- */
 /* The network log                                                        */
 /* ---------------------------------------------------------------------- */
@@ -741,6 +748,347 @@ async function main() {
       await emulate(cdp, WIDTHS[1]);
     }
 
+    /* =================================================================
+     * T088 -- the state and constituency entry point. US3.
+     *
+     * On a FRESH page, for the same reason the two-word query reloaded: by
+     * now nothing seat-related has been fetched, but the search module's
+     * memos are warm and the digest block is still in place. A reload gives
+     * a new module instance, and the HTTP cache is disabled, so what the
+     * "seatopen" phase records is a real FIRST USE of this view.
+     * ================================================================= */
+    await cdp.send("Network.setBlockedURLs", {
+      urls: ["*sansad.in*", "*sansad.nic.in*", "*://*/api_ls/*", "*://*/api_rs/*"],
+    });
+
+    currentPhase = "seatload";
+    console.log("");
+    console.log("Scenario 7 — the state and constituency view, on a FRESH page");
+    await cdp.send("Page.navigate", { url: `${ORIGIN}/` });
+    await waitFor(cdp, `document.getElementById("seat-open") !== null`, {
+      label: "the constituency finder's open button",
+    });
+    const seatLoadRequests = log.all().filter((r) => r.phase === "seatload");
+    report.phases.seatload = {
+      requests: seatLoadRequests.length,
+      encodedBytes: seatLoadRequests.reduce((n, r) => n + (r.encodedDataLength ?? 0), 0),
+      urls: seatLoadRequests.map((r) => ({
+        url: r.url,
+        status: r.status,
+        encodedDataLength: r.encodedDataLength,
+        contentEncoding: r.headers?.["content-encoding"] ?? null,
+      })),
+    };
+    check(
+      "NOTHING this view needs was requested on load",
+      !seatLoadRequests.some(
+        (r) =>
+          r.url.includes("constituencies.jsonl") ||
+          r.url.includes("state-subjects") ||
+          r.url.includes("/by-member/"),
+      ),
+      seatLoadRequests
+        .filter((r) => r.url.includes("constituencies") || r.url.includes("state-subjects"))
+        .map((r) => r.url)
+        .join(", ") || "none",
+    );
+
+    /* ---------------- phase: first use of the view ---------------- */
+    currentPhase = "seatopen";
+    console.log("");
+    console.log("First use of the view — the seat list and the state summary");
+    await evaluate(cdp, `document.getElementById("seat-open").click(), true`);
+    await waitFor(cdp, `document.getElementById("seat-state") !== null`, {
+      label: "the state picker",
+      timeoutMs: 60000,
+    });
+    const seatOpenRequests = log.all().filter((r) => r.phase === "seatopen");
+    report.phases.seatopen = {
+      requests: seatOpenRequests.length,
+      encodedBytes: seatOpenRequests.reduce((n, r) => n + (r.encodedDataLength ?? 0), 0),
+      urls: seatOpenRequests.map((r) => ({
+        url: r.url,
+        status: r.status,
+        encodedDataLength: r.encodedDataLength,
+        contentEncoding: r.headers?.["content-encoding"] ?? null,
+      })),
+    };
+    check(
+      "opening the view fetched EXACTLY the two files it needs",
+      seatOpenRequests.length === 2 &&
+        seatOpenRequests.some((r) => r.url.endsWith("reference/constituencies.jsonl")) &&
+        seatOpenRequests.some((r) => r.url.endsWith("aggregates/state-subjects.jsonl")),
+      seatOpenRequests.map((r) => r.url.split("/").pop()).join(", "),
+    );
+    check(
+      "the 3.4 MB member reference set was NOT fetched",
+      !log.all().some((r) => r.url.includes("reference/members")),
+      `${report.phases.seatopen.encodedBytes.toLocaleString("en-US")} B on the wire for the view`,
+    );
+
+    /* The state, the seat and its members all DERIVED from the page. */
+    const target = await evaluate(
+      cdp,
+      `(() => {
+         const select = document.getElementById("seat-state");
+         const options = [...select.options].map((o) => o.value).filter(Boolean);
+         return { states: options.length };
+       })()`,
+    );
+    check("every state in the record is offered", target.states >= 30, `${target.states} states`);
+
+    /* ---------------- phase: a state picked ---------------- */
+    currentPhase = "state";
+    console.log("");
+    console.log("A state picked — its seats, and the published subject summary");
+    const chosen = await evaluate(
+      cdp,
+      `(() => {
+         const name = ${JSON.stringify(SEAT_NAME)}.toLowerCase();
+         const box = document.getElementById("seat-name");
+         box.value = ${JSON.stringify(SEAT_NAME)};
+         box.form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+         const states = [...document.querySelectorAll("#seat-matches .match-state")]
+           .map((n) => n.textContent);
+         const names = [...document.querySelectorAll("#seat-matches .match-name")]
+           .map((n) => n.textContent.toLowerCase());
+         return { states, names, exact: names.filter((n) => n === name).length };
+       })()`,
+    );
+    check(
+      "a constituency name that exists in two states lists BOTH, each with its state",
+      chosen.exact === 2 && new Set(chosen.states).size === 2,
+      `${chosen.exact} seats named ${JSON.stringify(SEAT_NAME)} in ${JSON.stringify(chosen.states)}`,
+    );
+    if (SCREENS) {
+      for (const metrics of WIDTHS) {
+        await emulate(cdp, metrics);
+        report.screenshots.push(await shoot(cdp, SCREENS, "18-seat-name-two-states", metrics, "#constituency"));
+      }
+      await emulate(cdp, WIDTHS[1]);
+    }
+
+    /* Click the first match, which selects its state and its seat. */
+    await evaluate(cdp, `document.querySelector("#seat-matches .match-button").click(), true`);
+    await waitFor(
+      cdp,
+      `document.getElementById("seat-result").dataset.state === "ready" &&
+       document.getElementById("state-summary").dataset.state === "ready"`,
+      { label: "the seat and the state summary", timeoutMs: 60000 },
+    );
+    const stateState = await evaluate(
+      cdp,
+      `(() => {
+         const root = document.getElementById("state-summary");
+         const rows = [...root.querySelectorAll(".subject-list li")];
+         return {
+           heading: (root.querySelector(".seat-name") || {}).textContent || null,
+           subjects: rows.length,
+           firstSubject: rows.length ? rows[0].querySelector(".subject-text").textContent : null,
+           facts: [...root.querySelectorAll(".fact-value")].map((n) => n.textContent),
+           basis: (root.querySelector(".basis-text") || {}).textContent || "",
+           basisSrc: (root.querySelector(".basis-src") || {}).textContent || "",
+         };
+       })()`,
+    );
+    check(
+      "the state's subjects are summarised from the published aggregate",
+      stateState.subjects > 0 && stateState.facts.length === 2,
+      `${stateState.subjects} subject line(s), facts ${JSON.stringify(stateState.facts)}`,
+    );
+    check(
+      "the attribution rule is on the page, read from the published basis",
+      /counts ONCE toward a state/i.test(stateState.basis) &&
+        /do not sum the states/i.test(stateState.basis) &&
+        /exact subject lines/i.test(stateState.basis),
+      stateState.basisSrc,
+    );
+    check(
+      "the questions with no identified asker are declared on the page",
+      /cannot be attributed to any state and are EXCLUDED/i.test(stateState.basis),
+      (stateState.basis.match(/([\d,]+) questions in this window/) || [])[0] ?? "not stated",
+    );
+    if (SCREENS) {
+      for (const metrics of WIDTHS) {
+        await emulate(cdp, metrics);
+        report.screenshots.push(await shoot(cdp, SCREENS, "15-state-picked", metrics, "#state-summary"));
+      }
+      await emulate(cdp, WIDTHS[1]);
+    }
+
+    /* ---------------- phase: a two-holder seat ---------------- */
+    currentPhase = "seat";
+    console.log("");
+    console.log("A constituency with two holders across the terms — scenario 3");
+    const seatState = await evaluate(
+      cdp,
+      `(() => {
+         const root = document.getElementById("seat-result");
+         const reps = [...root.querySelectorAll(".rep")];
+         return {
+           name: (root.querySelector(".seat-name") || {}).textContent || null,
+           state: (root.querySelector(".seat-state") || {}).textContent || null,
+           history: (root.querySelector(".seat-history") || {}).textContent || null,
+           reps: reps.length,
+           people: reps.map((li) => ({
+             name: (li.querySelector(".rep-name") || {}).textContent || null,
+             terms: [...li.querySelectorAll(".rep-meta dd")].map((n) => n.textContent),
+           })),
+         };
+       })()`,
+    );
+    check(
+      "both holders appear, NOT merged, each with their own term",
+      seatState.reps === 2 &&
+        new Set(seatState.people.map((p) => p.name)).size === 2 &&
+        /different members/i.test(seatState.history ?? ""),
+      `${seatState.reps} members: ${seatState.people.map((p) => p.name).join(" | ")}`,
+    );
+    check(
+      "the seat names its state beside its name",
+      Boolean(seatState.state) && seatState.state.trim().length > 0,
+      `${seatState.name} — ${seatState.state}`,
+    );
+    check(
+      "each holder shows a party and a term, with no date invented",
+      seatState.people.every((p) => p.terms.some((t) => /Lok Sabha/.test(t))) &&
+        !seatState.people.some((p) => p.terms.some((t) => /\d{4}-\d{2}-\d{2}/.test(t))),
+      JSON.stringify(seatState.people[0].terms),
+    );
+    if (SCREENS) {
+      for (const metrics of WIDTHS) {
+        await emulate(cdp, metrics);
+        report.screenshots.push(await shoot(cdp, SCREENS, "16-seat-two-holders", metrics, "#seat-result"));
+      }
+      await emulate(cdp, WIDTHS[1]);
+    }
+
+    /* ---------------- phase: a member opened ---------------- */
+    currentPhase = "member";
+    console.log("");
+    console.log("A member opened — their questions, one file");
+    await evaluate(cdp, `document.querySelector("#seat-result .rep-open").click(), true`);
+    await waitFor(
+      cdp,
+      `document.querySelector("#seat-result .rep-questions[data-state='ready']") !== null`,
+      { label: "the member's questions", timeoutMs: 60000 },
+    );
+    const memberRequests = log.all().filter((r) => r.phase === "member");
+    report.phases.member = {
+      requests: memberRequests.length,
+      encodedBytes: memberRequests.reduce((n, r) => n + (r.encodedDataLength ?? 0), 0),
+      urls: memberRequests.map((r) => ({
+        url: r.url,
+        status: r.status,
+        encodedDataLength: r.encodedDataLength,
+        contentEncoding: r.headers?.["content-encoding"] ?? null,
+      })),
+    };
+    check(
+      "opening one member fetched exactly ONE by-member file and nothing else",
+      memberRequests.length === 1 && memberRequests[0].url.includes("/by-member/"),
+      memberRequests.map((r) => r.url.split("/").pop()).join(", ") || "no request",
+    );
+    const memberState = await evaluate(
+      cdp,
+      `(() => {
+         const host = document.querySelector("#seat-result .rep-questions[data-state='ready']");
+         const statusValues = [...host.querySelectorAll(".status-value")]
+           .map((n) => Number(n.textContent.replace(/[^0-9]/g, "")));
+         const total = Number(
+           (host.querySelector(".fact-value") || {}).textContent.replace(/[^0-9]/g, ""));
+         return {
+           total,
+           statusValues,
+           statusSum: statusValues.reduce((a, b) => a + b, 0),
+           questions: host.querySelectorAll(".question-list li").length,
+           flagWords: host.querySelectorAll(".flag-word").length,
+           subjects: host.querySelectorAll(".subject-list li").length,
+           basis: (host.querySelector(".basis-text") || {}).textContent || "",
+         };
+       })()`,
+    );
+    check(
+      "their questions are reachable from the seat",
+      memberState.questions > 0 && memberState.total > 0,
+      `${memberState.questions} listed of ${memberState.total} published`,
+    );
+    check(
+      "the four link-status counts account for the total on screen",
+      memberState.statusValues.length === 4 && memberState.statusSum === memberState.total,
+      `${memberState.statusValues.join(" + ")} = ${memberState.statusSum}, total ${memberState.total}`,
+    );
+    check(
+      "unresolved and ambiguous questions are flagged IN WORDS, not colour",
+      memberState.flagWords >= 1,
+      `${memberState.flagWords} "flagged" word(s)`,
+    );
+    check(
+      "the counting basis is on the page beside the figures",
+      /QUESTIONS, not question-asker pairs/i.test(memberState.basis),
+      `${memberState.subjects} subject line(s) tallied`,
+    );
+    if (SCREENS) {
+      for (const metrics of WIDTHS) {
+        await emulate(cdp, metrics);
+        report.screenshots.push(await shoot(cdp, SCREENS, "17-member-opened", metrics, "#seat-result"));
+      }
+      await emulate(cdp, WIDTHS[1]);
+    }
+
+    /* ---------------- phase: a failed member fetch ---------------- */
+    currentPhase = "seatfailure";
+    console.log("");
+    console.log("Fetch failure — every by-member file blocked at the network level");
+    await cdp.send("Network.setBlockedURLs", {
+      urls: [
+        "*sansad.in*",
+        "*sansad.nic.in*",
+        "*://*/api_ls/*",
+        "*://*/api_rs/*",
+        "*/by-member/*",
+      ],
+    });
+    await evaluate(
+      cdp,
+      `(() => {
+         const buttons = [...document.querySelectorAll("#seat-result .rep-open")];
+         buttons[buttons.length - 1].click();
+         return true;
+       })()`,
+    );
+    await waitFor(
+      cdp,
+      `document.querySelector("#seat-result .rep-questions .unavailable") !== null`,
+      { label: "a visible failure", timeoutMs: 60000 },
+    );
+    const seatFailure = await evaluate(
+      cdp,
+      `(() => {
+         const box = document.querySelector("#seat-result .rep-questions .unavailable");
+         const host = box.closest(".rep-questions");
+         return {
+           state: host.dataset.state,
+           head: (box.querySelector(".unavailable-head") || {}).textContent || null,
+           detail: (box.querySelector(".unavailable-detail") || {}).textContent || null,
+           questions: host.querySelectorAll(".question-list li").length,
+           visible: box.getBoundingClientRect().height > 20,
+         };
+       })()`,
+    );
+    check(
+      "a failed member fetch shows a VISIBLE error, never an empty question list",
+      seatFailure.state === "error" && seatFailure.visible && seatFailure.questions === 0,
+      `${seatFailure.head} | ${seatFailure.detail}`,
+    );
+    if (SCREENS) {
+      for (const metrics of WIDTHS) {
+        await emulate(cdp, metrics);
+        report.screenshots.push(await shoot(cdp, SCREENS, "19-member-fetch-failure", metrics, "#seat-result"));
+      }
+      await emulate(cdp, WIDTHS[1]);
+    }
+
     /* ---------------- the whole-run network assertions ---------------- */
     currentPhase = "done";
     console.log("");
@@ -781,10 +1129,27 @@ async function main() {
       offOrigin.length === 0,
       `${all.length} request(s), all to ${ORIGIN}`,
     );
+    /* The two phases that block a request ON PURPOSE are exempt, and named
+     * rather than matched on a pattern: `failure` blocks the search digests
+     * and `seatfailure` the by-member files, each to prove the page shows a
+     * visible error instead of an empty list. A blocked request in any other
+     * phase means the page tried to leave this host. */
+    const DELIBERATE_BLOCKS = new Set(["failure", "seatfailure"]);
+    const unexpectedBlocks = log.failures().filter((f) => !DELIBERATE_BLOCKS.has(f.phase));
     check(
-      "no request was blocked, which would mean the page tried to leave this host",
-      log.failures().filter((f) => f.phase !== "failure").length === 0,
-      JSON.stringify(log.failures().filter((f) => f.phase !== "failure")),
+      "no request was blocked outside the two phases that block one on purpose",
+      unexpectedBlocks.length === 0,
+      JSON.stringify(unexpectedBlocks),
+    );
+    check(
+      "both deliberate blocks did fire, so the two failure checks tested something",
+      [...DELIBERATE_BLOCKS].every((phase) =>
+        log.failures().some((f) => f.phase === phase),
+      ),
+      log
+        .failures()
+        .map((f) => `${f.phase}:${f.url.split("/").pop()}`)
+        .join(", ") || "none",
     );
     check(
       "the page threw no uncaught error and logged no console error",

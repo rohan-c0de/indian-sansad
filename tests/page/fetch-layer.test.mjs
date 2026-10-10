@@ -24,15 +24,22 @@ import {
   fetchNdjson,
   digestRelativePath,
   loadAskerNames,
+  loadMemberQuestions,
   loadSearchDigest,
   loadSearchIndex,
+  loadSeats,
+  loadStateSubjects,
+  memberRelativePath,
   publishedPath,
   requestUrl,
   requestableUrls,
   requestedDigests,
+  requestedMembers,
   resetSearchIndex,
+  resetSeatData,
   searchAssetsRequested,
   searchIndexRequested,
+  seatAssetsRequested,
 } from "../../web/lib/fetch.js";
 
 const PAGE = "https://rohan-c0de.github.io/indian-sansad/index.html";
@@ -156,9 +163,17 @@ test("every requestable URL is relative and under the published base", () => {
   // assert against a real network log.
   assert.deepEqual(new Set(Object.keys(PUBLISHED_FILES)), new Set([
     "manifest", "coverage", "countingBasis", "sessions",
-    "ministryProfile", "ministries",   // T078 / T080
-    "searchIndex", "askerNames",       // T079, both lazy
+    "ministryProfile", "ministries",       // T078 / T080
+    "searchIndex", "askerNames",           // T079, both lazy
+    "constituencies", "stateSubjects",     // T088, both lazy
   ]));
+  // `reference/members.jsonl` is NOT here, and that is the decision: it is
+  // 3,447,794 B, and T086 put each member's name, party and sitting status
+  // onto the constituency set's representations so this page never needs it.
+  assert.ok(
+    !Object.values(PUBLISHED_FILES).includes("reference/members.jsonl"),
+    "the 3.4 MB member set is not a file this page requests",
+  );
   // The 21 per-session digests are a PATTERN, not 21 entries: which ones a
   // search fetches depends on which sessions contain a match, and most
   // searches fetch one. The pattern still has to be published-relative, which
@@ -166,6 +181,23 @@ test("every requestable URL is relative and under the published base", () => {
   const pattern = urls.filter((url) => url.includes("<session>"));
   assert.equal(pattern.length, 1, "the digest pattern is listed exactly once");
   assert.equal(pattern[0], "./data/published/search/digest/<house>-<term>-<session>.jsonl");
+  // And the 1,592 by-member files, for the same reason: T088 fetches ONE, for
+  // the member the visitor opened.
+  const members = urls.filter((url) => url.includes("<member-id>"));
+  assert.equal(members.length, 1, "the by-member pattern is listed exactly once");
+  assert.equal(members[0], "./data/published/by-member/<member-id>.jsonl");
+});
+
+test("a member id that is not one cannot compose a path", () => {
+  // The id reaches `memberRelativePath` from a PUBLISHED RECORD, so it is
+  // upstream-derived text and is checked before it can build a URL -- not left
+  // to `publishedPath`, whose message would name the path instead of the id.
+  for (const bad of ["", "../../etc/hosts", "ls-129/../..", "LS-129", "ls-", "x".repeat(40)]) {
+    assert.throws(() => memberRelativePath(bad), CrossOriginRefused, `accepted ${bad}`);
+  }
+  assert.equal(memberRelativePath("ls-129"), "by-member/ls-129.jsonl");
+  assert.equal(publishedPath(memberRelativePath("ls-5199")),
+    "./data/published/by-member/ls-5199.jsonl");
 });
 
 /* ---------------------------------------------------------------------- */
@@ -286,4 +318,72 @@ test("NO search file is requested until a search happens — the boot assertion"
   await loadAskerNames(opts(impl));
   assert.equal(searchAssetsRequested(), true);
   resetSearchIndex();
+});
+
+
+/* ---------------------------------------------------------------------- */
+/* T088 — the state view's three files are lazy, and memoised             */
+/* ---------------------------------------------------------------------- */
+
+function counting(body) {
+  const calls = [];
+  const impl = async (url) => {
+    calls.push(url);
+    return { ok: true, status: 200, text: async () => body };
+  };
+  return { impl, calls };
+}
+
+test("nothing the state view needs is requested until it is asked for", () => {
+  resetSeatData();
+  assert.equal(seatAssetsRequested(), false);
+  assert.deepEqual(requestedMembers(), []);
+});
+
+test("the seat set and the state summary are each requested once", async () => {
+  resetSeatData();
+  const seats = counting('{"constituency_id":"bihar-aurangabad","representations":[]}\n');
+  await Promise.all([loadSeats(opts(seats.impl)), loadSeats(opts(seats.impl))]);
+  assert.equal(seats.calls.length, 1, "two callers must share one request");
+  assert.equal(seatAssetsRequested(), true);
+  assert.ok(seats.calls[0].endsWith("/data/published/reference/constituencies.jsonl"));
+
+  const subjects = counting('{"state":"Bihar","subject":"Water","questions":2}\n');
+  await Promise.all([
+    loadStateSubjects(opts(subjects.impl)),
+    loadStateSubjects(opts(subjects.impl)),
+  ]);
+  assert.equal(subjects.calls.length, 1);
+  assert.ok(subjects.calls[0].endsWith("/data/published/aggregates/state-subjects.jsonl"));
+  resetSeatData();
+});
+
+test("one member file per member, memoised, and the id is in the path", async () => {
+  resetSeatData();
+  const member = counting('{"question_id":"lok-sabha/18/1/unstarred/1","subject":"Water"}\n');
+  await loadMemberQuestions("ls-129", opts(member.impl));
+  await loadMemberQuestions("ls-129", opts(member.impl));
+  assert.equal(member.calls.length, 1, "re-opening a member must cost nothing");
+  assert.ok(member.calls[0].endsWith("/data/published/by-member/ls-129.jsonl"));
+
+  await loadMemberQuestions("ls-5199", opts(member.impl));
+  assert.equal(member.calls.length, 2);
+  assert.deepEqual(requestedMembers().sort(), ["ls-129", "ls-5199"]);
+  resetSeatData();
+  assert.deepEqual(requestedMembers(), []);
+});
+
+test("a failed load does not poison every later attempt", async () => {
+  resetSeatData();
+  let attempt = 0;
+  const impl = async () => {
+    attempt += 1;
+    if (attempt === 1) return { ok: false, status: 503, text: async () => "" };
+    return { ok: true, status: 200, text: async () => '{"constituency_id":"x"}\n' };
+  };
+  await assert.rejects(() => loadSeats(opts(impl)), PublishedFileUnavailable);
+  assert.equal(seatAssetsRequested(), false, "a failed load must not look requested");
+  const rows = await loadSeats(opts(impl));
+  assert.equal(rows.length, 1);
+  resetSeatData();
 });

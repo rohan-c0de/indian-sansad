@@ -1373,3 +1373,84 @@ small fetch with no per-state question partition — but a "top 25 subjects by
 question count" is a ranking, and the owner's standing instruction for this
 phase is "no rankings". That tension is the owner's to resolve, not this
 document's.
+
+---
+
+# T090 — first page load re-measured with the third view present
+
+**2026-10-10. Same machine, same method as T083**: `make test-page` drives the
+real page in headless Chrome over `make serve-local`, with every hostname but
+the loopback host unresolvable, and `tools/measure_first_load.py` reads the
+network log. 43 of 43 checks passed.
+
+## Two columns, as the owner required — and the third T083 added
+
+| | wire B | vs T019 | body B | vs T019 | gzip -6 B | vs compressed ref |
+|---|---:|---:|---:|---:|---:|---:|
+| **first page load, no search, no state view** | 518,565 | **−87.6%** | 515,390 | **−87.7%** | 87,781 | −89.6% |
+| **first load + first search** (one word, 1 digest) | 4,112,854 | **−1.7%** | 4,109,147 | **−1.8%** | 1,007,452 | +18.9% |
+| the same, plus "Show 25 more" | 5,686,969 | +35.9% | 5,683,086 | +35.8% | 1,217,527 | +43.7% |
+| **first load + first search** (two words, 2 digests) | 5,686,969 | **+35.9%** | 5,683,086 | **+35.8%** | 1,217,527 | +43.7% |
+| **first load + first use of the state view** | 952,488 | **−77.2%** | 948,963 | **−77.3%** | 125,676 | −85.2% |
+| the same, plus one member opened | 1,034,403 | **−75.3%** | 1,030,704 | **−75.4%** | 133,909 | −84.2% |
+
+T019 budget (RAW, the contract): **4,183,979 B**.
+Like-for-like compressed reference (INFORMATIONAL ONLY): **847,324 B**.
+
+## The verdict
+
+- **The gate still PASSES.** A common word costs **4,109,147 B, −1.8% under**
+  T019's raw budget.
+- **The third view adds NOTHING to a page load.** 18 requests on load, the same
+  18 as T083 measured, and the driver asserts it in the log rather than in
+  prose: `NOTHING this view needs was requested on load`. Its two files are
+  fetched on first use.
+- **A visitor who uses the view pays 433,573 B for it** — the seat set
+  (252,226 B) and the state subject summary (181,347 B), in exactly two
+  requests, asserted. Opening one member costs one further file; the one the
+  driver opened was 81,741 B, and the largest in the dataset is 442,053 B.
+- **`reference/members.jsonl` was never requested**, asserted over the whole
+  run's log. That is what T086's three copied fields bought: 433,573 B where
+  the member set alone would have been 3,447,794 B.
+
+## The cost that IS on every page load, and it is not nothing
+
+First load went from T083's **465,387 B to 515,390 B — +50,003 B, +10.7%** —
+and every byte of it is the page's own code, not data:
+
+| file | T083 | now | delta |
+|---|---:|---:|---:|
+| `app.js` | 55,200 | 80,105 | +24,905 |
+| `lib/constituency.js` | — | 12,638 | **+12,638** |
+| `style.css` | 31,072 | 35,954 | +4,882 |
+| `lib/fetch.js` | 12,391 | 16,918 | +4,527 |
+| `index.html` | 5,532 | 7,011 | +1,479 |
+| the seven unchanged modules | 56,119 | 56,119 | 0 |
+| **page's own files** | **160,314** | **208,745** | **+48,431** |
+
+A view whose *data* is lazy still ships its *code* eagerly, because the page is
+one ES module graph with no build step and no dynamic import. At −87.7% of the
+budget that is affordable and no action is proposed; it is recorded because the
+same trick cannot be repeated indefinitely, and because "the view is lazy" is
+true of the 433,573 B and false of the 48,431 B.
+
+## A finding about the state summary itself
+
+The top-25 list is **nearly flat**. Bihar's most-asked subject line has **8**
+questions out of **7,613** attributed to the state, across **7,179 distinct
+subject lines** — the top 25 accounts for roughly 1.6% of them. That follows
+directly from the published rule that subjects are *exact subject lines, not
+topics*: 7,179 distinct lines over 7,613 questions means most lines occur once.
+
+The page shows the denominator beside the figure — "25 of 7,179 distinct lines"
+— so the reader can see the shape rather than mistake a count of 8 for a
+headline. **No grouping was added**: grouping is a reader's judgement, it would
+not be reproducible from the published records, and the counting basis says so.
+Recorded for the owner as a property of the data, not a defect in the view.
+
+## What this does not establish
+
+One machine, one browser, over loopback, against the working tree. It is not a
+measurement of GitHub Pages, and `Content-Encoding` was absent on every
+response, so every raw figure above is genuinely raw and every `gzip -6` figure
+is an offline estimate rather than what a visitor would receive.

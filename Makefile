@@ -277,15 +277,35 @@ report:
 	   $(if $(LS_TERM),--term "$(LS_TERM)",) \
 	   --published "$(REPO_ROOT)/data/published"
 
+# --------------------------------------------------------------------------
+# lookup -- T089 / quickstart.md scenario 7 (US3, SC-008).
+#
+#   make lookup CONSTITUENCY=Aurangabad
+#   make lookup CONSTITUENCY=Aurangabad STATE=Bihar
+#
+# Walks the same two files the page does -- the constituency reference set,
+# then the chosen members' own question files -- and never
+# reference/members.jsonl. A tool that reached the answer another way would
+# not be checking the route a consumer has.
+#
+# A NAME IS NOT AN IDENTITY. Three names in the covered window name a
+# different seat in each of two states, so a bare name prints BOTH seats under
+# their own states and says so; STATE= narrows it. Picking one would be wrong
+# half the time and silently.
+# --------------------------------------------------------------------------
+STATE ?=
+
 lookup:
 	@set -eu -o pipefail; \
-	 echo "make lookup: NOT IMPLEMENTED YET."; \
-	 echo "  will: resolve a constituency to its members and their periods, e.g. CONSTITUENCY=<name>"; \
-	 echo "  quickstart.md: scenario 7 (US3, SC-008)"; \
-	 echo "  implemented by: T089"; \
-	 echo "  Failing deliberately (T035): a stub that exited 0 would let"; \
-	 echo "  'make validate' report success on work that has not been done."; \
-	 exit 1
+	 if [[ -z "$(CONSTITUENCY)" ]]; then \
+	   echo "make lookup: CONSTITUENCY is required."; \
+	   echo "  e.g. make lookup CONSTITUENCY=Aurangabad [STATE=Bihar]"; \
+	   exit 1; \
+	 fi; \
+	 "$(VENV_PY)" tools/show_lookup.py \
+	   --constituency "$(CONSTITUENCY)" \
+	   $(if $(STATE),--state "$(STATE)",) \
+	   --published "$(REPO_ROOT)/data/published"
 
 # --------------------------------------------------------------------------
 # composition -- T068 / quickstart.md scenario 8 (US4).

@@ -88,6 +88,34 @@
   </section>
 
   <!-- ===================================================================
+       T088 — the state and constituency entry point. User Story 3.
+
+       NOTHING here is fetched on page load. The seat list
+       (reference/constituencies.jsonl, 252,226 B) and the state subject
+       summary (aggregates/state-subjects.jsonl, 181,347 B) are read on the
+       visitor's FIRST USE of the view, and one by-member file per member they
+       open. boot() asserts none of them has been touched before it renders.
+
+       State first, then constituency: three constituency names in the covered
+       window name a different seat in each of two states, so a name on its
+       own does not identify a seat.
+       =================================================================== -->
+  <section class="section" id="constituency" aria-labelledby="seat-h">
+    <div class="section-head">
+      <h2 id="seat-h">Your state and constituency</h2>
+      <p class="lede">Who has represented a seat across the covered window, and what
+        they have asked. Which Houses this record covers is stated in the coverage
+        statement above, which derives it from the published record rather than
+        repeating it here.</p>
+    </div>
+    <div class="card" id="seat-picker">
+      <p class="status" role="status">Preparing the constituency finder…</p>
+    </div>
+    <div id="state-summary" data-state="empty"></div>
+    <div id="seat-result" data-state="empty"></div>
+  </section>
+
+  <!-- ===================================================================
        T080 — two-ministry comparison, over the same aggregate as T078.
        Nothing is pre-selected: a pair the page picked would read as a
        comparison someone had asked for.

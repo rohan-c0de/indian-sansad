@@ -58,6 +58,13 @@ PHASE_MEANING = {
     "ignored": "a query with words the tokenise rule drops",
     "zero": "a query with no hits",
     "failure": "a blocked digest, to prove the error is visible",
+    # T088/T090 -- the third view. Added 2026-10-10.
+    "seatload": "a THIRD first load, for the state-view measurement below",
+    "seatopen": "FIRST USE OF THE STATE VIEW — the seat set and the state summary",
+    "state": "a state picked — rendered from what `seatopen` already fetched",
+    "seat": "a constituency picked — rendered from the same fetch",
+    "member": "ONE member opened — one by-member file, and nothing else",
+    "seatfailure": "a blocked by-member file, to prove the error is visible",
 }
 
 
@@ -187,6 +194,33 @@ def main() -> int:
                 reload_["wire"] + two["wire"],
                 reload_["body"] + two["body"],
                 reload_["gzip"] + two["gzip"],
+            )
+        )
+
+    # T090 -- the third view, measured against the SAME budget. T019's budget
+    # is per PAGE LOAD, and this view adds nothing to a page load: its two
+    # files are fetched on first use. The rows below therefore say what a
+    # visitor who uses it pays, which is a different question from the gate,
+    # and both are printed so neither is mistaken for the other.
+    seatload = totals.get("seatload", {})
+    seatopen = totals.get("seatopen", {})
+    member = totals.get("member", {})
+    if seatload and seatopen:
+        rows.append(
+            (
+                "first load + first use of the state view",
+                seatload["wire"] + seatopen["wire"],
+                seatload["body"] + seatopen["body"],
+                seatload["gzip"] + seatopen["gzip"],
+            )
+        )
+    if seatload and seatopen and member:
+        rows.append(
+            (
+                "the same, plus one member opened",
+                seatload["wire"] + seatopen["wire"] + member["wire"],
+                seatload["body"] + seatopen["body"] + member["body"],
+                seatload["gzip"] + seatopen["gzip"] + member["gzip"],
             )
         )
 

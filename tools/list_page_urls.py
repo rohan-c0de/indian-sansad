@@ -68,6 +68,7 @@ SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 _OFF_HOST = re.compile(r"(?:https?:)?//[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _BASE = re.compile(r"""PUBLISHED_BASE\s*=\s*["']([^"']+)["']""")
 _DIGEST_BASE = re.compile(r"""DIGEST_BASE\s*=\s*["']([^"']+)["']""")
+_MEMBER_BASE = re.compile(r"""MEMBER_BASE\s*=\s*["']([^"']+)["']""")
 _ENTRY = re.compile(r"""^\s*([A-Za-z][A-Za-z0-9]*)\s*:\s*["']([^"']+)["'],?\s*$""", re.M)
 
 
@@ -97,6 +98,20 @@ def digest_base() -> str:
     match = _DIGEST_BASE.search(source)
     if not match:
         raise SystemExit("could not find DIGEST_BASE in web/lib/fetch.js")
+    return match.group(1)
+
+
+def member_base() -> str:
+    """The per-member question-file prefix, read out of `web/lib/fetch.js`.
+
+    A pattern for the same reason the digests are: T088 fetches ONE, for the
+    member the visitor opened, and listing 1,592 URLs here would read as 1,592
+    requests a page makes.
+    """
+    source = (WEB / "lib" / "fetch.js").read_text(encoding="utf-8")
+    match = _MEMBER_BASE.search(source)
+    if not match:
+        raise SystemExit("could not find MEMBER_BASE in web/lib/fetch.js")
     return match.group(1)
 
 
@@ -142,11 +157,13 @@ def main() -> int:
     published = REPO_ROOT / "data" / "published"
     eager_bytes = lazy_bytes = 0
     missing = False
+    sizes: dict[str, int] = {}
     for name, url in declared:
         when = "on load" if name in eager else "on demand"
         path = published / url[len(PUBLISHED_BASE_PREFIX) :]
         if path.is_file():
             size = path.stat().st_size
+            sizes[name] = size
             if name in eager:
                 eager_bytes += size
             else:
@@ -175,10 +192,22 @@ def main() -> int:
     if not pattern.startswith("./"):
         problems.append(f"searchDigest: {pattern} is not a relative path")
 
+    # T088 -- one per member opened, as a pattern for the same reason.
+    member_prefix = member_base()
+    member_dir = published / member_prefix
+    member_files = sorted(member_dir.glob("*.jsonl")) if member_dir.is_dir() else []
+    member_sizes = [path.stat().st_size for path in member_files]
+    member_pattern = f"{PUBLISHED_BASE_PREFIX}{member_prefix}<member-id>.jsonl"
+    member_shown = f"{max(member_sizes):,}" if member_sizes else "NOT BUILT"
+    print(f"{'per member':<11}{'byMember':<17}{member_shown:>12}  {member_pattern}")
+    if not member_pattern.startswith("./"):
+        problems.append(f"byMember: {member_pattern} is not a relative path")
+
     print("-" * 92)
     print(
         f"{len(declared)} URL(s): {len(eager)} on load, {len(declared) - len(eager)} on demand, "
-        f"plus 1 pattern over {len(digest_files)} per-session digest file(s)"
+        f"plus 2 patterns over {len(digest_files)} per-session digest file(s) "
+        f"and {len(member_files)} per-member file(s)"
     )
     if missing:
         print("  (sizes are from the locally built dataset; some files are NOT BUILT)")
@@ -196,6 +225,21 @@ def main() -> int:
             print(
                 f"  a FIRST SEARCH fetching one median digest: "
                 f"{eager_bytes + lazy_bytes + median_digest:>12,} B"
+            )
+        if member_sizes:
+            median_member = sorted(member_sizes)[len(member_sizes) // 2]
+            print(
+                f"  members  : {len(member_sizes)} file(s), median {median_member:,} B, "
+                f"largest {max(member_sizes):,} B, total {sum(member_sizes):,} B"
+            )
+            # T088's own walk, which fetches NEITHER search file.
+            seat_bytes = sum(
+                size for name, size in sizes.items() if name in ("constituencies", "stateSubjects")
+            )
+            print(
+                f"  the STATE VIEW's walk (not a page load): "
+                f"{seat_bytes:,} B on first use, "
+                f"+{median_member:,} B for a median member opened"
             )
         print()
         print("  Against T019's budgets (spike/size-budget.md):")
