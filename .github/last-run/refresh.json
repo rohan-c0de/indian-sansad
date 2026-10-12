@@ -1,8 +1,8 @@
 {
-  "last_attempted": "2026-10-11T10:09:03Z",
-  "refresh_outcome": "success",
+  "last_attempted": "2026-10-12T10:30:38Z",
+  "refresh_outcome": "failure",
   "previous_snapshot_checkout": "success",
-  "run_id": "38127709944",
+  "run_id": "38231530139",
   "note": "Keep-alive against the 60-day scheduled-workflow disable rule.",
   "why_main": "Whether a push to a non-default branch counts as",
   "why_main_cont": "repository activity is UNVERIFIED; FR-009 does not rest on it."
