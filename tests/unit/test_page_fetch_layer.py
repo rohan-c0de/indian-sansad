@@ -27,9 +27,39 @@ WEB = REPO_ROOT / "web"
 PAGE_TESTS = sorted((REPO_ROOT / "tests" / "page").glob("*.test.mjs"))
 LIST_PAGE_URLS = REPO_ROOT / "tools" / "list_page_urls.py"
 
-#: Suffixes these checks can read. A file under `web/` with any other suffix
+#: Suffixes these checks can read AS CODE. Every text scan below iterates
+#: exactly this set, via `PAGE_FILES`.
+PAGE_CODE_SUFFIXES = frozenset({".html", ".css", ".js"})
+
+#: Shipped binaries. **No text scan here can read one** -- a `woff2` is
+#: brotli-compressed, so `read_text` raises `UnicodeDecodeError` and a host
+#: regex over the bytes would be meaningless in both directions.
+#:
+#: They are not exempt, they are routed: `tools/check_font_scope.py` reads each
+#: one's `cmap` and asserts no Devanagari codepoint (Constitution Principle IV),
+#: the declared family and weight, the byte count, and that a licence sits
+#: beside it. `test_shipped_binaries_are_covered_by_their_own_check` below pins
+#: that routing so the category cannot become a silent skip.
+SHIPPED_BINARY_SUFFIXES = frozenset({".woff2"})
+
+#: Shipped documentation -- the font licences and their provenance note.
+#:
+#: Text, but **not code**. SIL OFL 1.1 requires a licence to travel with the
+#: font, so `OFL-*.txt` has to ship beside the `woff2` it covers; and the
+#: provenance note is the record of where these binaries came from, which is
+#: most useful to someone who takes the published branch and has no repository.
+#:
+#: The off-host rule does not apply to them, for the same reason it does not
+#: apply to the SVG namespace: a licence that cites its own licence URL, or a
+#: provenance note that records the URL a font was fetched from, is prose about
+#: a request -- not a request. What makes that safe is asserted rather than
+#: assumed: `test_no_page_code_references_a_shipped_doc` proves no page file
+#: points at them, so their content can never become something the page fetches.
+SHIPPED_DOC_SUFFIXES = frozenset({".txt", ".md"})
+
+#: Every suffix allowed to ship under `web/`. A file with any other suffix
 #: fails `test_every_file_under_web_is_scanned` rather than being skipped.
-PAGE_SUFFIXES = frozenset({".html", ".css", ".js"})
+PAGE_SUFFIXES = PAGE_CODE_SUFFIXES | SHIPPED_BINARY_SUFFIXES | SHIPPED_DOC_SUFFIXES
 
 #: Every file that ships as part of the page. GLOBBED, never listed.
 #:
@@ -39,7 +69,15 @@ PAGE_SUFFIXES = frozenset({".html", ".css", ".js"})
 #: `lib/licence.js` went unscanned by that tool and nothing failed when each was
 #: added. Collected at import time so `@pytest.mark.parametrize` can name each
 #: file, and asserted complete below.
-PAGE_FILES = tuple(sorted(str(p.relative_to(WEB)) for p in WEB.rglob("*") if p.is_file()))
+ALL_WEB_FILES = tuple(sorted(str(p.relative_to(WEB)) for p in WEB.rglob("*") if p.is_file()))
+
+#: The page's CODE -- what every text scan below reads. Narrowed from "every
+#: file under web/" when feature 002 shipped three fonts and their licences:
+#: the scans were written for code and raise on a binary, so the category they
+#: iterate has to be the category they can read.
+PAGE_FILES = tuple(n for n in ALL_WEB_FILES if (WEB / n).suffix in PAGE_CODE_SUFFIXES)
+SHIPPED_BINARIES = tuple(n for n in ALL_WEB_FILES if (WEB / n).suffix in SHIPPED_BINARY_SUFFIXES)
+SHIPPED_DOCS = tuple(n for n in ALL_WEB_FILES if (WEB / n).suffix in SHIPPED_DOC_SUFFIXES)
 
 
 def test_node_is_available_and_the_page_tests_exist() -> None:
@@ -69,13 +107,25 @@ def test_every_file_under_web_is_scanned() -> None:
     on_disk = sorted(str(p.relative_to(WEB)) for p in WEB.rglob("*") if p.is_file())
     assert on_disk, "web/ is empty, or the glob stopped matching"
     assert len(on_disk) >= 9, f"only {len(on_disk)} file(s) under web/; the glob looks wrong"
-    assert sorted(PAGE_FILES) == on_disk
+    assert sorted(ALL_WEB_FILES) == on_disk
 
     unreadable = [name for name in on_disk if (WEB / name).suffix not in PAGE_SUFFIXES]
     assert unreadable == [], (
         f"these files ship in web/ but no check here can read them: {unreadable}. "
         "Add the suffix to PAGE_SUFFIXES deliberately, or do not ship the file."
     )
+
+    # Every file lands in EXACTLY ONE category, and no category is empty while
+    # files of its kind are on disk. Three categories with an untested boundary
+    # would be the same blindness this test exists to prevent, one level up:
+    # a file could satisfy `PAGE_SUFFIXES` and still be read by nothing if the
+    # category tuples drifted from the suffix sets.
+    assert sorted((*PAGE_FILES, *SHIPPED_BINARIES, *SHIPPED_DOCS)) == on_disk, (
+        "a file under web/ is in no category, or in two: "
+        f"code={len(PAGE_FILES)} binary={len(SHIPPED_BINARIES)} doc={len(SHIPPED_DOCS)} "
+        f"against {len(on_disk)} on disk"
+    )
+    assert PAGE_FILES, "no page code under web/ -- every text scan below would be zero tests"
 
     spec = importlib.util.spec_from_file_location("sansad_list_page_urls", LIST_PAGE_URLS)
     assert spec and spec.loader
@@ -84,7 +134,16 @@ def test_every_file_under_web_is_scanned() -> None:
     assert sorted(tool.page_files()) == on_disk, (
         "tools/list_page_urls.py scans a different set of files than these tests do"
     )
-    assert tool.PAGE_SUFFIXES == PAGE_SUFFIXES
+    # The tool and these tests must agree on all three categories, not just on
+    # the code one. Comparing only `PAGE_SUFFIXES` would let the tool treat a
+    # font as code, or a stylesheet as documentation, with the suite green.
+    assert tool.PAGE_SUFFIXES == PAGE_CODE_SUFFIXES
+    assert tool.SHIPPED_BINARY_SUFFIXES == SHIPPED_BINARY_SUFFIXES
+    assert tool.SHIPPED_DOC_SUFFIXES == SHIPPED_DOC_SUFFIXES
+    assert (
+        tool.PAGE_SUFFIXES | tool.SHIPPED_BINARY_SUFFIXES | tool.SHIPPED_DOC_SUFFIXES
+        == PAGE_SUFFIXES
+    ), "the tool allows a suffix to ship that these tests do not, or the reverse"
 
 
 def test_the_page_test_suite_passes() -> None:
@@ -147,6 +206,62 @@ def test_no_page_file_names_another_host(name: str) -> None:
                 continue
             offenders.append((number, line.strip()))
     assert offenders == [], f"{name} names an outside host: {offenders}"
+
+
+def test_shipped_binaries_are_covered_by_their_own_check() -> None:
+    """A category the text scans cannot read must be routed, not skipped.
+
+    `.woff2` is the first binary to ship in `web/`, and three separate things
+    here are blind to it: these text scans raise `UnicodeDecodeError` on it,
+    `tools/guard_no_raw_payloads.py` lists `.woff2` in `UNSCANNABLE_SUFFIXES`
+    so `make guard` and `make audit-fields` skip it, and the 64 KB payload
+    ceiling does not apply because `PAYLOAD_SUFFIXES` holds only data formats.
+
+    So the one check that *can* read it has to exist, and has to be pointed at
+    the directory the fonts are actually in. Without this test, deleting
+    `check_font_scope.py` would turn a Principle IV gate into silence.
+    """
+    checker = REPO_ROOT / "tools" / "check_font_scope.py"
+    assert checker.is_file(), (
+        "web/ ships a binary and tools/check_font_scope.py is gone -- "
+        "nothing in this repository can read inside a font"
+    )
+    source = checker.read_text(encoding="utf-8")
+    # It must read the cmap and test the Devanagari block, not merely exist.
+    assert "cmap" in source and "0x0900" in source and "0x0980" in source
+    for name in SHIPPED_BINARIES:
+        assert Path(name).name in source, (
+            f"{name} ships in web/ but check_font_scope.py does not name it, "
+            "so its family, weight and byte count are unasserted"
+        )
+
+
+def test_no_page_code_references_a_shipped_doc() -> None:
+    """What makes the documentation exemption safe, asserted rather than assumed.
+
+    `OFL-*.txt` and `PROVENANCE.md` ship inside `web/` and DO name other hosts
+    -- a licence cites its own licence URL, and the provenance note records the
+    `fonts.gstatic.com` URL each font came from. That is prose about a request,
+    not a request, and the off-host rule is waived for them on exactly that
+    basis.
+
+    The waiver holds only while no page file points at one. The moment
+    something does -- a link, a `fetch`, an `@import` -- those URLs stop being
+    prose, because a reader could follow them from the page. This closes that
+    gap the same way the SVG-namespace exemption is closed: by checking the
+    condition the exemption rests on.
+    """
+    offenders: list[str] = []
+    for doc in SHIPPED_DOCS:
+        basename = Path(doc).name
+        for name in PAGE_FILES:
+            text = (WEB / name).read_text(encoding="utf-8")
+            if basename in text:
+                offenders.append(f"{name} references {doc}")
+    assert offenders == [], (
+        "page code points at shipped documentation, so its URLs are reachable "
+        f"from the page and the off-host waiver no longer holds: {offenders}"
+    )
 
 
 def test_the_svg_namespace_is_used_only_as_a_namespace() -> None:

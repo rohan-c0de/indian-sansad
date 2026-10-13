@@ -60,7 +60,7 @@ OFL 1.1 permits bundling and redistribution provided the licence travels with th
 
 ## R3 — Is the Latin subset actually sufficient for this record?
 
-**Decision**: yes, provably. No further subset range is needed and no character will fall back to a system font.
+**Decision**: yes — no further subset range is needed, and zero Devanagari enters the repository. **But see the correction below**: three of the 13 dataset codepoints are in the declared `unicode-range` and *not* in the fonts, so they do fall back to a system face. The claim originally made here, that none would, was wrong.
 
 **Rationale and evidence**: both families' `latin` `@font-face` carries the identical `unicode-range`:
 
@@ -288,7 +288,9 @@ Plus a contrast script that recomputes every palette pair from the stylesheet's 
 
 Wire figures still come from the live deployment: `tools/measure_first_load.py` documents that `make serve-local` compresses nothing and asserts it from the recorded headers.
 
-**UNVERIFIED**: whether `prefers-reduced-motion` (SC-010) can be emulated through the existing CDP bridge. `Emulation.setEmulatedMedia` supports it, but the driver does not call it today. If it cannot be reached, SC-010 falls back to a static assertion that every `transition`/`animation` in the stylesheet sits inside a `@media (prefers-reduced-motion: reduce)` guard — weaker, and it must be recorded as such rather than claimed as a browser check.
+**RESOLVED 2026-10-13 (T110)**: `prefers-reduced-motion` (SC-010) **is** reachable through the existing CDP bridge. `Emulation.setEmulatedMedia` is accepted, the media query matches inside the driver, and the page already honours it at `web/style.css:676`. No fallback is needed and SC-010 is a genuine browser check.
+
+One trap found while building it, recorded because trusting the check would have damaged correct code: a first version tested `transitionDuration > 0` and condemned every element on the page. The conventional reduced-motion reset is `transition-duration: 0.01ms !important`, not `0s` — a true zero can break code waiting on `transitionend` — and `0.01ms` parses to a positive number. The sweep compares against a 1 ms floor instead.
 
 ---
 
@@ -328,6 +330,6 @@ Against the spec's ceilings: SC-001 160,000 (**58,463 B headroom**), SC-002 95,0
 |---|---|
 | The 2026-10-10 live wire figures | Re-read `Content-Length` and `Content-Encoding` from the live deployment. The offline `gzip -6` sum agrees to within 1,180 B, which is corroboration only. |
 | The three font files total 60,684 B *as served by GitHub Pages* | `woff2` is already compressed and Pages will not re-encode it, so the figure should carry across unchanged — but it is a `fonts.gstatic.com` `content-length`, not a measurement of this site. |
-| `prefers-reduced-motion` is reachable through the driver | Call `Emulation.setEmulatedMedia` in `drive_page.mjs` and see. |
+| ~~`prefers-reduced-motion` is reachable through the driver~~ | **RESOLVED 2026-10-13 (T110): it is.** `Emulation.setEmulatedMedia` works, the media query matches inside the driver, and `web/style.css:676` already honours it. SC-010 is a browser check, not the fallback stylesheet assertion. |
 | No third test asserts the no-web-font property | A wider grep over `tests/` for `woff`, `font-face`, `@import`. |
 | The 2,800 px result-list ceiling (SC-006) | Build one denser row and measure 25 of them at 390 px. |

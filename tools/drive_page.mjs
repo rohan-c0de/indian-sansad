@@ -13,7 +13,7 @@
  *
  * Exits non-zero on any assertion failure, and prints the network log summary
  * T082 requires. `--screens` additionally writes the review screenshots at
- * 390 and 1280 CSS px using CDP device-metric EMULATION rather than a resized
+ * 390, 768, 1024 and 1440 CSS px using CDP device-metric EMULATION rather than a resized
  * window: a resized window is the host OS's idea of a viewport, bounded by the
  * real screen and carrying its scrollbars and chrome, so two machines produce
  * two different images of the same page.
@@ -164,10 +164,28 @@ function check(name, condition, detail) {
  * the page with 25 results open is tens of thousands of device pixels tall.
  * These are review screenshots of a layout, so 1x at the right CSS width is
  * the thing being reviewed and 2x only doubled the bytes. */
+/* Four widths, not two -- feature 002 SC-011. 390 and 1280 were the pair that
+ * reviewed the single-scroll page; the four below are the set the spec names,
+ * and they exist to catch what two could not: 768 is where a two-column
+ * layout first has room, and 1024 is where the view navigation stops being
+ * the tightest thing on the page. */
 const WIDTHS = [
   { width: 390, height: 844, scale: 1, handheld: true, label: "390" },
-  { width: 1280, height: 900, scale: 1, handheld: false, label: "1280" },
+  { width: 768, height: 1024, scale: 1, handheld: true, label: "768" },
+  { width: 1024, height: 768, scale: 1, handheld: false, label: "1024" },
+  { width: 1440, height: 900, scale: 1, handheld: false, label: "1440" },
 ];
+
+/* The width the FUNCTIONAL run happens at -- every scenario that drives the
+ * page rather than photographing it returns here afterwards.
+ *
+ * Named, not indexed. This was `FUNCTIONAL` in eleven places when WIDTHS held
+ * two entries and index 1 meant "the desktop one". Adding two widths in the
+ * middle would have silently repointed all eleven at 768 px, and the run would
+ * have kept passing while testing a width nobody chose. The lesson is the
+ * index, not the number: a positional reference into a list that is expected
+ * to grow is a defect waiting for the next edit. */
+const FUNCTIONAL = WIDTHS[WIDTHS.length - 1];
 
 /* The CDP parameter that selects handheld-device emulation, held as a VALUE
  * rather than written as an object key.
@@ -252,6 +270,229 @@ async function shoot(cdp, dir, name, metrics, selector = "#subject-search") {
 /* ---------------------------------------------------------------------- */
 /* Page interactions                                                      */
 /* ---------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------- */
+/* Measurement sweeps -- feature 002 T107-T110                            */
+/* ---------------------------------------------------------------------- */
+
+/* These four exist because the defects they look for were found BY HAND on the
+ * live site, which is the same as saying nothing was looking for them. Four
+ * links were under the tap-target floor -- the skip link at 25 px and three
+ * footer links at 38, 17 and 17 -- and a harness that drives this page in a
+ * real browser at four widths had no reason to miss them except that it was
+ * never asked.
+ *
+ * All four REPORT rather than throw. A sweep that stops at the first failure
+ * turns one run into N runs, and the whole point is to enumerate.
+ */
+
+/** WCAG 2.5.5 / the spec's SC-008 floor, in CSS px. */
+const TAP_FLOOR = 44;
+
+/** What counts as interactive. `[tabindex="-1"]` is excluded deliberately: it
+ * is the pattern this page uses to make a heading focusable for a programmatic
+ * focus move, which is not a control a reader can tab to or tap. */
+const INTERACTIVE =
+  'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+/** A short, stable descriptor for one element, so a failure names itself. */
+const DESCRIBE = `(node) => {
+  const id = node.id ? "#" + node.id : "";
+  const cls = node.className && typeof node.className === "string"
+    ? "." + node.className.trim().split(/\\s+/).join(".") : "";
+  const text = (node.textContent || "").trim().replace(/\\s+/g, " ").slice(0, 40);
+  return node.tagName.toLowerCase() + id + cls + (text ? ' "' + text + '"' : "");
+}`;
+
+/** T107 -- every interactive element's box, and every one under the floor. */
+async function tapTargetSweep(cdp) {
+  return evaluate(
+    cdp,
+    `(() => {
+      const describe = ${DESCRIBE};
+      const out = [];
+      for (const node of document.querySelectorAll(${JSON.stringify(INTERACTIVE)})) {
+        const r = node.getBoundingClientRect();
+        // An element with no box is not rendered -- a closed view, or a skip
+        // link parked off-screen until focus. Measuring it would report a
+        // 0x0 failure for something a reader cannot reach anyway.
+        if (r.width === 0 && r.height === 0) continue;
+        const w = Math.round(r.width * 100) / 100;
+        const h = Math.round(r.height * 100) / 100;
+        if (w < ${TAP_FLOOR} || h < ${TAP_FLOOR}) {
+          out.push({ what: describe(node), w, h });
+        }
+      }
+      return { floor: ${TAP_FLOOR}, under: out };
+    })()`,
+  );
+}
+
+/** T108 -- the page itself must never scroll sideways. */
+async function horizontalScrollSweep(cdp) {
+  return evaluate(
+    cdp,
+    `(() => {
+      const describe = ${DESCRIBE};
+      const d = document.documentElement;
+      const over = d.scrollWidth - d.clientWidth;
+      // Name the culprit rather than only the symptom: the widest element
+      // whose right edge is past the viewport.
+      let worst = null;
+      if (over > 0) {
+        for (const node of document.querySelectorAll("body *")) {
+          const r = node.getBoundingClientRect();
+          if (r.right > d.clientWidth + 1 && (!worst || r.right > worst.right)) {
+            worst = { what: describe(node), right: Math.round(r.right) };
+          }
+        }
+      }
+      return { scrollWidth: d.scrollWidth, clientWidth: d.clientWidth, over, worst };
+    })()`,
+  );
+}
+
+/** T109 -- SC-006's figure: the rendered height of a 25-result list. */
+async function resultListHeight(cdp) {
+  return evaluate(
+    cdp,
+    `(() => {
+      const list = document.querySelector("ol.result-list");
+      if (!list) return { present: false };
+      const r = list.getBoundingClientRect();
+      return {
+        present: true,
+        items: list.children.length,
+        height: Math.round(r.height),
+        perItem: list.children.length
+          ? Math.round((r.height / list.children.length) * 10) / 10
+          : null,
+      };
+    })()`,
+  );
+}
+
+/** T110 -- prefers-reduced-motion, if the protocol will emulate it.
+ *
+ * Returns `{ reachable: false }` when `Emulation.setEmulatedMedia` is not
+ * available or the feature is not honoured, which is a RESULT, not a failure:
+ * the task says to record it and fall back to a stylesheet assertion, and to
+ * report SC-010 as a stylesheet assertion rather than as a browser check. */
+async function reducedMotionSweep(cdp) {
+  try {
+    await cdp.send("Emulation.setEmulatedMedia", {
+      features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+    });
+  } catch (error) {
+    return { reachable: false, why: `setEmulatedMedia rejected: ${error.message}` };
+  }
+  await sleep(150);
+  const seen = await evaluate(
+    cdp,
+    `(() => {
+      const honoured = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const describe = ${DESCRIBE};
+      /* "Effectively zero", not "exactly zero".
+       *
+       * The first version of this check tested \`> 0\` and reported every
+       * element on the page as still animating. It was WRONG, and the page was
+       * right: the standard reduced-motion reset sets
+       * \`transition-duration: 0.01ms !important\`, not \`0s\`, because a true
+       * zero can break code waiting on \`transitionend\`. 0.01ms parses to a
+       * positive number, so \`> 0\` condemns the correct implementation.
+       *
+       * One millisecond is the threshold: below it nothing is perceptible as
+       * motion, and every conventional reset lands orders of magnitude under. */
+      const FLOOR_S = 0.001;
+      const moving = [];
+      for (const node of document.querySelectorAll("body, body *")) {
+        const s = getComputedStyle(node);
+        const longest = (value) =>
+          String(value).split(",").reduce((n, part) => Math.max(n, parseFloat(part) || 0), 0);
+        const trans = longest(s.transitionDuration);
+        const named = s.animationName && s.animationName !== "none";
+        const anim = named ? longest(s.animationDuration) : 0;
+        if (trans > FLOOR_S || anim > FLOOR_S) {
+          moving.push({ what: describe(node), transition: s.transitionDuration,
+                        animation: s.animationName, animationDuration: s.animationDuration });
+          if (moving.length >= 20) break;
+        }
+      }
+      return { honoured, floorSeconds: FLOOR_S, moving };
+    })()`,
+  );
+  // Put the media state back, or every later screenshot is taken under it.
+  await cdp.send("Emulation.setEmulatedMedia", { features: [] });
+  return { reachable: true, ...seen };
+}
+
+/**
+ * Run the geometry sweeps at all four widths, then reduced motion once.
+ *
+ * `label` names the page state being swept, because "no element is under
+ * 44 px" is only as good as the state it was measured in -- a view nobody
+ * opened has no boxes to measure.
+ */
+async function runSweeps(cdp, report, label) {
+  console.log(`\nSweeps — ${label}`);
+  const perWidth = [];
+  for (const metrics of WIDTHS) {
+    await emulate(cdp, metrics);
+    const [tap, scroll, list] = [
+      await tapTargetSweep(cdp),
+      await horizontalScrollSweep(cdp),
+      await resultListHeight(cdp),
+    ];
+    perWidth.push({ width: metrics.width, tap, scroll, list });
+
+    check(
+      `${label} @${metrics.width}px: every interactive element is at least ${TAP_FLOOR} px`,
+      tap.under.length === 0,
+      tap.under.length === 0
+        ? null
+        : `${tap.under.length} under the floor: ` +
+          tap.under.map((u) => `${u.what} ${u.w}x${u.h}`).join("; "),
+    );
+    check(
+      `${label} @${metrics.width}px: the page does not scroll sideways`,
+      scroll.over <= 0,
+      scroll.over <= 0
+        ? null
+        : `${scroll.over} px over; widest offender ${scroll.worst?.what ?? "unknown"}`,
+    );
+    if (list.present) {
+      console.log(
+        `       result list: ${list.height} px for ${list.items} item(s)` +
+          ` (${list.perItem} px each)`,
+      );
+    }
+  }
+  await emulate(cdp, FUNCTIONAL);
+
+  const motion = await reducedMotionSweep(cdp);
+  if (motion.reachable) {
+    check(
+      `${label}: prefers-reduced-motion is honoured — no transition, no animation`,
+      motion.honoured && motion.moving.length === 0,
+      motion.honoured
+        ? motion.moving.length === 0
+          ? null
+          : `${motion.moving.length} element(s) still animate: ` +
+            motion.moving.slice(0, 5).map((m) => m.what).join("; ")
+        : "the media query did not match even after setEmulatedMedia",
+    );
+  } else {
+    console.log(
+      `  [NOTE] prefers-reduced-motion is NOT reachable through this driver` +
+        ` — ${motion.why}. SC-010 falls back to a stylesheet assertion and must` +
+        ` be reported as one, not as a browser check.`,
+    );
+  }
+
+  report.sweeps ??= [];
+  report.sweeps.push({ label, floor: TAP_FLOOR, perWidth, reducedMotion: motion });
+  return { perWidth, motion };
+}
 
 async function typeAndSearch(cdp, query) {
   // Set the value and dispatch a real submit, so the path exercised is the
@@ -348,7 +589,7 @@ async function main() {
   };
 
   try {
-    await emulate(cdp, WIDTHS[1]);
+    await emulate(cdp, FUNCTIONAL);
 
     /* ---------------- phase: first page load ---------------- */
     currentPhase = "load";
@@ -503,8 +744,16 @@ async function main() {
         await emulate(cdp, metrics);
         report.screenshots.push(await shoot(cdp, SCREENS, "10-search-results", metrics));
       }
-      await emulate(cdp, WIDTHS[1]);
+      await emulate(cdp, FUNCTIONAL);
     }
+
+    /* The sweeps run HERE, with 25 results on screen, because this is the
+     * state the three measurements are about: it is the only state that has a
+     * result list to measure (SC-006), it has the most interactive elements of
+     * any state the page reaches (SC-008), and it is the widest content the
+     * page ever lays out (SC-007). Sweeping the bare landing view would report
+     * a clean bill of health for a page nobody had used. */
+    await runSweeps(cdp, report, "search results open");
 
     /* ---------------- phase: show more ---------------- */
     currentPhase = "more";
@@ -558,7 +807,7 @@ async function main() {
         await emulate(cdp, metrics);
         report.screenshots.push(await shoot(cdp, SCREENS, "11-search-show-more", metrics));
       }
-      await emulate(cdp, WIDTHS[1]);
+      await emulate(cdp, FUNCTIONAL);
     }
 
     /* ---------------- phase: a two-session query, on a FRESH page ----------
@@ -667,7 +916,7 @@ async function main() {
         await emulate(cdp, metrics);
         report.screenshots.push(await shoot(cdp, SCREENS, "12-search-ignored-words", metrics));
       }
-      await emulate(cdp, WIDTHS[1]);
+      await emulate(cdp, FUNCTIONAL);
     }
 
     /* ---------------- phase: zero hits ---------------- */
@@ -699,7 +948,7 @@ async function main() {
         await emulate(cdp, metrics);
         report.screenshots.push(await shoot(cdp, SCREENS, "13-search-zero-hits", metrics));
       }
-      await emulate(cdp, WIDTHS[1]);
+      await emulate(cdp, FUNCTIONAL);
     }
 
     /* ---------------- phase: a failed digest fetch ---------------- */
@@ -745,7 +994,7 @@ async function main() {
         await emulate(cdp, metrics);
         report.screenshots.push(await shoot(cdp, SCREENS, "14-search-fetch-failure", metrics));
       }
-      await emulate(cdp, WIDTHS[1]);
+      await emulate(cdp, FUNCTIONAL);
     }
 
     /* =================================================================
@@ -865,7 +1114,7 @@ async function main() {
         await emulate(cdp, metrics);
         report.screenshots.push(await shoot(cdp, SCREENS, "18-seat-name-two-states", metrics, "#constituency"));
       }
-      await emulate(cdp, WIDTHS[1]);
+      await emulate(cdp, FUNCTIONAL);
     }
 
     /* Click the first match, which selects its state and its seat. */
@@ -913,7 +1162,7 @@ async function main() {
         await emulate(cdp, metrics);
         report.screenshots.push(await shoot(cdp, SCREENS, "15-state-picked", metrics, "#state-summary"));
       }
-      await emulate(cdp, WIDTHS[1]);
+      await emulate(cdp, FUNCTIONAL);
     }
 
     /* ---------------- phase: a two-holder seat ---------------- */
@@ -960,7 +1209,7 @@ async function main() {
         await emulate(cdp, metrics);
         report.screenshots.push(await shoot(cdp, SCREENS, "16-seat-two-holders", metrics, "#seat-result"));
       }
-      await emulate(cdp, WIDTHS[1]);
+      await emulate(cdp, FUNCTIONAL);
     }
 
     /* ---------------- phase: a member opened ---------------- */
@@ -1033,7 +1282,7 @@ async function main() {
         await emulate(cdp, metrics);
         report.screenshots.push(await shoot(cdp, SCREENS, "17-member-opened", metrics, "#seat-result"));
       }
-      await emulate(cdp, WIDTHS[1]);
+      await emulate(cdp, FUNCTIONAL);
     }
 
     /* ---------------- phase: a failed member fetch ---------------- */
@@ -1086,7 +1335,7 @@ async function main() {
         await emulate(cdp, metrics);
         report.screenshots.push(await shoot(cdp, SCREENS, "19-member-fetch-failure", metrics, "#seat-result"));
       }
-      await emulate(cdp, WIDTHS[1]);
+      await emulate(cdp, FUNCTIONAL);
     }
 
     /* ---------------- the whole-run network assertions ---------------- */
@@ -1195,6 +1444,37 @@ async function main() {
     exitCode = 1;
   } finally {
     if (REPORT) {
+      /* T112 -- a machine-readable verdict for the three sweeps, so
+       * `make validate` reads pass/fail from a field instead of parsing prose.
+       * Derived from `report.sweeps`, never typed alongside it: two places
+       * holding the same verdict is how a green summary over a red sweep
+       * happens. */
+      report.sweepSummary = (report.sweeps ?? []).map((s) => {
+        const under = s.perWidth.flatMap((w) =>
+          w.tap.under.map((u) => ({ width: w.width, ...u })),
+        );
+        const overflowing = s.perWidth
+          .filter((w) => w.scroll.over > 0)
+          .map((w) => ({ width: w.width, over: w.scroll.over, worst: w.scroll.worst }));
+        const lists = s.perWidth
+          .filter((w) => w.list.present)
+          .map((w) => ({ width: w.width, items: w.list.items, height: w.list.height }));
+        return {
+          label: s.label,
+          widths: s.perWidth.map((w) => w.width),
+          tapTargets: { floor: s.floor, underCount: under.length, under, ok: under.length === 0 },
+          horizontalScroll: { offenderCount: overflowing.length, overflowing, ok: overflowing.length === 0 },
+          resultList: { measured: lists, ceiling: 2800, ok: lists.every((l) => l.height <= 2800) },
+          reducedMotion: {
+            reachable: s.reducedMotion.reachable,
+            honoured: s.reducedMotion.honoured ?? null,
+            stillMoving: s.reducedMotion.moving?.length ?? null,
+            // When the protocol cannot emulate it, SC-010 is NOT a browser
+            // check and the summary says so rather than reporting a pass.
+            basis: s.reducedMotion.reachable ? "browser" : "not measured here",
+          },
+        };
+      });
       await writeFile(REPORT, JSON.stringify(report, null, 1) + "\n", "utf8");
       console.log(`report: ${REPORT}`);
     }

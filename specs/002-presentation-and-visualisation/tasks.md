@@ -39,6 +39,26 @@ Each remains independently testable, and US1 can be pulled forward if the readab
 
 **US8 is independent of every page story** and can run at any point, or in parallel by a second person.
 
+### Sequencing defect found during execution, 2026-10-13
+
+**T102 lands font files in `web/` in Phase 1, but the checks that read them were
+written as T114 and T125 in Phase 3.** The suite went red the moment the fonts
+were committed — 15 failures in `tests/unit/test_page_fetch_layer.py`, because
+its text scans glob `web/` and a `woff2` is a compressed binary, and because the
+OFL licences and the provenance note legitimately name other hosts.
+
+Those failures were the pre-existing checks working exactly as designed. Feature
+001 wrote `test_every_file_under_web_is_scanned` to catch this precise case —
+"An image, a font or a wasm blob is a request the text scans cannot see. It
+fails here instead of being skipped" — and it did.
+
+**T114 was therefore pulled forward into Phase 2**, where the files it checks
+actually exist, together with the three-category split in
+`tests/unit/test_page_fetch_layer.py` and `tools/list_page_urls.py` (page code /
+shipped binary / shipped documentation). The lesson for the remaining phases: a
+task that puts a new *kind* of file into `web/` must land with the check that
+reads it, not two phases later.
+
 ---
 
 ## Phase 1: Setup
@@ -61,13 +81,13 @@ Each remains independently testable, and US1 can be pulled forward if the readab
 
 **⚠️ CRITICAL**: no story can be *verified* until this phase is done, and a story that cannot be verified is not done.
 
-- [ ] T106 Change `SCREENS` in `tools/drive_page.mjs` from `{390, 1280}` to the four widths SC-011 requires — `{width: 390, height: 844, handheld: true}`, `{width: 768, height: 1024, handheld: true}`, `{width: 1024, height: 768, handheld: false}`, `{width: 1440, height: 900, handheld: false}` — keeping CDP device-metric emulation rather than window resizing, and keeping scale 1 for the reason already recorded in that file (`captureBeyondViewport` at 390 px and scale 2 never returned)
-- [ ] T107 Add a tap-target sweep to `tools/drive_page.mjs`: at each width, for every `a, button, input, select, [tabindex]:not([tabindex="-1"])`, read `getBoundingClientRect()` and report every element under **44 px in either dimension** with its selector and measured box. Report, do not throw — the sweep must enumerate *all* failures in one run, not stop at the first
-- [ ] T108 [P] Add a horizontal-scroll assertion to `tools/drive_page.mjs`: at each width assert `document.documentElement.scrollWidth <= document.documentElement.clientWidth`, reporting the overflowing element when it fails (SC-007)
-- [ ] T109 [P] Add a result-list height measurement to `tools/drive_page.mjs`: after a 25-result query at 390 px, report the rendered height of the result list in CSS px (SC-006). Record the **current** figure before any densification work, so the reduction is measured against a number from this harness rather than against the ~6,000 px estimate
-- [ ] T110 Attempt `prefers-reduced-motion` emulation in `tools/drive_page.mjs` via CDP `Emulation.setEmulatedMedia` with `features: [{name: "prefers-reduced-motion", value: "reduce"}]`, and assert no element reports a non-`none` `transition-duration` or `animation-name`. **If the call proves unreachable, record that in `research.md` and fall back** to a static assertion that every `transition` and `animation` in `web/style.css` sits inside a `@media (prefers-reduced-motion: reduce)` guard — then report SC-010 as a stylesheet assertion, never as a browser check
+- [X] T106 Change `SCREENS` in `tools/drive_page.mjs` from `{390, 1280}` to the four widths SC-011 requires — `{width: 390, height: 844, handheld: true}`, `{width: 768, height: 1024, handheld: true}`, `{width: 1024, height: 768, handheld: false}`, `{width: 1440, height: 900, handheld: false}` — keeping CDP device-metric emulation rather than window resizing, and keeping scale 1 for the reason already recorded in that file (`captureBeyondViewport` at 390 px and scale 2 never returned)
+- [X] T107 Add a tap-target sweep to `tools/drive_page.mjs`: at each width, for every `a, button, input, select, [tabindex]:not([tabindex="-1"])`, read `getBoundingClientRect()` and report every element under **44 px in either dimension** with its selector and measured box. Report, do not throw — the sweep must enumerate *all* failures in one run, not stop at the first
+- [X] T108 [P] Add a horizontal-scroll assertion to `tools/drive_page.mjs`: at each width assert `document.documentElement.scrollWidth <= document.documentElement.clientWidth`, reporting the overflowing element when it fails (SC-007)
+- [X] T109 [P] Add a result-list height measurement to `tools/drive_page.mjs`: after a 25-result query at 390 px, report the rendered height of the result list in CSS px (SC-006). Record the **current** figure before any densification work, so the reduction is measured against a number from this harness rather than against the ~6,000 px estimate
+- [X] T110 Attempt `prefers-reduced-motion` emulation in `tools/drive_page.mjs` via CDP `Emulation.setEmulatedMedia` with `features: [{name: "prefers-reduced-motion", value: "reduce"}]`, and assert no element reports a non-`none` `transition-duration` or `animation-name`. **If the call proves unreachable, record that in `research.md` and fall back** to a static assertion that every `transition` and `animation` in `web/style.css` sits inside a `@media (prefers-reduced-motion: reduce)` guard — then report SC-010 as a stylesheet assertion, never as a browser check
 - [ ] T111 Extend `tools/drive_page.mjs` to capture a screenshot **per view per width** once the router exists, naming them `<nn>-<view>-<width>.png` in `page-screens/`; until Phase 4 lands, capture per section as today so the harness stays runnable
-- [ ] T112 Add a `--json` summary to `tools/drive_page.mjs`'s report covering the three new sweeps, so `make validate` can read pass/fail without parsing prose
+- [X] T112 Add a `--json` summary to `tools/drive_page.mjs`'s report covering the three new sweeps, so `make validate` can read pass/fail without parsing prose
 
 **Checkpoint**: `make test-page` runs at four widths and reports tap targets, horizontal scroll and list height. The pre-work figures are recorded.
 
@@ -82,7 +102,7 @@ Each remains independently testable, and US1 can be pulled forward if the readab
 ### Checks for User Story 2
 
 - [ ] T113 [P] [US2] Write `tools/check_contrast.py`: parse the `:root` token values out of `web/style.css`, recompute every pair with the WCAG relative-luminance formula, and assert text pairs ≥4.5:1 and meaning-carrying marks ≥3:1. Any pair **below** a floor is a pass only if the stylesheet records it together with what carries the meaning instead; an unrecorded sub-floor pair fails. Expected figures per `contracts/design-tokens.md`: `--ink` 13.38:1 / 15.19:1, `--ink-soft` 6.48 / 7.36, `--house` 6.75 / 7.66, `--mark` 6.95 / 7.88, `--series-2` 3.75 / 4.25; recorded sub-floor pairs `--paper`/`--sheet` 1.13:1, `--house`/`--mark` 1.03:1, `--series-2`/`--house` 1.80:1
-- [ ] T114 [P] [US2] Write `tools/check_font_scope.py`: for each file in `web/fonts/*.woff2`, use `fontTools` to read the `cmap` and assert **no codepoint in U+0900–U+097F** (FR-111); assert the family name and weight match the `@font-face` declaration; assert an `OFL-*.txt` sits in the same directory; and assert the total payload is ≤95,000 B across ≤4 files (SC-002). Print each file's byte count and codepoint range
+- [X] T114 [P] [US2] Write `tools/check_font_scope.py`: for each file in `web/fonts/*.woff2`, use `fontTools` to read the `cmap` and assert **no codepoint in U+0900–U+097F** (FR-111); assert the family name and weight match the `@font-face` declaration; assert an `OFL-*.txt` sits in the same directory; and assert the total payload is ≤95,000 B across ≤4 files (SC-002). Print each file's byte count and codepoint range
 - [ ] T115 [US2] Add `check-contrast` and `check-fonts` targets to `Makefile` invoking the two tools above with `$(VENV_PY)`, and add both to the `validate` target's check list so they gate alongside the existing ones
 
 ### Implementation for User Story 2

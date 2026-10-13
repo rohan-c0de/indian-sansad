@@ -28,12 +28,29 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WEB = REPO_ROOT / "web"
 
-#: Suffixes this check can read. A file under `web/` with any other suffix is
-#: reported as a FAILURE rather than skipped -- an image, a font or a wasm
-#: blob shipping in `web/` is a request this scan cannot read, and silently
-#: not reading it is how the check would come to pass on a page it had not
-#: seen.
+#: Suffixes this check can read AS CODE. A file under `web/` with any suffix
+#: outside the three sets below is reported as a FAILURE rather than skipped --
+#: an image or a wasm blob shipping in `web/` is a request this scan cannot
+#: read, and silently not reading it is how the check would come to pass on a
+#: page it had not seen.
 PAGE_SUFFIXES = frozenset({".html", ".css", ".js"})
+
+#: Shipped binaries -- the self-hosted fonts. A `woff2` is brotli-compressed,
+#: so there is no text in it to scan for a host. Covered instead by
+#: `tools/check_font_scope.py`, which reads the `cmap`. Named here so this tool
+#: reports them as routed elsewhere rather than as unscanned.
+SHIPPED_BINARY_SUFFIXES = frozenset({".woff2"})
+
+#: Shipped documentation -- the OFL licences, which SIL OFL 1.1 requires to
+#: travel with the font, and the provenance note recording where the binaries
+#: came from.
+#:
+#: These DO name other hosts, and that is correct: a licence citing its own
+#: licence URL, and a provenance note recording the URL a font was fetched
+#: from, are prose about a request rather than a request. The page references
+#: neither -- `tests/unit/test_page_fetch_layer.py` asserts that, so their
+#: content cannot become something the browser fetches.
+SHIPPED_DOC_SUFFIXES = frozenset({".txt", ".md"})
 
 
 def page_files() -> tuple[str, ...]:
@@ -277,6 +294,12 @@ def main() -> int:
     names = page_files()
     for name in names:
         path = WEB / name
+        if path.suffix in SHIPPED_BINARY_SUFFIXES:
+            print(f"  {name}  routed to tools/check_font_scope.py (binary; no text to scan)")
+            continue
+        if path.suffix in SHIPPED_DOC_SUFFIXES:
+            print(f"  {name}  shipped documentation, not page code -- host rule does not apply")
+            continue
         if path.suffix not in PAGE_SUFFIXES:
             problems.append(f"{name}: not a readable text file, so it was NOT scanned")
             print(f"  {name}  NOT SCANNED -- suffix {path.suffix!r} is not one this check reads")
@@ -294,10 +317,25 @@ def main() -> int:
     print()
 
     css = strip_comments((WEB / "style.css").read_text(encoding="utf-8"))
-    for token in ("@import", "url("):
-        if token in css:
-            problems.append(f"style.css contains {token}")
-            print(f"  style.css contains {token}")
+    if "@import" in css:
+        problems.append("style.css contains @import")
+        print("  style.css contains @import")
+    # FR-112: `url()` is no longer forbidden outright -- the self-hosted fonts
+    # need it. What is forbidden is a url() that leaves this host, or points at
+    # a file that is not here. The invariant narrowed; it did not disappear.
+    for target in re.findall(r"url\(\s*['\"]?([^'\")]+)['\"]?\s*\)", css):
+        clean = target.strip()
+        if clean.startswith(("http://", "https://", "//", "data:")):
+            problems.append(f"style.css url() leaves this host or inlines data: {clean}")
+            print(f"  style.css url({clean})  OFF-HOST OR DATA")
+        elif clean.startswith("/"):
+            problems.append(f"style.css url() is root-relative, not relative: {clean}")
+            print(f"  style.css url({clean})  ROOT-RELATIVE")
+        elif not (WEB / clean).is_file():
+            problems.append(f"style.css url() points at a file that is not here: {clean}")
+            print(f"  style.css url({clean})  MISSING")
+        else:
+            print(f"  style.css url({clean})  same-host, present")
 
     if problems:
         print("FAIL:")

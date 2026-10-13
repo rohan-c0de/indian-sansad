@@ -22,7 +22,7 @@ REPO_ROOT := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 # fall back to /tmp/ where it is unset (most CI runners).
 SANSAD_SCRATCH ?= $(or $(TMPDIR),/tmp/)sansad-scratch
 
-.PHONY: scratch guard setup lint yamllint audit-fields \
+.PHONY: scratch guard setup lint yamllint audit-fields check-fonts \
         refresh verify-joins extract report lookup composition coverage \
         serve-local serve-local-mapping test-page validate
 
@@ -145,6 +145,30 @@ yamllint:
 audit-fields:
 	@set -eu -o pipefail; \
 	 $(PYTHON) tools/guard_no_raw_payloads.py "$(REPO_ROOT)" --audit-fields
+
+# --------------------------------------------------------------------------
+# check-fonts -- T114. The ONLY check that can see inside a font.
+#
+# It exists because three other checks cannot, and that was verified rather
+# than assumed:
+#   * `.woff2` is in UNSCANNABLE_SUFFIXES in tools/guard_no_raw_payloads.py,
+#     so `make guard` and `make audit-fields` SKIP font files.
+#   * The 64 KB payload ceiling does not apply -- PAYLOAD_SUFFIXES holds only
+#     data formats.
+#   * The text scans in tests/unit/test_page_fetch_layer.py raise
+#     UnicodeDecodeError on a compressed binary.
+#
+# Without it a self-hosted font could carry any script and every check in the
+# repository would stay green, which is a Principle IV hole, not an oversight.
+#
+# Asserts per file: no cmap codepoint in Devanagari U+0900-U+097F; the declared
+# family and usWeightClass; the exact byte count; an OFL licence beside it; and
+# that every codepoint the published record actually contains either renders or
+# is a recorded fallback. Plus the SC-002 total: <= 95,000 B across <= 4 files.
+# --------------------------------------------------------------------------
+check-fonts:
+	@set -eu -o pipefail; \
+	 $(VENV_PY) tools/check_font_scope.py "$(REPO_ROOT)/web/fonts"
 
 # ========================================================================
 # T035 -- an address for every quickstart.md entry point, from the start.
