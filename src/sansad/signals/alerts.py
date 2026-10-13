@@ -193,34 +193,70 @@ def resolution_rate_below_target(
     resolved: int,
     total: int,
     target: float,
+    previous: float | None = None,
     is_automatic_rate: bool = False,
-) -> Signal:
-    """The resolution rate fell below target.
+) -> Signal | None:
+    """The resolution rate **dropped against the previous publication**.
 
-    Both rates are checked, and they are not the same check. The owner's
-    decision of 2026-10-09 left the **automatic** rate at 94.78% -- already
-    below SC-002's 95% -- with the published rate carried over the line to
-    96.36% by four maintainer assertions. So an automatic rate below target is
-    the KNOWN AND ACCEPTED state, raised as a NOTICE, while the published rate
-    falling below target is a real regression against a met criterion.
+    THE TRIGGER IS A DROP, NOT A THRESHOLD, and that is the whole reason this
+    signal can be wired at all. The automatic rate is **0.947831** against an
+    `sc_002_target` of **0.95** -- both published on `manifest.json`, with
+    `sc_002_met_on_automatic_rate: false`. An absolute trigger would therefore
+    fire on **every single run**, for a state the owner has already accepted
+    and published. A signal that always fires carries no information, and
+    chasing it every day is precisely the routine manual work Principle II
+    forbids.
 
-    Reporting both at the same severity would mean either a permanent false
-    alarm on the automatic rate, or silence when the published rate slipped.
+    So: the rate falling below its target is the KNOWN state. The rate falling
+    below ITSELF is the finding.
+
+    Returns `None` when there is nothing to report -- the rate held or rose --
+    so a caller raises a signal only when there is one. A function that always
+    returned a Signal would push that judgement onto every call site.
+
+    Args:
+        resolved: the numerator this run published.
+        total: the denominator this run published.
+        target: SC-002's target, carried in the payload for context. It does
+            NOT gate the signal.
+        previous: the same rate as the PREVIOUS publication recorded it, or
+            None when there is no previous publication to compare with. None
+            means "no comparison made" and raises nothing -- it is not 0.0, and
+            treating it as 0.0 would report a catastrophic drop on every first
+            run (FR-136).
+        is_automatic_rate: which of the two published rates this is.
+
+    Severity still splits the two rates, and for the same reason it always did:
+    the automatic rate sitting below target is accepted, so a drop in it is a
+    NOTICE, while the published rate is the one SC-002 is met on and a drop in
+    it is a DEGRADED regression against a criterion currently met.
     """
     rate = (resolved / total) if total else 0.0
-    severity = Severity.NOTICE if is_automatic_rate else Severity.DEGRADED
     which = "automatic" if is_automatic_rate else "published"
+
+    if previous is None:
+        return None
+    if rate >= previous:
+        return None
+
+    severity = Severity.NOTICE if is_automatic_rate else Severity.DEGRADED
+    drop = previous - rate
     return Signal(
         kind=SignalKind.RESOLUTION_RATE_BELOW_TARGET,
         severity=severity,
         summary=(
-            f"{which} resolution rate {rate:.2%} ({resolved}/{total}) is below target {target:.0%}"
+            f"{which} resolution rate FELL from {previous:.2%} to {rate:.2%} "
+            f"({resolved}/{total}), a drop of {drop:.2%}"
+            + (f"; it is also below the {target:.0%} target" if rate < target else "")
         ),
         detail={
             "rate": rate,
+            "previous_rate": previous,
+            "drop": drop,
             "resolved": resolved,
             "total": total,
             "target": target,
+            "below_target": rate < target,
             "which_rate": which,
         },
     )

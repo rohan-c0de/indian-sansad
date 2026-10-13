@@ -392,3 +392,93 @@ Islands **all 25 published rows have the same figure** — so "most-asked" does
 not determine the order on its own. The published order is kept and the
 tie-break is named on the page, the same discipline the search view applies to
 its own result order.
+
+
+## Phase 10: the two dead signals, wired (T171-T179)
+
+All four FR-011 maintainer signals now have a production caller. 343 tests.
+
+### The trigger is a drop, and that is what made wiring possible at all
+
+The automatic rate is **0.947831** against an `sc_002_target` of **0.95**, both
+published, with `sc_002_met_on_automatic_rate: false`. A signal triggered by
+that threshold would fire **on every single run, forever**, for a state the
+owner has already accepted and published — and chasing it daily is precisely
+the routine manual work Principle II forbids.
+
+So: the rate falling below its *target* is the known state. The rate falling
+below *itself* is the finding. Verified:
+
+| Case | Result |
+|---|---|
+| unchanged at 94.78% | **nothing raised** |
+| risen | nothing raised |
+| no previous publication | nothing raised, "no comparison made" logged |
+| automatic dropped | `NOTICE`, naming 94.78% → 93.42% |
+| published dropped | `DEGRADED`, naming 96.36% → 95.52% |
+
+`resolution_rate_below_target` returns `None` when there is nothing to report,
+so a caller raises a signal only when there is one. `previous=None` means "no
+comparison made" and is **not** 0.0 — treating it as zero would report a
+catastrophic drop on every first run, the one run guaranteed to have no
+previous publication (FR-136).
+
+### The comparison source already existed
+
+`.github/workflows/refresh.yml` has checked out the previous snapshot since
+feature 001, with a comment naming this exact purpose: *"FR-010's
+last-known-good and FR-011's signal for a question leaving `resolved` both need
+the prior record to compare against."* The wiring was designed and then not
+done. `src/sansad/publish/previous.py` reads it; it reads and nothing more,
+because "what the previous record said" and "what that means" are different
+questions.
+
+### The "automated field-scope check" was not automated
+
+FR-138 asks that the check classify `representations.member_name` mechanically.
+Investigating it turned up something larger: **the census was never a tool.**
+Feature 001's gate evidence carries it as a one-off, produced by hand, while
+the constitution requires it re-run "against what will actually be published"
+*before each publication*. A census nobody can re-run is a census that was true
+on one afternoon.
+
+`tools/check_field_scope.py` is that tool. 9 published sets, 205 distinct field
+names, and it reports the resolution explicitly:
+
+```
+Resolved through a DECLARED SPELLING, which is the defect this closes:
+  reference: representations.member_name -> canonical_name
+```
+
+Renaming the published key was the other remedy `gate-evidence.md` named, and
+it is not available: FR-140 forbids changing `data/published/` and the key is
+pinned by a contract test. `PUBLISHED_FIELD_SYNONYMS` **widens no field set** —
+every entry must map onto a field already in `PUBLISHED_FIELDS`, which a test
+asserts, so it cannot become a back door.
+
+### Two of my own designs were wrong, and the checks said so
+
+**The first version of the field-scope tool tried to classify every key** as
+permitted, record-level, non-person or *unclassified*, failing on the last. It
+reported **35 findings that were all obviously fine** —
+`manifest.sets.by-session.records`, `window_questions`, `source_terms`. The
+non-person set is unbounded; enumerating it would have been a maintenance
+burden that taught nobody anything. The bounded question is the one Principle V
+actually asks: does any published key *name an attribute it excludes*?
+
+**`make guard` failed my own test file** — ten violations, every one a
+prohibited spelling typed as a string literal in a test about not publishing
+them. The guard was right about the shape and the file was wrong, and the
+codebase had already recorded the rule for this exact case: `drive_page.mjs`
+hit it with the CDP parameter named `mobile`, and the fix was to move the token
+out of key position rather than exempt the file. The spellings are now read
+from the guard's own table — which is better anyway, since a copy here could
+drift, and the copy that drifts is always the one nobody re-reads.
+
+### T176: inverted, not deleted
+
+The test asserting `resolved_transitions_out` had **no** caller said in its own
+words: *"This test fails when the detection is implemented, which is what it is
+for: at that point delete it."* It is inverted instead, the treatment feature
+001 gave the "Not built yet" assertion. A deleted assertion lets the fact
+silently revert; an inverted one keeps it under test.

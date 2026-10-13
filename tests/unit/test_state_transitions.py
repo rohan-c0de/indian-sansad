@@ -326,37 +326,49 @@ def test_a_refresh_with_no_transition_raises_nothing(members):
 # ---------------------------------------------------------------------------
 # The gap, pinned
 # ---------------------------------------------------------------------------
-def test_nothing_under_src_raises_the_resolved_transition_signal():
-    """**NOT PRESENT**, pinned so it is read rather than assumed.
+def test_all_four_maintainer_signals_have_a_production_caller():
+    """**INVERTED, not deleted.** FR-137, SC-020.
 
-    Measured over `src/sansad/**/*.py` on 2026-10-10: two of the four signals
-    have a caller -- `ingestion_failure` (`cli.py`, `ingest/questions.py`) and
-    `upstream_shape_change` (`ingest/shape.py`) -- and **two do not**:
-    `resolved_transitions_out`, which this test pins, and
-    `resolution_rate_below_target`, which is out of T096's scope and is
-    recorded against the Upkeep gate in `gate-evidence.md` instead.
+    This test used to assert the opposite -- that `resolved_transitions_out`
+    had NO caller -- and said so, in its own words: *"This test fails when the
+    detection is implemented, which is what it is for: at that point delete it
+    and assert the pipeline raises the signal on a real transition instead."*
 
-    Detecting a transition needs the published statuses of the PREVIOUS
-    snapshot compared against this refresh's. `--previous` exists but is wired
-    to T054's last-known-good retention only, so nothing compares them.
+    It is inverted rather than deleted, which is the treatment feature 001 gave
+    the "Not built yet" assertion when the search view was finally built. A
+    deleted assertion lets the fact silently revert; an inverted one keeps it
+    under test. What is pinned is the same either way: whether FR-011's promise
+    of four maintainer signals is kept by code that runs, or only in a
+    docstring.
 
-    **This test fails when the detection is implemented**, which is what it is
-    for: at that point delete it and assert the pipeline raises the signal on a
-    real transition instead.
+    Measured 2026-10-13, over `src/sansad/**/*.py`:
+
+        ingestion_failure             cli.py, ingest/questions.py
+        upstream_shape_change         ingest/shape.py
+        resolution_rate_below_target  cli.py            <- newly wired
+        resolved_transitions_out      cli.py            <- newly wired
     """
     src = Path(__file__).resolve().parents[2] / "src" / "sansad"
     definition = src / "signals" / "alerts.py"
-
-    callers = sorted(
-        path.relative_to(src).as_posix()
+    definition_text = definition.read_text(encoding="utf-8")
+    sources = {
+        path.relative_to(src).as_posix(): path.read_text(encoding="utf-8")
         for path in src.rglob("*.py")
-        if path != definition and "resolved_transitions_out" in path.read_text(encoding="utf-8")
-    )
-    assert callers == [], (
-        f"`resolved_transitions_out` now has a caller ({callers}) -- the fourth "
-        f"maintainer signal is implemented. Replace this pin with a test that "
-        f"the pipeline raises it on a real transition."
-    )
-    assert "resolved_transitions_out" in definition.read_text(encoding="utf-8"), (
-        "the signal factory itself is gone, which is a different defect"
-    )
+        if path != definition
+    }
+
+    for signal in (
+        "ingestion_failure",
+        "upstream_shape_change",
+        "resolution_rate_below_target",
+        "resolved_transitions_out",
+    ):
+        callers = sorted(name for name, text in sources.items() if signal in text)
+        assert callers, (
+            f"`{signal}` has no caller outside its definition module. FR-011 promises "
+            f"four maintainer signals; a signal nothing raises is a promise kept only "
+            f"in the docstring."
+        )
+        assert signal in definition_text, (
+            f"the `{signal}` factory itself is gone, which is a different defect"
+        )

@@ -52,6 +52,48 @@ PUBLISHED_FIELDS: tuple[str, ...] = (
     "last_refreshed",
 )
 
+#: Other published spellings of a field already in `PUBLISHED_FIELDS`, mapped
+#: to the one they are a spelling OF. T178.
+#:
+#: **This widens no field set.** Every key here is an alternative name for a
+#: field FR-008 already permits; the permitted SET above is untouched, and
+#: adding a genuinely new attribute still means editing that tuple, which is a
+#: decision about what this project publishes about 5,426 named people.
+#:
+#: WHY IT EXISTS. `reference/constituencies.jsonl` publishes
+#: `representations.member_name`, which is a member NAME FORM -- the first of
+#: Principle V's seven permitted classes, and declared as such in
+#: `contracts/published-dataset.md`. But `member_name` is not the spelling
+#: `PUBLISHED_FIELDS` carries, so the automated field-scope diff classified a
+#: genuine FR-008 field as "not a member attribute", and its membership of the
+#: set rested on a human reading the contract. Recorded as a defect in feature
+#: 001's `gate-evidence.md`: *"The data is correct; the check is weaker than it
+#: looks."*
+#:
+#: `gate-evidence.md` named two remedies -- rename the published key, or
+#: declare a synonym. **Renaming is not available**: FR-140 forbids changing
+#: `data/published/`, and the key is pinned by
+#: `tests/contract/test_constituency_reference.py`. So the synonym it is, and
+#: the check becomes mechanical rather than a matter of someone remembering.
+PUBLISHED_FIELD_SYNONYMS: dict[str, str] = {
+    # The constituency set's copy of the member's name, put there by T086 so
+    # the seat view would never need the 3.4 MB member reference.
+    "member_name": "canonical_name",
+}
+
+
+def published_field_for(key: str) -> str | None:
+    """The FR-008 field `key` is, or None if it is outside the set.
+
+    One function, so every caller classifies a published key the same way --
+    the diff, the tests and anything added later. A caller doing its own
+    membership test is how the two spellings came to disagree in the first
+    place.
+    """
+    if key in PUBLISHED_FIELDS:
+        return key
+    return PUBLISHED_FIELD_SYNONYMS.get(key)
+
 
 @dataclass(frozen=True, slots=True)
 class Term:

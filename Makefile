@@ -22,7 +22,7 @@ REPO_ROOT := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 # fall back to /tmp/ where it is unset (most CI runners).
 SANSAD_SCRATCH ?= $(or $(TMPDIR),/tmp/)sansad-scratch
 
-.PHONY: scratch guard setup lint yamllint audit-fields check-fonts check-contrast \
+.PHONY: scratch guard setup lint yamllint audit-fields check-fonts check-contrast check-field-scope \
         refresh verify-joins extract report lookup composition coverage \
         serve-local serve-local-mapping test-page validate
 
@@ -186,6 +186,27 @@ check-fonts:
 check-contrast:
 	@set -eu -o pipefail; \
 	 $(VENV_PY) tools/check_contrast.py "$(REPO_ROOT)/web/style.css"
+
+# --------------------------------------------------------------------------
+# check-field-scope -- T178 / FR-138. Every published field name against the
+# FR-008 set, resolved through the declared spellings.
+#
+# Feature 001 produced this census ONCE, by hand, for its Member-fields gate
+# evidence. The constitution requires it re-run "against what will actually be
+# published, not against what was specified" before each publication, and a
+# census nobody can re-run is a census that was true on one afternoon.
+#
+# It also closes the defect that evidence recorded: `representations.member_name`
+# is a genuine FR-008 name form whose published spelling is not the one
+# PUBLISHED_FIELDS carries, so the diff called it "not a member attribute" and
+# its membership rested on a human reading the contract.
+#
+# `make guard` scans file CONTENT for prohibited spellings. This scans published
+# key NAMES. Both are needed; neither replaces the other.
+# --------------------------------------------------------------------------
+check-field-scope:
+	@set -eu -o pipefail; \
+	 $(VENV_PY) tools/check_field_scope.py "$(REPO_ROOT)/data/published"
 
 # ========================================================================
 # T035 -- an address for every quickstart.md entry point, from the start.

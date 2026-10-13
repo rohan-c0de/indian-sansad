@@ -47,7 +47,7 @@ from sansad.ingest.questions import (
 )
 from sansad.ingest.transport import scratch_path
 from sansad.model._common import House, ResolutionStatus
-from sansad.model.coverage_statement import Freshness
+from sansad.model.coverage_statement import SC_002_TARGET, Freshness
 from sansad.publish.aggregates import AGGREGATES_DIR_NAME, write_aggregates
 from sansad.publish.coverage import (
     CoverageInputs,
@@ -58,6 +58,7 @@ from sansad.publish.coverage import (
 from sansad.publish.formats import rows_for, write_both
 from sansad.publish.last_known_good import retain_previous
 from sansad.publish.partitions import write_manifest, write_partitions
+from sansad.publish.previous import read_previous
 from sansad.publish.reference import (
     MinistryRegistry,
     assign_ministry_ids,
@@ -74,7 +75,12 @@ from sansad.publish.search_digest import (
 from sansad.publish.search_index import SEARCH_DIR_NAME, write_search_index
 from sansad.resolve import resolve_questions
 from sansad.resolve.assertions import load_assertions, load_ministry_renames
-from sansad.signals.alerts import SignalLog, ingestion_failure
+from sansad.signals.alerts import (
+    SignalLog,
+    ingestion_failure,
+    resolution_rate_below_target,
+    resolved_transitions_out,
+)
 from sansad.views.composition import compose
 from sansad.views.ministry_profile import ministry_profiles
 from sansad.views.state_subjects import state_subjects, states_by_member
@@ -521,6 +527,60 @@ def run_refresh(
         "files": len(resolution_files),
         "records": len(resolution_records),
     }
+    # --- the two comparison signals (T173-T175, FR-134 to FR-136) ----------
+    #
+    # Both compare against the PREVIOUS publication, which the workflow checks
+    # out before anything overwrites it and passes as `--previous`. Raised here,
+    # after the build is known good and before the run reports its result, so a
+    # finding travels with the publish rather than after it.
+    previous_record = read_previous(previous_dir)
+    print(f"refresh: {previous_record.describe()}")
+
+    if not previous_record.available:
+        # FR-136: not a pass, and not a signal. A valid first run and a broken
+        # comparison have to stay distinguishable in the log.
+        print(
+            "refresh: NO COMPARISON MADE against a previous publication -- "
+            "`resolved_transitions_out` and `resolution_rate_below_target` were "
+            f"not evaluated. Reason: {previous_record.reason}",
+            file=sys.stderr,
+        )
+    else:
+        # FR-134. A question that WAS resolved and is not now. This is the
+        # signal most likely to be the only sign of a real problem: it fires on
+        # a SUCCESSFUL refresh, where nothing failed and the overall rate may
+        # even have risen, while a join a consumer already took has quietly
+        # become uncertain.
+        moved_out: dict[str, list[str]] = {}
+        for question in published_questions:
+            was = previous_record.statuses.get(question.question_id)
+            if was != ResolutionStatus.RESOLVED.value:
+                continue
+            now = question.resolution_status.value
+            if now != ResolutionStatus.RESOLVED.value:
+                moved_out.setdefault(now, []).append(question.question_id)
+        for new_status, ids in sorted(moved_out.items()):
+            # Question ids only -- no name, no value. The same rule
+            # `excluded_keys_in` keeps: report the offending path, never the
+            # content.
+            signals.add(resolved_transitions_out(tuple(sorted(ids)), new_status=new_status))
+
+        # FR-135. A DROP, never an absolute threshold: the automatic rate is
+        # 94.78% against a 95% target, so a threshold would fire every run.
+        for resolved_count, previous_rate, automatic in (
+            (totals["automatic"], previous_record.rate_automatic, True),
+            (totals["assisted"], previous_record.rate_published, False),
+        ):
+            dropped = resolution_rate_below_target(
+                resolved=resolved_count,
+                total=totals["total"],
+                target=SC_002_TARGET,
+                previous=previous_rate,
+                is_automatic_rate=automatic,
+            )
+            if dropped is not None:
+                signals.add(dropped)
+
     write_manifest(
         out,
         last_refreshed=last_refreshed,
