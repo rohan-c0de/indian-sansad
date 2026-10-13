@@ -187,6 +187,11 @@ export const PUBLISHED_FILES = Object.freeze({
   // the view, which `boot()` asserts.
   constituencies: "reference/constituencies.jsonl",
   stateSubjects: "aggregates/state-subjects.jsonl",
+  // Feature 002 T161. Fetched on FIRST USE OF THE COMPOSITION VIEW only.
+  // 25,237 B raw, 1,835 B on the wire -- the cheapest file on this list, and
+  // fetched by nothing at all before this feature: feature 001 published the
+  // composition aggregate and deliberately left it off the page.
+  composition: "aggregates/composition.jsonl",
 });
 
 /* `reference/members.jsonl` is NOT in the object above, and its absence is the
@@ -243,8 +248,81 @@ export const fetchManifest = (o) => fetchJson(PUBLISHED_FILES.manifest, o);
 export const fetchCoverage = (o) => fetchNdjson(PUBLISHED_FILES.coverage, o);
 export const fetchCountingBasis = (o) => fetchNdjson(PUBLISHED_FILES.countingBasis, o);
 export const fetchSessions = (o) => fetchNdjson(PUBLISHED_FILES.sessions, o);
-export const fetchMinistryProfile = (o) => fetchNdjson(PUBLISHED_FILES.ministryProfile, o);
-export const fetchMinistries = (o) => fetchNdjson(PUBLISHED_FILES.ministries, o);
+/* The two ministry files, memoised. T137.
+ *
+ * These were plain pass-throughs, fetched by `bootViews()` on PAGE LOAD, and
+ * between them they were 19,408 B of the measured 88,961 B first load -- 22% of
+ * it, paid by every visitor including one who only ever reads the coverage
+ * statement. FR-151 takes them off the first load, so they need the same
+ * memoised, first-use shape the search and seat files already have: three
+ * views share them (`#ministry`, `#compare`, `#load`) and must not fetch them
+ * three times.
+ *
+ * The promise is cached, not the value, so two views opening in the same tick
+ * share one request rather than racing. A rejection clears the cache, so a
+ * failed download can be retried by opening the view again instead of
+ * poisoning it for the rest of the session. */
+let ministryProfilePromise = null;
+let ministriesPromise = null;
+
+export function fetchMinistryProfile(options = {}) {
+  if (!ministryProfilePromise) {
+    ministryProfilePromise = fetchNdjson(PUBLISHED_FILES.ministryProfile, options).catch(
+      (error) => {
+        ministryProfilePromise = null;
+        throw error;
+      },
+    );
+  }
+  return ministryProfilePromise;
+}
+
+export function fetchMinistries(options = {}) {
+  if (!ministriesPromise) {
+    ministriesPromise = fetchNdjson(PUBLISHED_FILES.ministries, options).catch((error) => {
+      ministriesPromise = null;
+      throw error;
+    });
+  }
+  return ministriesPromise;
+}
+
+/** Whether EITHER ministry file has been requested. `boot()` asserts this is
+ * false (FR-151): a visitor who never opens a ministry view must not pay for
+ * the 17,552 B profile aggregate. */
+export function ministryAssetsRequested() {
+  return ministryProfilePromise !== null || ministriesPromise !== null;
+}
+
+/** Test seam only: forget both ministry requests. */
+export function resetMinistryAssets() {
+  ministryProfilePromise = null;
+  ministriesPromise = null;
+}
+
+/* The composition aggregate, same shape and same reason. T161. */
+let compositionPromise = null;
+
+export function loadComposition(options = {}) {
+  if (!compositionPromise) {
+    compositionPromise = fetchNdjson(PUBLISHED_FILES.composition, options).catch((error) => {
+      compositionPromise = null;
+      throw error;
+    });
+  }
+  return compositionPromise;
+}
+
+/** Whether the composition aggregate has been requested. `boot()` asserts
+ * this is false (FR-127). */
+export function compositionAssetsRequested() {
+  return compositionPromise !== null;
+}
+
+/** Test seam only. */
+export function resetCompositionAssets() {
+  compositionPromise = null;
+}
 
 /* ------------------------------------------------------------------------ */
 /* The search index, fetched LAZILY -- on the first search only.            */

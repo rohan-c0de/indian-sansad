@@ -4,7 +4,27 @@
 
 The enforceable form of FR-126, FR-127, FR-128, FR-146, FR-147, FR-151, FR-152 and FR-153. Every `id` below is a **public URL** and may not change once published.
 
-## The eight views
+## Corrections made during implementation, 2026-10-13
+
+Two things in this contract were wrong and are corrected rather than honoured.
+
+**There are SEVEN views, not eight.** `licence` was listed as the eighth. The
+licence, the attribution and the **source-terms disclosure** live in the page
+footer, which sits outside `<main>` and therefore renders on *every* view —
+feature 001 put them there deliberately, because the disclosure that the
+source's terms were never determined is a standing obligation rather than a
+page a reader opts into. Turning it into a switchable view would have hidden it
+behind a choice. It stays in the footer, and
+`test_the_licence_is_outside_the_views_so_it_shows_on_every_one` asserts the
+footer cannot drift inside `<main>` where a view's `hidden` could reach it.
+
+**The first load is 15 requests, not 14.** The extra one is `lib/shared.js`, a
+module that did not exist when this contract was written: the shared helpers
+had to move out of `app.js` to break a dependency cycle (`app -> view -> app`
+through a dynamic import). Measured at 15 requests and 105,137 B, against
+SC-004's ceiling of 16 and SC-001's of 160,000.
+
+## The seven views
 
 | `#id` | Heading | Module | Data, read on first open only |
 |---|---|---|---|
@@ -15,7 +35,6 @@ The enforceable form of FR-126, FR-127, FR-128, FR-146, FR-147, FR-151, FR-152 a
 | `compare` | Compare two ministries | `./views/ministries.js` | — (shares `ministry`'s two files) |
 | `load` | Question load by session | `./views/ministries.js` | — (shares `ministry`'s two files) |
 | `composition` | House composition | `./views/composition.js` | `aggregates/composition.jsonl` |
-| `licence` | Licence and source terms | shell | — (`manifest.json` is on the first load) |
 
 `ministry`, `compare` and `load` share one module and one pair of files: opening any of the three loads them, and the other two then cost nothing. `reference/ministries.jsonl` is shared with `search`, which needs it to name a ministry on a result row; it is read once between them, not twice.
 
@@ -23,26 +42,38 @@ The enforceable form of FR-126, FR-127, FR-128, FR-146, FR-147, FR-151, FR-152 a
 
 Exactly this, and nothing else (FR-126, FR-151; measured in [research.md](../research.md) R14):
 
+Measured in a browser, 2026-10-13:
+
 ```
-index.html
-style.css
-fonts/newsreader-600.woff2
-fonts/ibm-plex-sans-400.woff2
-fonts/ibm-plex-sans-600.woff2
-app.js
-lib/fetch.js   lib/coverage.js   lib/format.js   lib/licence.js
-data/published/coverage.jsonl
-data/published/reference/sessions.jsonl
-data/published/aggregates/counting-basis.jsonl
-data/published/manifest.json
+/                                               index.html
+/style.css
+/app.js
+/lib/coverage.js  /lib/fetch.js  /lib/format.js  /lib/licence.js  /lib/shared.js
+/fonts/newsreader-600.woff2
+/fonts/ibm-plex-sans-400.woff2
+/fonts/ibm-plex-sans-600.woff2
+/data/published/coverage.jsonl
+/data/published/reference/sessions.jsonl
+/data/published/aggregates/counting-basis.jsonl
+/data/published/manifest.json
 ```
 
-14 requests. **Anything else on the first load is a failure**, including:
+**15 requests, 105,137 B** at the `gzip -6` basis that matched the live wire
+figure to within 1.3%. Against the ceilings: SC-001 160,000 B, SC-003 60,000 B
+non-font (actual **44,453**, down from 88,961), SC-004 16 requests.
+
+`lib/shared.js` is the fifteenth and was not in the original list — the shared
+helpers had to leave `app.js` to break a dependency cycle. `lib/viewkit.js`
+holds the helpers that pull in `chart.js` and `profile.js`, and it is NOT on
+the first load: both were, briefly, at 6,222 B for a visitor who only read the
+coverage statement, and splitting the shared layer in two is what removed them.
+
+**Anything else on the first load is a failure**, including:
 
 - any file under `search/`, by-member, `constituencies`, `state-subjects` — already asserted at boot today, and that assertion stays
 - `aggregates/ministry-profile.jsonl` or `reference/ministries.jsonl` — **newly forbidden** by FR-151; these are on the first load today
 - `aggregates/composition.jsonl` — forbidden by FR-127
-- `lib/search.js`, `lib/constituency.js`, `lib/profile.js`, `lib/tokenise.js`, `lib/chart.js` — **newly forbidden**; all five are on the first load today
+- `lib/search.js`, `lib/constituency.js`, `lib/profile.js`, `lib/tokenise.js`, `lib/chart.js`, `lib/viewkit.js`, `lib/marks.js` — **forbidden**; the first five were on the first load before this feature
 - anything under `views/` — FR-128
 - `aggregates/subject-trends.jsonl` — forbidden **always**, at 13,178,975 B raw; the trend is derived from the search index instead
 

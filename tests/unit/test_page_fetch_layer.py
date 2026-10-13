@@ -80,6 +80,37 @@ SHIPPED_BINARIES = tuple(n for n in ALL_WEB_FILES if (WEB / n).suffix in SHIPPED
 SHIPPED_DOCS = tuple(n for n in ALL_WEB_FILES if (WEB / n).suffix in SHIPPED_DOC_SUFFIXES)
 
 
+def page_source() -> str:
+    """Every line of the page's code, from every module, comments stripped.
+
+    Most assertions below are about THE PAGE -- "the index is loaded from the
+    search path and nowhere else", "no view renders a position number" -- and
+    the page used to be one file, so they read `app.js`. Feature 002 split it:
+    `app.js` is the shell and the router, the view code is under `views/`, and
+    the shared helpers are in `lib/shared.js` and `lib/viewkit.js`.
+
+    An assertion about the page therefore has to read the page, not one of its
+    files. Eleven of these tests failed on the split for exactly that reason,
+    and every one of them was still making a true and useful claim -- about
+    code that had moved.
+
+    Concatenated rather than parameterised because the claims are existential
+    or universal over the whole page ("exactly one call site", "nowhere"), and
+    those cannot be evaluated one file at a time.
+    """
+    parts = []
+    for name in PAGE_FILES:
+        if name.endswith(".js"):
+            parts.append(f"/* ===== {name} ===== */\n" + (WEB / name).read_text(encoding="utf-8"))
+    return "\n".join(parts)
+
+
+#: The page's code with comments removed -- a URL or a call in a comment is
+#: documentation, and counting it would make these assertions unusable in a
+#: codebase that explains itself.
+PAGE_CODE = re.sub(r"/\*.*?\*/", "", page_source(), flags=re.S)
+
+
 def test_node_is_available_and_the_page_tests_exist() -> None:
     """Without this the suite could pass by silently skipping the only tests
     that exercise the refusal."""
@@ -283,14 +314,55 @@ def test_the_svg_namespace_is_used_only_as_a_namespace() -> None:
 
 @pytest.mark.parametrize("name", PAGE_FILES)
 def test_no_page_file_imports_anything_but_a_relative_path(name: str) -> None:
-    """A bare module specifier would need a bundler or an import map; either
-    way it is a build step, and there is not one."""
+    r"""A bare module specifier would need a bundler or an import map; either
+    way it is a build step, and there is not one.
+
+    **Both forms of `import`, which was not true until feature 002.** The
+    pattern here was `(?:from|import)\s+["']...["']`, and `\s+` cannot match
+    `import("./x.js")` -- there is no whitespace after the keyword in a call.
+    Verified at the time:
+
+        'import { x } from "./lib/a.js";'      -> ['./lib/a.js']
+        'await import("./lib/a.js")'           -> []
+
+    So the static form was checked and the dynamic form was not checked at all.
+    That mattered the moment FR-128 required the view modules to load through
+    `import()` on first use: every one of those specifiers would have gone
+    unexamined, and a bare or cross-origin one could have shipped with the
+    suite green. The call form is now matched explicitly.
+    """
+    patterns = (
+        # static:  import x from "./a.js" / export … from "./a.js"
+        r"""(?:from|import)\s+["']([^"']+)["']""",
+        # dynamic: import("./a.js") / import( "./a.js" )
+        r"""\bimport\s*\(\s*["']([^"']+)["']""",
+    )
     for number, line in _code_lines(WEB / name):
-        for match in re.finditer(r"""(?:from|import)\s+["']([^"']+)["']""", line):
-            spec = match.group(1)
-            assert spec.startswith("./") or spec.startswith("../"), (
-                f"{name}:{number} imports a non-relative specifier {spec!r}"
-            )
+        for pattern in patterns:
+            for match in re.finditer(pattern, line):
+                spec = match.group(1)
+                assert spec.startswith("./") or spec.startswith("../"), (
+                    f"{name}:{number} imports a non-relative specifier {spec!r}"
+                )
+
+
+def test_the_dynamic_import_pattern_actually_matches_a_dynamic_import() -> None:
+    """Pins the fix above against the exact case the old pattern missed.
+
+    A widened regex that still did not match `import("./x.js")` would leave the
+    suite green and the check blind, which is indistinguishable from before.
+    So the pattern is exercised on literal samples rather than trusted.
+    """
+    dynamic = r"""\bimport\s*\(\s*["']([^"']+)["']"""
+    assert re.findall(dynamic, 'await import("./views/search.js")') == ["./views/search.js"]
+    assert re.findall(dynamic, "const m = await import('./views/seat.js');") == ["./views/seat.js"]
+    assert re.findall(dynamic, 'import( "./views/x.js" )') == ["./views/x.js"]
+    # A bare specifier is what must be caught, so it must MATCH here (the
+    # assertion about it being relative lives in the test above).
+    assert re.findall(dynamic, 'await import("lodash")') == ["lodash"]
+    # And the static pattern must not be broken by the addition.
+    static = r"""(?:from|import)\s+["']([^"']+)["']"""
+    assert re.findall(static, 'import { x } from "./lib/a.js";') == ["./lib/a.js"]
 
 
 def test_the_stylesheet_fetches_nothing_from_another_host() -> None:
@@ -395,8 +467,7 @@ def test_the_search_view_is_keyboard_operable_and_labelled() -> None:
     input by `htmlFor`, a submit button, and a politely-announced result
     region.
     """
-    app = (WEB / "app.js").read_text(encoding="utf-8")
-    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+    body = PAGE_CODE
     assert 'el("form", "search-form")' in body, "the search box is not a form"
     assert 'form.addEventListener("submit"' in body, "Enter in the field would not search"
     assert "event.preventDefault()" in body, "submitting would navigate; there is no server"
@@ -418,7 +489,7 @@ def test_the_result_order_is_rendered_from_the_code_not_retyped() -> None:
     one thing. `ORDER_STATEMENT` lives in `web/lib/search.js` beside the sort,
     and the page renders it -- so the page cannot describe an order it does not
     implement."""
-    app = (WEB / "app.js").read_text(encoding="utf-8")
+    app = PAGE_CODE  # the page, not one of its files -- see page_source()
     assert "ORDER_STATEMENT" in app, "the page never renders the order statement"
     assert 'el("p", "order-text", ORDER_STATEMENT)' in app
     # And the sentence itself is not duplicated into the page or the shell.
@@ -461,7 +532,7 @@ def test_the_search_view_renders_no_position_number() -> None:
     block = css[css.index(".result-list {") :]
     rule = block[: block.index("}")]
     assert "list-style: none" in rule, "the result list shows its numbers"
-    app = (WEB / "app.js").read_text(encoding="utf-8")
+    app = PAGE_CODE  # the page, not one of its files -- see page_source()
     assert 'el("ol", "result-list")' in app, "the list is not an ordered list"
 
 
@@ -569,8 +640,7 @@ def test_the_page_hardcodes_nothing_the_record_supplies() -> None:
 
 def test_the_houses_claim_is_derived_not_typed() -> None:
     """Fix (a). The words must come out of a function over the coverage rows."""
-    app = (WEB / "app.js").read_text(encoding="utf-8")
-    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+    body = PAGE_CODE
     assert "housesClaim(coverage)" in body
     assert '"Lok Sabha only"' not in body, "the claim is typed, not derived"
     assert "Lok Sabha only" not in (WEB / "index.html").read_text(encoding="utf-8")
@@ -578,7 +648,7 @@ def test_the_houses_claim_is_derived_not_typed() -> None:
 
 def test_the_session_table_is_collapsed_and_the_key_figures_are_not() -> None:
     """Fix (b). The table is behind <details>; the figures above it are not."""
-    app = (WEB / "app.js").read_text(encoding="utf-8")
+    app = PAGE_CODE  # the page, not one of its files -- see page_source()
     assert 'el("details", "sessions")' in app
     assert 'el("summary")' in app
     assert "sessions`" in app, "the summary must state the session count"
@@ -593,13 +663,13 @@ def test_zero_sitting_days_is_flagged_in_words() -> None:
     assert "ZERO_SITTING_DAYS_FLAG" in coverage_js
     assert "0 sitting days as published" in coverage_js
     assert 'NOT_APPLICABLE = "n/a"' in coverage_js
-    app = (WEB / "app.js").read_text(encoding="utf-8")
+    app = PAGE_CODE  # the page, not one of its files -- see page_source()
     assert "ZERO_SITTING_DAYS_FLAG" in app
 
 
 def test_the_project_link_opens_in_a_new_tab_safely() -> None:
     """Fix (d)."""
-    app = (WEB / "app.js").read_text(encoding="utf-8")
+    app = PAGE_CODE  # the page, not one of its files -- see page_source()
     assert 'a.target = "_blank"' in app
     assert 'a.rel = "noopener noreferrer"' in app
 
@@ -627,7 +697,7 @@ def test_the_counting_basis_text_is_not_retyped_in_the_page() -> None:
 
 def test_the_page_reads_the_basis_and_the_licence_from_the_published_files() -> None:
     """The positive half of the two tests above: it must actually read them."""
-    app = (WEB / "app.js").read_text(encoding="utf-8")
+    app = PAGE_CODE  # the page, not one of its files -- see page_source()
     assert "fetchCountingBasis" in app
     assert "counting_basis" in app
     for field in ("license", "license_scope", "attribution", "project_url", "license_file"):
@@ -646,7 +716,7 @@ def test_the_page_reads_the_source_terms_disclosure_from_the_manifest() -> None:
     for field in ("source_terms", "corrections_url"):
         assert f"manifest.{field}" in licence, f"licence.js never reads manifest.{field}"
     # The footer has to call it, or the module renders for nobody.
-    app = (WEB / "app.js").read_text(encoding="utf-8")
+    app = PAGE_CODE  # the page, not one of its files -- see page_source()
     assert 'from "./lib/licence.js"' in app
     assert "renderDisclosure(" in app
 
@@ -676,13 +746,13 @@ def _function_body(source: str, name: str) -> str:
     """One top-level function's body, by name.
 
     Sliced from its signature to the next `}` in column 0 -- every top-level
-    function in `web/app.js` closes that way, and brace-counting through
+    function in the page's modules closes that way, and brace-counting through
     template literals would need a lexer to be correct. Raises rather than
     returning "" if the function is not found: a silently empty body would make
     the assertions below pass by finding nothing.
     """
     match = re.search(rf"^(?:export )?(?:async )?function {re.escape(name)}\(", source, re.M)
-    assert match, f"{name}() is not defined in app.js"
+    assert match, f"{name}() is not defined anywhere in the page's code"
     rest = source[match.start() :]
     end = re.search(r"^\}", rest[1:], re.M)
     assert end, f"{name}() has no closing brace in column 0"
@@ -692,16 +762,18 @@ def _function_body(source: str, name: str) -> str:
 def test_the_function_body_helper_actually_slices_a_function() -> None:
     """The helper above is load-bearing for the laziness test: if it returned
     the whole file, or nothing, that test would pass for the wrong reason."""
-    app = (WEB / "app.js").read_text(encoding="utf-8")
-    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+    body = PAGE_CODE
     boot = _function_body(body, "boot")
     assert boot.startswith("export async function boot(")
-    assert "await bootViews(doc)" in boot, "the slice stopped short of the end of boot()"
+    assert "await startRouter(doc)" in boot, "the slice stopped short of the end of boot()"
     assert "function bootViews" not in boot, "the slice ran past the end of boot()"
     assert len(boot) < len(body) / 2, "the slice is most of the file; it is not slicing"
     views = _function_body(body, "bootViews")
     assert "buildCompareView(doc)" in views
-    assert "buildSearchView(doc)" in views
+    # `buildProfileView` and not `buildSearchView`: bootViews stopped building
+    # the other two views when the router took that job, so the sentinel moved
+    # to something bootViews still does.
+    assert "buildProfileView(doc)" in views, "the slice stopped short of the end of bootViews()"
     assert "function resultItem" not in views, "the slice ran past the end of bootViews()"
 
 
@@ -718,13 +790,21 @@ def test_no_search_file_is_fetched_on_load() -> None:
     would pass while a digest was already in flight, and a digest is up to
     1,573,939 B.
     """
-    app = (WEB / "app.js").read_text(encoding="utf-8")
-    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+    body = PAGE_CODE
 
-    assert "searchAssetsRequested()" in body, "boot must assert NO search file is requested"
-    assert "a search file was requested during boot" in body, (
-        "the boot assertion has lost its message"
+    # boot() guards four file classes through a declared table rather than four
+    # inline `if` statements, so the assertion is on the table and on boot
+    # reaching it. That is the same property, checked in two parts instead of
+    # one literal sentence -- which is what broke when the table replaced the
+    # inline throws.
+    guards = _function_body(body, "boot")
+    assert "searchAssetsRequested" in body, "nothing asserts that no search file is requested"
+    assert '["a search file", searchAssetsRequested]' in body, (
+        "searchAssetsRequested is not in BOOT_GUARDS, so boot does not check it"
     )
+    assert "BOOT_GUARDS" in guards, "boot() does not iterate its own guard table"
+    assert "was requested during boot" in body, "the boot assertion has lost its message"
+    assert "throw new Error" in guards, "boot() warns instead of throwing"
 
     # The three lazy loaders are called from the search path only. `boot` and
     # `bootViews` run on page load; neither may name one.
@@ -735,10 +815,22 @@ def test_no_search_file_is_fetched_on_load() -> None:
             called = _function_body(body, runs_on_load)
             assert loader not in called, f"{runs_on_load}() calls {loader}; it must be lazy"
 
-    # And the index is loaded in exactly one place, so there is one thing to
+    # And the index is loaded from exactly one place, so there is one thing to
     # reason about when asking what a first search costs.
-    assert body.count("loadSearchIndex(") == 1, "loadSearchIndex is called more than once"
-    assert body.count("loadAskerNames(") == 1
+    #
+    # CALL SITES, not occurrences. `PAGE_CODE` spans every module now, which
+    # includes `lib/fetch.js` where these loaders are DEFINED -- so counting
+    # occurrences counts the definition and reports two call sites where there
+    # is one. The definition is excluded by shape rather than by file, so a
+    # loader that moved would still be counted correctly.
+    for loader in ("loadSearchIndex", "loadAskerNames"):
+        occurrences = re.findall(rf"(\w+\s+)?\b{loader}\(", body)
+        definitions = len(re.findall(rf"(?:export\s+)?function\s+{loader}\(", body))
+        call_sites = len(occurrences) - definitions
+        assert call_sites == 1, (
+            f"{loader} has {call_sites} call site(s); exactly one keeps the cost "
+            f"of a first search answerable in one place"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -833,13 +925,21 @@ def test_no_seat_file_is_fetched_on_load() -> None:
     seat set is 252,226 B and the state subject summary 181,347 B, and a
     visitor who never looks up a constituency must pay for neither.
     """
-    app = (WEB / "app.js").read_text(encoding="utf-8")
-    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+    body = PAGE_CODE
 
-    assert "seatAssetsRequested()" in body, "boot must assert NO seat file is requested"
-    assert "a seat file was requested during boot" in body, (
-        "the boot assertion has lost its message"
+    # boot() guards four file classes through a declared table rather than four
+    # inline `if` statements, so the assertion is on the table and on boot
+    # reaching it. That is the same property, checked in two parts instead of
+    # one literal sentence -- which is what broke when the table replaced the
+    # inline throws.
+    guards = _function_body(body, "boot")
+    assert "seatAssetsRequested" in body, "nothing asserts that no seat file is requested"
+    assert '["a seat file", seatAssetsRequested]' in body, (
+        "seatAssetsRequested is not in BOOT_GUARDS, so boot does not check it"
     )
+    assert "BOOT_GUARDS" in guards, "boot() does not iterate its own guard table"
+    assert "was requested during boot" in body, "the boot assertion has lost its message"
+    assert "throw new Error" in guards, "boot() warns instead of throwing"
 
     for loader in ("loadSeats", "loadStateSubjects", "loadMemberQuestions"):
         assert loader in body, f"{loader} is never called; the view cannot work"
@@ -849,9 +949,26 @@ def test_no_seat_file_is_fetched_on_load() -> None:
 
     # Each is loaded in exactly one place, so there is one thing to reason
     # about when asking what opening the view costs.
-    assert body.count("loadSeats(") == 1
-    assert body.count("loadStateSubjects(") == 1
-    assert body.count("loadMemberQuestions(") == 1
+    for loader in ("loadSeats", "loadStateSubjects"):
+        occurrences = re.findall(rf"(\w+\s+)?\b{loader}\(", body)
+        definitions = len(re.findall(rf"(?:export\s+)?function\s+{loader}\(", body))
+        assert len(occurrences) - definitions == 1, (
+            f"{loader} must have exactly one call site -- PAGE_CODE now spans "
+            f"lib/fetch.js, where it is defined"
+        )
+    for loader in ("loadSeats", "loadStateSubjects"):
+        occurrences = re.findall(rf"(\w+\s+)?\b{loader}\(", body)
+        definitions = len(re.findall(rf"(?:export\s+)?function\s+{loader}\(", body))
+        assert len(occurrences) - definitions == 1, (
+            f"{loader} must have exactly one call site -- PAGE_CODE spans "
+            f"lib/fetch.js, where it is defined"
+        )
+    occurrences = re.findall(r"(\w+\s+)?\bloadMemberQuestions\(", body)
+    definitions = len(re.findall(r"(?:export\s+)?function\s+loadMemberQuestions\(", body))
+    assert len(occurrences) - definitions == 1, (
+        "loadMemberQuestions must have exactly one call site -- PAGE_CODE spans "
+        "lib/fetch.js, where it is defined"
+    )
 
     # `buildConstituencyView` runs on load and must fetch nothing itself.
     built = _function_body(body, "buildConstituencyView")
@@ -877,7 +994,7 @@ def test_the_page_never_fetches_the_member_reference_set() -> None:
 def test_the_state_view_is_keyboard_operable_and_labelled() -> None:
     """A finder reachable only by mouse is one most readers of a public record
     cannot use. Every control is a real button, select or input with a label."""
-    app = (WEB / "app.js").read_text(encoding="utf-8")
+    app = PAGE_CODE  # the page, not one of its files -- see page_source()
     view = _function_body(app, "buildConstituencyView") + _function_body(app, "renderSeatPickers")
 
     # The opener and the name box are real controls, not click handlers on a div.
@@ -900,7 +1017,7 @@ def test_the_state_view_renders_no_position_number() -> None:
     """No charts, no rankings, no leaderboards (owner, Phase 7). The one
     ranking the owner lifted the rule for is the published state subject
     summary, and even there the ORDER carries it -- the page adds no index."""
-    app = (WEB / "app.js").read_text(encoding="utf-8")
+    app = PAGE_CODE  # the page, not one of its files -- see page_source()
     for fn in ("renderStateSummary", "renderSeat", "renderMemberQuestions", "renderNameMatches"):
         # Comments out first: prose about where a flag sits is documentation,
         # a position rendered into a node is a ranking. A check that cannot
@@ -916,7 +1033,7 @@ def test_the_state_view_renders_no_position_number() -> None:
 def test_the_state_always_accompanies_a_constituency_name() -> None:
     """Three names in the window name a different seat in each of two states,
     so a name shown without its state is a seat a reader cannot identify."""
-    app = (WEB / "app.js").read_text(encoding="utf-8")
+    app = PAGE_CODE  # the page, not one of its files -- see page_source()
     seat_head = _function_body(app, "renderSeat")
     assert 'el("p", "seat-state", stated(seat.state))' in seat_head, (
         "the seat panel must print the state"
@@ -930,8 +1047,7 @@ def test_the_state_always_accompanies_a_constituency_name() -> None:
 def test_the_view_reads_the_state_basis_from_the_published_file() -> None:
     """The attribution rule is published prose; the page renders it and never
     retypes it."""
-    app = (WEB / "app.js").read_text(encoding="utf-8")
-    body = re.sub(r"/\*.*?\*/", "", app, flags=re.S)
+    body = PAGE_CODE
     assert "basisBlockForUnit(summary.basisUnit" in body
     assert "STATE_BASIS_UNIT" in body
     # The rule's own sentences must NOT appear in the page source.

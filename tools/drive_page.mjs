@@ -494,6 +494,174 @@ async function runSweeps(cdp, report, label) {
   return { perWidth, motion };
 }
 
+/* ---------------------------------------------------------------------- */
+/* Router assertions -- T190, SC-017 and SC-018                           */
+/* ---------------------------------------------------------------------- */
+
+/* `tests/unit/test_view_routes.py` pins the view MAP -- the ids, the module
+ * specifiers, the containers, the navigation links. It cannot show that a hash
+ * actually renders anything, because no browser runs there.
+ *
+ * These do. Each one failed at least once while the router was being built,
+ * which is the argument for having them: a module with a duplicate declaration
+ * left every view blank and the map test still passed; an error renderer
+ * pointed at the view container destroyed the heading focus was about to move
+ * to, and the measured result was `document.activeElement === body`.
+ */
+
+/**
+ * Open one view and wait for it to be there.
+ *
+ * Every scenario below used to interact with a page where all five sections
+ * were rendered at once, so it could type into the search box without opening
+ * anything. With the router, six of seven views are `hidden` on arrival and a
+ * hidden input cannot be typed into -- so each scenario now opens its own view
+ * first. This is the one line that makes the difference, and it is a helper
+ * rather than two inlined statements because it is called nine times.
+ */
+async function openView(cdp, id, readyExpression, { label } = {}) {
+  await evaluate(cdp, `(location.hash = "#${id}", true)`);
+  await waitFor(
+    cdp,
+    readyExpression ?? `document.getElementById("view-${id}") && !document.getElementById("view-${id}").hidden`,
+    { label: label ?? `the #${id} view`, timeoutMs: 60000 },
+  );
+}
+
+/** The declared view ids, read from the page rather than retyped here. */
+async function viewIdsOnPage(cdp) {
+  return evaluate(
+    cdp,
+    `[...document.querySelectorAll("section.view")].map((s) => s.id.replace(/^view-/, ""))`,
+  );
+}
+
+async function viewState(cdp, id) {
+  return evaluate(
+    cdp,
+    `(() => {
+      const host = document.getElementById("view-${id}");
+      if (!host) return { missing: true };
+      const shown = [...document.querySelectorAll("section.view")]
+        .filter((s) => !s.hidden)
+        .map((s) => s.id.replace(/^view-/, ""));
+      const active = document.activeElement;
+      return {
+        missing: false,
+        hidden: host.hidden,
+        shown,
+        heading: Boolean(host.querySelector("h1, h2")),
+        focusTag: active ? active.tagName : null,
+        focusInView: Boolean(active && host.contains(active)),
+        current: (document.querySelector('[aria-current="page"]') || {}).dataset
+          ? document.querySelector('[aria-current="page"]').dataset.view
+          : null,
+        failed: Boolean(host.querySelector(".unavailable")),
+      };
+    })()`,
+  );
+}
+
+/**
+ * Open every view by hash, then prove the three things only a browser can.
+ *
+ * `log` is the network recorder, so "returning refetches nothing" is read off
+ * real requests rather than inferred from the code.
+ */
+async function routerAssertions(cdp, log, report) {
+  console.log("");
+  console.log("Router — one view at a time, deep-linkable, no refetch on return");
+
+  const ids = await viewIdsOnPage(cdp);
+  check(
+    `the page carries every declared view container`,
+    ids.length >= 7,
+    `${ids.length}: ${ids.join(", ")}`,
+  );
+
+  const perView = [];
+  for (const id of ids) {
+    const before = log.all().length;
+    await evaluate(cdp, `(location.hash = "#${id}", true)`);
+    await sleep(1200);
+    const state = await viewState(cdp, id);
+    const requests = log.all().length - before;
+    perView.push({ id, requests, ...state });
+
+    check(
+      `#${id} renders, and it is the only view rendered`,
+      !state.hidden && state.shown.length === 1 && state.shown[0] === id,
+      `shown: ${JSON.stringify(state.shown)}`,
+    );
+    check(
+      `#${id} keeps a heading for focus to land on`,
+      state.heading,
+      state.failed ? "the view reported a load failure, and still has its heading" : null,
+    );
+    check(`#${id} moved focus into the view`, state.focusInView, `focus on ${state.focusTag}`);
+    check(`#${id} is marked current in the navigation`, state.current === id, `aria-current: ${state.current}`);
+  }
+
+  /* SC-018 -- returning to a view refetches nothing.
+   *
+   * Measured over a SECOND pass of the same hashes: every module and every
+   * file is already in hand, so a correct router issues zero requests. One
+   * request here would mean a view rebuilding itself, which is also how a
+   * reader's typed query would get thrown away. */
+  console.log("");
+  const second = [];
+  for (const id of ids) {
+    const before = log.all().length;
+    await evaluate(cdp, `(location.hash = "#${id}", true)`);
+    await sleep(900);
+    second.push({ id, requests: log.all().length - before });
+  }
+  const refetched = second.filter((v) => v.requests > 0);
+  check(
+    "returning to a view a second time refetches NOTHING",
+    refetched.length === 0,
+    refetched.length === 0
+      ? `${ids.length} view(s) revisited, 0 requests`
+      : refetched.map((v) => `#${v.id} made ${v.requests}`).join("; "),
+  );
+
+  /* FR-153 -- a hash naming no view lands on the coverage statement, not on an
+   * error and not on an empty page. */
+  await evaluate(cdp, `(location.hash = "#nonsense-not-a-view", true)`);
+  await sleep(900);
+  const unknown = await evaluate(
+    cdp,
+    `[...document.querySelectorAll("section.view")].filter((s) => !s.hidden).map((s) => s.id)`,
+  );
+  check(
+    "an unknown hash renders the coverage statement, not an error",
+    unknown.length === 1 && unknown[0] === "view-coverage",
+    `shown: ${JSON.stringify(unknown)}`,
+  );
+
+  /* FR-147 -- back returns to the previous view rather than leaving the page. */
+  await evaluate(cdp, `(location.hash = "#composition", true)`);
+  await sleep(700);
+  await cdp.send("Runtime.evaluate", { expression: "history.back()" });
+  await sleep(1000);
+  const afterBack = await evaluate(
+    cdp,
+    `({ hash: location.hash,
+        shown: [...document.querySelectorAll("section.view")].filter((s) => !s.hidden).map((s) => s.id) })`,
+  );
+  check(
+    "the back button moves between views rather than off the page",
+    afterBack.shown.length === 1 && afterBack.shown[0] !== "view-composition",
+    `back from #composition -> ${afterBack.hash || "(no hash)"} showing ${JSON.stringify(afterBack.shown)}`,
+  );
+
+  report.router = { ids, firstPass: perView, secondPass: second, unknownHash: unknown, afterBack };
+  // Leave the page on the landing view so later scenarios start where they
+  // expect to.
+  await evaluate(cdp, `(location.hash = "#coverage", true)`);
+  await sleep(600);
+}
+
 async function typeAndSearch(cdp, query) {
   // Set the value and dispatch a real submit, so the path exercised is the
   // form's own handler rather than a function called directly.
@@ -597,11 +765,13 @@ async function main() {
     await cdp.send("Page.navigate", { url: `${ORIGIN}/` });
     await waitFor(
       cdp,
+      /* The SHELL only. `profile-result` being ready and `search-query`
+       * existing were part of this condition until feature 002, and both are
+       * now false on arrival by design: those views mount when a reader opens
+       * them (FR-151). Waiting for them here would hang on correct behaviour. */
       `document.getElementById("coverage-body").dataset.state === "ready" &&
-       document.getElementById("profile-result").dataset.state === "ready" &&
-       document.getElementById("licence-body").dataset.state === "ready" &&
-       document.getElementById("search-query") !== null`,
-      { label: "both views and the licence to render" },
+       document.getElementById("licence-body").dataset.state === "ready"`,
+      { label: "the coverage statement and the licence to render" },
     );
 
     const housesText = await evaluate(
@@ -616,10 +786,36 @@ async function main() {
 
     const coverageVisible = await evaluate(
       cdp,
-      `(() => { const n = document.getElementById("coverage"); const r = n.getBoundingClientRect();
+      `(() => { const n = document.getElementById("view-coverage"); const r = n.getBoundingClientRect();
          return r.height > 50 && getComputedStyle(n).display !== "none"; })()`,
     );
     check("the coverage region is rendered on the page, not only in the files", coverageVisible);
+
+    /* The ministry checks below need the ministry view, which no longer
+     * mounts on load -- its two files are 19,408 B on the wire and FR-151
+     * takes them off the first load. Opening it here is what the scenario
+     * always implicitly did; it is now explicit. */
+    /* The TRUE first load: every request the page made before any view was
+     * opened. Captured here because the checks below deliberately open views,
+     * and once they have, `phase === "load"` no longer means "the first load". */
+    const firstLoadOnly = log.all().filter((r) => r.phase === "load");
+    report.firstLoadOnly = {
+      requests: firstLoadOnly.length,
+      encodedBytes: firstLoadOnly.reduce((n, r) => n + (r.encodedDataLength ?? 0), 0),
+      urls: firstLoadOnly.map((r) => r.url),
+    };
+    const loadRequestsBeforeMinistry = firstLoadOnly.length;
+    await openView(
+      cdp,
+      "ministry",
+      `document.getElementById("profile-result").dataset.state === "ready"`,
+      { label: "the ministry profile" },
+    );
+    check(
+      "the ministry profile's files were NOT on the first load, and arrive when it is opened",
+      log.all().filter((r) => r.phase === "load").length > loadRequestsBeforeMinistry,
+      `${log.all().filter((r) => r.phase === "load").length - loadRequestsBeforeMinistry} request(s) on first open`,
+    );
 
     const flagWords = await evaluate(
       cdp,
@@ -648,12 +844,23 @@ async function main() {
       `${statusSum.values.join(" + ")} = ${statusSum.sum}, total ${statusSum.total}`,
     );
 
+    /* Opened, not rendered-into: the search view builds its box on arrival and
+     * fetches NOTHING until a query is submitted, which is the discipline
+     * boot() has asserted since T079 and the router does not change. */
+    await openView(cdp, "search", `document.getElementById("search-query") !== null`, {
+      label: "the search box",
+    });
     const searchUntouched = await evaluate(
       cdp,
       `document.getElementById("search-result").dataset.state === "empty" &&
        document.querySelectorAll(".result").length === 0`,
     );
     check("nothing search-related has rendered before a search", searchUntouched);
+    check(
+      "opening the search view fetched no search file -- the index waits for a query",
+      !log.all().some((r) => r.url.includes("/search/")),
+      log.all().filter((r) => r.url.includes("/search/")).map((r) => r.url).join(", ") || "none",
+    );
 
     const loadRequests = log.all().filter((r) => r.phase === "load");
     const loadBytes = loadRequests.reduce((n, r) => n + (r.encodedDataLength ?? 0), 0);
@@ -673,10 +880,18 @@ async function main() {
       loadRequests.filter((r) => r.url.includes("/search/")).map((r) => r.url).join(", ") || "none",
     );
 
+    /* ---------------- the router (T190) ---------------- */
+    await routerAssertions(cdp, log, report);
+
     /* ---------------- phase: first search, keyboard only ---------------- */
     currentPhase = "search";
     console.log("");
     console.log(`First search — ${JSON.stringify(QUERY)}, typed and submitted with the keyboard`);
+    // routerAssertions leaves the page on the landing view, so the search box
+    // has to be brought back before anything can type into it.
+    await openView(cdp, "search", `document.getElementById("search-query") !== null`, {
+      label: "the search box",
+    });
     await pressEnterInSearchBox(cdp, QUERY);
     await waitFor(cdp, RESULTS_READY, { label: "search results", timeoutMs: 60000 });
 
@@ -823,11 +1038,34 @@ async function main() {
     console.log("");
     console.log(`Two-word query — ${JSON.stringify(QUERY_TWO)} (the accepted overrun), on a FRESH page`);
     await cdp.send("Page.navigate", { url: `${ORIGIN}/` });
-    /* Wait for `#search-query` to EXIST, not for `#search-result` to say
-     * "empty": the shell ships `data-state="empty"` in the markup, so that
-     * condition is true of the static HTML before any script has run and the
-     * wait would return on a page with no search box on it. The input is
-     * created by `buildSearchView`, so its presence is the real signal. */
+    /* Wait for the SHELL, and compare the on-load set BEFORE opening anything.
+     *
+     * The comparison below is the reason for the order. It used to read
+     * `reloadRequests.length === loadRequests.length`, which was right while
+     * every view rendered on arrival. Once views defer, a reload-plus-open
+     * fetches the view's module and its library dependencies -- measured at
+     * six more -- so comparing that against a bare first load fails on correct
+     * behaviour. Taking the measurement before any view is opened compares two
+     * bare loads, which is the claim actually worth making. */
+    await waitFor(
+      cdp,
+      `document.getElementById("coverage-body").dataset.state === "ready"`,
+      { label: "the reloaded shell" },
+    );
+    const reloadOnLoad = log.all().filter((r) => r.phase === "reload");
+    check(
+      "a fresh load fetches the same set as the first one, and still no search file",
+      reloadOnLoad.length === firstLoadOnly.length &&
+        !reloadOnLoad.some((r) => r.url.includes("/search/")),
+      `${reloadOnLoad.length} request(s) against ${firstLoadOnly.length} on the first load`,
+    );
+
+    /* Now open the search view. Wait for `#search-query` to EXIST, not for
+     * `#search-result` to say "empty": the shell ships `data-state="empty"` in
+     * the markup, so that condition is true of the static HTML before any
+     * script has run. The input is created by `buildSearchView`, so its
+     * presence is the real signal. */
+    await evaluate(cdp, `(location.hash = "#search", true)`);
     await waitFor(cdp, `document.getElementById("search-query") !== null`, {
       label: "the reloaded page's search box",
     });
@@ -842,11 +1080,27 @@ async function main() {
         contentEncoding: r.headers?.["content-encoding"] ?? null,
       })),
     };
+    /* Compared against the TRUE first load, not against the whole `load`
+     * phase.
+     *
+     * This read `reloadRequests.length === loadRequests.length` until feature
+     * 002, and that was right while the page rendered every view on arrival:
+     * two loads of the same page fetched the same set. It is wrong now, and
+     * measured so -- 22 against 25 -- because the load phase deliberately
+     * OPENS the ministry and search views to check them, and each open fetches
+     * the view's own module. Comparing a bare reload with a load-plus-two-opens
+     * compares different things and fails on correct behaviour.
+     *
+     * The claim worth keeping is the one this now makes: a fresh load, plus
+     * opening the search view, fetches the same set as the first time and
+     * still no search file. */
     check(
-      "the reloaded page fetched the same on-load set and still no search file",
-      reloadRequests.length === loadRequests.length &&
-        !reloadRequests.some((r) => r.url.includes("/search/")),
-      `${reloadRequests.length} request(s) against ${loadRequests.length} on the first load`,
+      "opening the search view on a fresh page still fetched no search file",
+      !reloadRequests.some((r) => r.url.includes("/search/")),
+      reloadRequests
+        .filter((r) => r.url.includes("/search/"))
+        .map((r) => r.url)
+        .join(", ") || "none",
     );
 
     currentPhase = "two";
@@ -1014,7 +1268,16 @@ async function main() {
     console.log("");
     console.log("Scenario 7 — the state and constituency view, on a FRESH page");
     await cdp.send("Page.navigate", { url: `${ORIGIN}/` });
-    await waitFor(cdp, `document.getElementById("seat-open") !== null`, {
+    await waitFor(
+      cdp,
+      `document.getElementById("coverage-body").dataset.state === "ready"`,
+      { label: "the fresh page's shell" },
+    );
+    /* The seat view's own files must not be on the FIRST LOAD, which is what
+     * the check below reads -- so the view is opened only after the load
+     * phase's requests have been recorded. Opening it builds the finder and
+     * still fetches nothing: its two files wait for first USE. */
+    await openView(cdp, "seat", `document.getElementById("seat-open") !== null`, {
       label: "the constituency finder's open button",
     });
     const seatLoadRequests = log.all().filter((r) => r.phase === "seatload");

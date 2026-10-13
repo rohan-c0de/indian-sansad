@@ -34,13 +34,39 @@
 
 <main class="container" id="main">
 
+<!-- =====================================================================
+     THE VIEW NAVIGATION — T129, FR-146/147/149/150.
+
+     Eight views, one rendered at a time, switched by the URL hash. A hash
+     rather than a path because GitHub Pages serves static files: `/search`
+     would 404 on a direct load and would need redirect configuration the free
+     tier does not offer. A hash never reaches the server, and it gives back
+     and forward for free.
+
+     Real <a href="#..."> links, not buttons: a view is a place, it should be
+     linkable and openable in a new tab, and a keyboard already knows how to
+     use a link. `aria-current="page"` is set by the router; the stylesheet
+     hangs a NON-COLOUR cue on it (FR-149).
+     ===================================================================== -->
+<nav class="viewnav" aria-label="Views">
+  <ul class="viewnav-list">
+    <li><a href="#coverage" data-view="coverage">Coverage</a></li>
+    <li><a href="#search" data-view="search">Subject search</a></li>
+    <li><a href="#seat" data-view="seat">State &amp; constituency</a></li>
+    <li><a href="#ministry" data-view="ministry">Ministry</a></li>
+    <li><a href="#compare" data-view="compare">Compare</a></li>
+    <li><a href="#load" data-view="load">Question load</a></li>
+    <li><a href="#composition" data-view="composition">Composition</a></li>
+  </ul>
+</nav>
+
   <!-- ===================================================================
        COVERAGE STATEMENT — T077.
        Filled at runtime from data/published/coverage.jsonl (the row where
        house = "lok-sabha") and data/published/reference/sessions.jsonl.
        Nothing in it is hardcoded. Until it loads it says so.
        =================================================================== -->
-  <section class="card coverage" id="coverage" aria-labelledby="coverage-h">
+  <section class="view card coverage" id="view-coverage" aria-labelledby="coverage-h">
     <div class="section-head">
       <h1 id="coverage-h">Coverage</h1>
       <p class="lede">What this record claims to cover, and where it is known to be
@@ -57,7 +83,7 @@
        T078 — ministry profile. Rendered from
        aggregates/ministry-profile.jsonl, fetched on load.
        =================================================================== -->
-  <section class="section" id="ministry-profile" aria-labelledby="profile-h">
+  <section class="view section" id="view-ministry" aria-labelledby="profile-h" hidden>
     <div class="section-head">
       <h2 id="profile-h">Ministry profile</h2>
       <p class="lede">Question load for one ministry across a span of sessions.</p>
@@ -75,7 +101,7 @@
        search-related is requested on page load: boot() asserts that before
        it renders anything.
        =================================================================== -->
-  <section class="section" id="subject-search" aria-labelledby="search-h">
+  <section class="view section" id="view-search" aria-labelledby="search-h" hidden>
     <div class="section-head">
       <h2 id="search-h">Subject search</h2>
       <p class="lede">Prior occurrences of a subject, with dates, ministries and asking
@@ -100,7 +126,7 @@
        window name a different seat in each of two states, so a name on its
        own does not identify a seat.
        =================================================================== -->
-  <section class="section" id="constituency" aria-labelledby="seat-h">
+  <section class="view section" id="view-seat" aria-labelledby="seat-h" hidden>
     <div class="section-head">
       <h2 id="seat-h">Your state and constituency</h2>
       <p class="lede">Who has represented a seat across the covered window, and what
@@ -120,7 +146,7 @@
        Nothing is pre-selected: a pair the page picked would read as a
        comparison someone had asked for.
        =================================================================== -->
-  <section class="section" id="compare" aria-labelledby="compare-h">
+  <section class="view section" id="view-compare" aria-labelledby="compare-h" hidden>
     <div class="section-head">
       <h2 id="compare-h">Compare two ministries</h2>
       <p class="lede">The same sessions and the same counting basis for both.</p>
@@ -129,6 +155,36 @@
       <p class="status" role="status">Reading the ministry profile…</p>
     </div>
     <div id="compare-result" data-state="loading"></div>
+  </section>
+
+  <!-- Question load across the 21 covered sessions. Built by
+       views/ministries.js, which shares its two files with #ministry and
+       #compare. T155. -->
+  <section class="view" id="view-load" aria-labelledby="load-h" hidden>
+    <div class="section-head">
+      <h2 id="load-h">Question load by session</h2>
+      <p class="lede">How many questions the House put across the covered
+        sessions, and the starred and unstarred mix of each.</p>
+    </div>
+    <div id="load-result" data-state="empty">
+      <p class="status" role="status">Opening this view reads the ministry
+        profile aggregate.</p>
+    </div>
+  </section>
+
+  <!-- House composition, 17th against 18th. Built by views/composition.js.
+       Its one file is read on first open and by nothing else. T162. -->
+  <section class="view" id="view-composition" aria-labelledby="composition-h" hidden>
+    <div class="section-head">
+      <h2 id="composition-h">House composition</h2>
+      <p class="lede">How the House differed between the 17th and 18th Lok
+        Sabha, by party, state and number of terms served — the three
+        dimensions the published aggregate carries.</p>
+    </div>
+    <div id="composition-result" data-state="empty">
+      <p class="status" role="status">Opening this view reads the composition
+        aggregate.</p>
+    </div>
   </section>
 
 </main>

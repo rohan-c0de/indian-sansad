@@ -163,9 +163,10 @@ test("every requestable URL is relative and under the published base", () => {
   // assert against a real network log.
   assert.deepEqual(new Set(Object.keys(PUBLISHED_FILES)), new Set([
     "manifest", "coverage", "countingBasis", "sessions",
-    "ministryProfile", "ministries",       // T078 / T080
+    "ministryProfile", "ministries",       // T078 / T080 -- LAZY since T137
     "searchIndex", "askerNames",           // T079, both lazy
     "constituencies", "stateSubjects",     // T088, both lazy
+    "composition",                         // T161, lazy -- feature 002
   ]));
   // `reference/members.jsonl` is NOT here, and that is the decision: it is
   // 3,447,794 B, and T086 put each member's name, party and sitting status
