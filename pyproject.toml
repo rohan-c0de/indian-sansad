@@ -94,6 +94,26 @@ dev = [
     # and an undeclared import is how this went unnoticed in the first place.
     "PyYAML>=6.0,<7.0",
     "yamllint>=1.35,<2.0",
+    # Added 2026-10-13 (feature 002, T101). DEV ONLY -- it never reaches the
+    # serving path, and `dependencies` above stays at two.
+    #
+    # It exists for exactly one check: `tools/check_font_scope.py` reads each
+    # self-hosted woff2's `cmap` and asserts no codepoint in the Devanagari
+    # block U+0900-U+097F (FR-111, SC-013). Nothing already in the repository
+    # can do that. `.woff2` is a member of `UNSCANNABLE_SUFFIXES` in
+    # `tools/guard_no_raw_payloads.py`, so `make guard` and `make audit-fields`
+    # SKIP font files entirely -- a font could carry any script and every
+    # existing check would stay green. The 64 KB payload ceiling does not
+    # apply either: `PAYLOAD_SUFFIXES` lists only data formats.
+    #
+    # The `[woff]` extra pulls brotli, which woff2 decompression needs. The
+    # alternative -- hand-rolling a brotli + woff2 table-transform reader --
+    # was rejected on risk, not on cost (research.md R4). Scanning the binary
+    # as text was rejected as meaningless in both directions: a compressed
+    # stream yields false negatives by construction and false positives by
+    # chance, which is presumably why `.woff2` is unscannable in the first
+    # place.
+    "fonttools[woff]>=4.55,<5.0",
 ]
 
 [tool.hatch.build.targets.wheel]
