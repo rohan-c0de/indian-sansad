@@ -22,7 +22,7 @@ REPO_ROOT := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 # fall back to /tmp/ where it is unset (most CI runners).
 SANSAD_SCRATCH ?= $(or $(TMPDIR),/tmp/)sansad-scratch
 
-.PHONY: scratch guard setup lint yamllint audit-fields check-fonts \
+.PHONY: scratch guard setup lint yamllint audit-fields check-fonts check-contrast \
         refresh verify-joins extract report lookup composition coverage \
         serve-local serve-local-mapping test-page validate
 
@@ -169,6 +169,23 @@ audit-fields:
 check-fonts:
 	@set -eu -o pipefail; \
 	 $(VENV_PY) tools/check_font_scope.py "$(REPO_ROOT)/web/fonts"
+
+# --------------------------------------------------------------------------
+# check-contrast -- T113. Recompute every palette ratio from the stylesheet's
+# own token values, and fail if a figure RECORDED in the stylesheet disagrees
+# with the figure computed from the token beside it.
+#
+# The second half is the point. Feature 001 found three recorded ratios that
+# were plain wrong -- conservative, but unreproducible -- and a measurement
+# nobody can reproduce is not a measurement. A comment drifts from the code it
+# describes silently; this target is what stops it.
+#
+# Text floor 4.5:1, meaning-carrying marks 3:1. A pair below a floor is a pass
+# ONLY if it is a declared exception naming what carries the meaning instead.
+# --------------------------------------------------------------------------
+check-contrast:
+	@set -eu -o pipefail; \
+	 $(VENV_PY) tools/check_contrast.py "$(REPO_ROOT)/web/style.css"
 
 # ========================================================================
 # T035 -- an address for every quickstart.md entry point, from the start.

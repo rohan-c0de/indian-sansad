@@ -17,6 +17,7 @@
  */
 
 import { legend, stackedColumns } from "./lib/chart.js";
+import { STARRED, figure, figureText, starMark, typeWord } from "./lib/marks.js";
 import {
   CrossOriginRefused,
   fetchCountingBasis,
@@ -69,6 +70,7 @@ import {
   askerIndex,
   askersFor,
   createResultSet,
+  parseQuestionId,
   planSearch,
 } from "./lib/search.js";
 import { renderDisclosure } from "./lib/licence.js";
@@ -1212,6 +1214,19 @@ function ministryNameFor(ministryId) {
   return { text: record.canonical_name ?? String(ministryId), flagged: false };
 }
 
+/* The published question TYPE for a question id.
+ *
+ * `parseQuestionId` yields the id's own path segment, which is lowercase
+ * (`starred` / `unstarred`); the published type field elsewhere in the record
+ * is uppercase (`STARRED` / `UNSTARRED`), and `lib/marks.js` compares against
+ * the published spelling. Normalised in ONE place so the two spellings cannot
+ * drift into two behaviours. An id that does not parse yields null, and
+ * `starMark` then renders nothing rather than guessing a bucket. */
+function questionTypeOf(parsed) {
+  if (!parsed || typeof parsed.type !== "string") return null;
+  return parsed.type.toUpperCase();
+}
+
 /** One result. A list item, so the count is in the accessibility tree. */
 function resultItem(record, position) {
   const li = el("li", "result");
@@ -1222,11 +1237,21 @@ function resultItem(record, position) {
   const subject = el("h4", "result-subject");
   subject.tabIndex = -1;
   subject.id = `result-${position}`;
+
+  /* The starred mark (T123, FR-113). The type is NOT a field on the search
+   * digest -- it is already in the question id, `lok-sabha/18/7/starred/1` --
+   * so `parseQuestionId` yields it and nothing further is fetched and nothing
+   * in data/published/ changes. An unstarred question gets no mark; the type
+   * is also a word in the meta line, so the glyph is never the only carrier. */
+  const parsed = parseQuestionId(record.questionId);
+  const star = starMark(questionTypeOf(parsed), document);
+  if (star) subject.append(star);
+
   if (isMissing(record.subject)) {
-    subject.textContent = NOT_STATED;
+    subject.append(document.createTextNode(NOT_STATED));
     subject.classList.add("result-subject-missing");
   } else {
-    subject.textContent = record.subject;
+    subject.append(document.createTextNode(record.subject));
   }
   head.append(subject);
   li.append(head);
