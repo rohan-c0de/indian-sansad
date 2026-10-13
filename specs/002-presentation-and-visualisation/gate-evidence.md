@@ -313,8 +313,8 @@ after a green run.
 
 | Claim | Status | What would settle it |
 |---|---|---|
-| **SC-001/003/004 — the live wire figures** | See the T184 section below | Response headers from the live deployment |
-| **The three fonts total 60,684 B as served by this site** | **UNVERIFIED** | `woff2` is pre-compressed and GitHub Pages will not re-encode it, so the figure should carry across — but 60,684 B is a `fonts.gstatic.com` `content-length`, not a measurement of this site |
+| ~~**SC-001/003/004 — the live wire figures**~~ | **MEASURED 2026-10-13**: 106,916 B over 15 requests, 46,232 B non-font. All four criteria met | — |
+| ~~**The three fonts total 60,684 B as served by this site**~~ | **CONFIRMED**: all three return `content-encoding: none` and byte-for-byte the `gstatic` figure. `woff2` does not re-compress | — |
 | **SC-025 — zero running cost** | **UNVERIFIED, and unverifiable here** | Observable only in operation. A billing period with no charge |
 | **SC-012 — no off-host request** | **VERIFIED locally only** | A local run proves the page made none *in that run*; a reference reachable only on an unexercised path would not appear. The static off-host assertions over all of `web/` cover the rest |
 | **SC-011's screenshots** | **captured, not judged** | 68 images prove a layout rendered. Whether it reads well is a person's call |
@@ -328,3 +328,34 @@ after a green run.
 | Whether two variable Latin romans fit 95,000 B | **They do not** — 98,392 B. Three static instances at 60,684 B replaced them |
 | Whether `prefers-reduced-motion` is reachable through the driver | **It is.** SC-010 is a genuine browser check, not the fallback stylesheet assertion |
 | The 2,800 px result-list ceiling | **Met at every width** — 2,672 px at 390 px, from a measured 9,720 px |
+
+
+---
+
+# The live deployment (T184)
+
+Published 2026-10-13 to the `published` branch, which GitHub Pages serves. The
+previous live commit was `c089bb89`, recorded before the push so the change is
+revertible.
+
+**The three pre-publish gates above ran BEFORE this**, which is the ordering
+`/speckit-analyze` corrected.
+
+```
+first load   : 88,961 -> 106,916 B   1.20x   (the ceiling allowed 1.80x)
+non-font     : 88,961 ->  46,232 B   0.52x   -- a 48% CUT
+requests     :      18 ->      15
+```
+
+**GitHub Pages serves and compresses this site** — `content-encoding: gzip` on
+every text file, `none` on the three fonts. The repository's `README.md`
+recorded Pages as never observed serving the site; that is now superseded and
+the note says so.
+
+**The local `gzip -6` basis is a good proxy**, which matters for every future
+run that cannot deploy: the projection was 105,137 B total and 44,453 B
+non-font against 106,916 and 46,232 measured — within 1.7% and 3.8%, and
+consistently in the direction that does not flatter the page.
+
+The dataset was republished byte-identical. `data/published/` has not changed
+since the 2026-10-10 build.

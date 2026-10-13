@@ -130,6 +130,12 @@ the dataset is built, all four reader-page views are built, and **the workflow h
 GitHub and published the `published` branch** — by hand, not on its schedule. **GitHub Pages has
 not been observed serving the site**, and no unattended run has happened.
 
+> **Superseded 2026-10-13.** GitHub Pages **is** serving the site, and the real
+> compressed first-load figure has been read from its response headers:
+> **106,916 bytes over 15 requests**, of which 60,684 is the three self-hosted
+> fonts. See `specs/002-presentation-and-visualisation/spec.md` → *MEASURED on
+> the live deployment*. The unattended scheduled run is still unobserved.
+
 ### Done
 
 - **Phases 1–5 complete** — guard rails (T001–T003), the blocking spike (T004–T020), the

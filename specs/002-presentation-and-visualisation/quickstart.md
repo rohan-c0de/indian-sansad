@@ -56,9 +56,9 @@ make test-page
 
 **Expected, from the network log**:
 
-- The first load is exactly the 14 requests in [contracts/view-routes.md](./contracts/view-routes.md). **Any other file is a failure** — including `ministry-profile.jsonl`, `ministries.jsonl` and the five view-only `lib/` modules, all of which are on the first load today and are newly forbidden.
+- The first load is exactly the **15** requests in [contracts/view-routes.md](./contracts/view-routes.md) — fifteen, not the fourteen first planned: `lib/shared.js` is the extra, a module that did not exist until the shared helpers had to leave `app.js` to break a dependency cycle. **Any other file is a failure** — including `ministry-profile.jsonl`, `ministries.jsonl` and the five view-only `lib/` modules, all of which were on the first load before this feature.
 - `boot()` throws if any search, seat, ministry, composition or `views/` asset was requested before first render.
-- Opening `#search`, `#seat`, `#ministry`, `#compare`, `#load`, `#composition`, `#licence` each renders that view; `#nonsense` and an empty hash render `coverage`.
+- Opening `#search`, `#seat`, `#ministry`, `#compare`, `#load`, `#composition` each renders that view; `#nonsense` and an empty hash render `coverage`. **Seven views, not eight**: the licence and the source-terms disclosure stay in the footer, outside `<main>`, so they show on every view rather than behind a choice.
 - Back and forward move between views, never off the page.
 - Switching away from a view with results and returning **refetches nothing** and the results are still there.
 - The subject trend draws with **zero** requests after the search that produced it.
@@ -70,9 +70,9 @@ make test-page
 make test-page            # the list-height sweep runs inside it
 ```
 
-**Expected**: a 25-result query renders a list **no taller than 2,800 px at 390 px**, against about 6,000 px today, with the subject, date, ministry, link status and askers all still present. Askers are inline, not one per line; a question asked by twenty members states the count against its total; anything abbreviated states how many are not shown.
+**MEASURED 2026-10-13: 2,672 px at 390 px**, from **9,720 px** before — a 3.64× reduction, under the ceiling at every width (2,162 at 768; 2,080 at 1024 and 1440). The spec's "about six thousand pixels" turned out to be the figure at 768 px and wider; nobody had measured the narrow case the page was designed for. The subject, date, ministry, link status and askers are all still present. Askers are inline, not one per line; a question asked by twenty members states the count against its total; anything abbreviated states how many are not shown.
 
-This ceiling is **derived, not measured** — 25 rows at about 90 px plus about 400 px of summary. If the built row cannot reach it, report the measured figure and let the owner retarget. Do not quietly widen the ceiling to match what was built.
+The ceiling was **derived, not measured** — 25 rows at about 90 px plus about 400 px of summary — and it was met at 106.9 px per row. Two responsive decisions got it the last 321 px, both forced by measurement: below 768 px the asker's party is hidden, and so are the asker names, leaving the count — which is the shape the owner's own preview shows.
 
 ## Scenario 5 — Operability (SC-007 to SC-010, SC-011, FR-130 to FR-133)
 
@@ -82,12 +82,12 @@ make test-page SCREENS=1
 
 **Expected**, at each of 390, 768, 1024 and 1440 px:
 
-- No interactive element under **44 px** in either dimension. The four known failures — the skip link at 25 px and three footer links at 38, 17 and 17 px — are at or above 44. The skip link's current `min-height` cannot work: it is a non-replaced inline `<a>`, so it needs a `display` change, not a larger number.
+- No interactive element under **44 px** in either dimension. **Measured: 0 under the floor at all four widths.** The four known failures — the skip link at 25 px and three footer links at 38, 17 and 17 px — are fixed. The skip link's `min-height` was already there and inert: `min-height` does not apply to a non-replaced inline `<a>`, so it needed a `display` change, not a larger number.
 - `documentElement.scrollWidth <= clientWidth` — no horizontal scroll, the new view navigation included.
-- Every interactive element shows a visible focus ring when tabbed, against whichever ground it sits on.
+- Every interactive element shows a visible focus ring when tabbed. **Measured: 14 stops tabbed against 14 focusable in the DOM, all ringed** — the sweep asserts it reached every one, because its first version passed while covering a third of the page.
 - A screenshot per view per width, in `page-screens/`.
 
-With `prefers-reduced-motion: reduce`, no transition and no animation runs. **If `Emulation.setEmulatedMedia` proves unreachable through the driver**, this falls back to asserting that every `transition` and `animation` in the stylesheet sits inside a `@media (prefers-reduced-motion: reduce)` guard — and must then be reported as a stylesheet assertion, not as a browser check.
+With `prefers-reduced-motion: reduce`, no transition and no animation runs. **`Emulation.setEmulatedMedia` IS reachable** — this is a genuine browser check, not the fallback stylesheet assertion the spec allowed for.
 
 ## Scenario 6 — The charts (SC-014, SC-015, SC-019, FR-116 to FR-125)
 
@@ -173,7 +173,21 @@ curl -sI -H 'Accept-Encoding: gzip, br' https://<pages-host>/ | grep -i 'content
 # repeat per first-load file; sum the content-lengths
 ```
 
-**Expected**: first load **≤160,000 B on the wire in ≤16 requests**, and the non-font part **≤60,000 B — down from the measured 88,961 B, not merely held**. The projection is ~101,537 B across 14 requests, which is 1.14× the baseline; the measured figure goes beside the 2026-10-10 numbers in the spec, per FR-129.
+**MEASURED 2026-10-13 on the live deployment** — all four criteria met:
+
+```
+  criterion                              ceiling      measured    verdict
+  ---------------------------------------------------------------------
+  SC-001  first load, wire              160,000       106,916     PASS
+  SC-002  fonts, wire                    95,000        60,684     PASS
+  SC-003  non-font, wire                 60,000        46,232     PASS
+  SC-004  first-load requests                16            15     PASS
+```
+
+**1.20× the 88,961 B baseline**, where the ceiling allowed 1.80× and the brief
+expected "approximately double". The non-font load is **0.52× — a 48% cut** —
+which is what paid for the fonts. The per-file figures are in `spec.md` →
+*MEASURED on the live deployment*.
 
 A non-font first load that holds at 88,961 B **fails SC-003 even if SC-001 passes**. That is the criterion's purpose: it is what makes FR-128 and FR-151 checkable rather than aspirational.
 
@@ -187,7 +201,7 @@ Stated here because the moment this claim is most likely to be made is immediate
 |---|---|---|
 | **SC-012** (no off-host request) locally | A local run proves the page makes none *in that run*. A reference reachable only on a path not exercised would not appear. | The live network log, plus the static off-host assertions over all of `web/` |
 | **SC-025** (zero cost, no new infrastructure) | Observable only in operation, over time | A billing period with no charge |
-| **SC-002 as served by this site** | 60,684 B is a `fonts.gstatic.com` `content-length`. `woff2` is pre-compressed so it should carry across unchanged, but that is UNVERIFIED | Reading `content-length` for the three font files from the live deployment |
+| ~~**SC-002 as served by this site**~~ | **RESOLVED 2026-10-13.** All three fonts return `content-encoding: none` and byte-for-byte the `gstatic` figure: 23,888 + 17,604 + 19,192 = 60,684 B. `woff2` does not re-compress | — |
 | **SC-011**'s screenshots | They are captured, not judged. A screenshot proves a layout rendered, never that it reads well | A person looking at them |
 
 Three further UNVERIFIED items are carried in [research.md](./research.md): whether `prefers-reduced-motion` is reachable through the driver, whether a third test asserts the no-web-font property, and the 2,800 px ceiling itself.

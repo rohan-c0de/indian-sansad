@@ -331,6 +331,57 @@ The landing view is the coverage statement. `boot()` already fetches only what i
 
 That is 44% of the current first load, and it is deferrable **without splitting `app.js` at all**. So the non-font first load should *fall* to about 52,000 B, and the fonts land on top of that rather than on top of 88,961 B. The criteria below are set against the measured figures, not the brief's estimate.
 
+### MEASURED on the live deployment, 2026-10-13 (T184, FR-129)
+
+The figures the four byte criteria are actually read off. Taken from
+`https://rohan-c0de.github.io/indian-sansad/` with `Accept-Encoding: gzip, br`,
+one request per first-load file.
+
+| File | On the wire | `content-encoding` |
+|---|---|---|
+| `/` | 3,141 | gzip |
+| `/style.css` | 15,714 | gzip |
+| `/app.js` | 8,478 | gzip |
+| `/lib/coverage.js` | 2,228 | gzip |
+| `/lib/fetch.js` | 6,348 | gzip |
+| `/lib/format.js` | 2,452 | gzip |
+| `/lib/licence.js` | 1,890 | gzip |
+| `/lib/shared.js` | 1,495 | gzip |
+| `/fonts/newsreader-600.woff2` | 23,888 | **none** |
+| `/fonts/ibm-plex-sans-400.woff2` | 17,604 | **none** |
+| `/fonts/ibm-plex-sans-600.woff2` | 19,192 | **none** |
+| `/data/published/coverage.jsonl` | 1,672 | gzip |
+| `/data/published/reference/sessions.jsonl` | 314 | gzip |
+| `/data/published/aggregates/counting-basis.jsonl` | 1,484 | gzip |
+| `/data/published/manifest.json` | 1,016 | gzip |
+| **TOTAL, 15 requests** | **106,916** | |
+| of which fonts | 60,684 | |
+| non-font | 46,232 | |
+
+| Criterion | Ceiling | Measured | |
+|---|---|---|---|
+| SC-001 first load | 160,000 B | **106,916** | PASS |
+| SC-002 fonts | 95,000 B | **60,684** | PASS |
+| SC-003 non-font | 60,000 B | **46,232** | PASS |
+| SC-004 requests | 16 | **15** | PASS |
+
+**Against the 2026-10-10 baseline of 88,961 B over 18 requests: 1.20×** — where
+the spec's own ceiling allowed 1.80×, and the brief expected "approximately
+double". **The non-font load is 0.52× — a 48% cut** — which is what paid for
+the fonts.
+
+Three things this measurement settled that were open:
+
+- **`woff2` does not re-compress.** All three fonts return
+  `content-encoding: none` and byte-for-byte the figure `fonts.gstatic.com`
+  reported. The spec carried this as UNVERIFIED; it is now measured.
+- **The local `gzip -6` basis is a good proxy.** The projection was 105,137 B
+  total and 44,453 B non-font, against 106,916 and 46,232 measured — within
+  1.7% and 3.8%. GitHub Pages compresses slightly less aggressively than
+  `gzip -6`, consistently and in the direction that does not flatter the page.
+- **GitHub Pages serves and compresses this site**, which the repository's
+  `README.md` recorded as unobserved.
+
 ### Measurable Outcomes
 
 - **SC-001**: First load is no more than **160,000 B on the wire**, measured on the live deployment and recorded beside the 2026-10-10 figures above. Derived: ~52,000 B (non-font, after FR-151) + 95,000 B (fonts) + ~2,000 B (stylesheet growth) ≈ 149,000 B, with the ceiling set above it. This is **1.80× the measured 88,961 B baseline, not the 2× the brief estimated**.
