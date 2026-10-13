@@ -372,6 +372,127 @@ async function resultListHeight(cdp) {
   );
 }
 
+/** T149 / SC-009 -- tab through the page and prove every stop shows a ring.
+ *
+ * REAL Tab keypresses, not `element.focus()`. `:focus-visible` is the whole
+ * point of the rule being checked, and it does not reliably match on
+ * programmatic focus -- Chrome decides from the last interaction modality. A
+ * check that focused elements in script could therefore report no ring on a
+ * page that rings correctly for a keyboard, which is the wrong answer in the
+ * more dangerous direction.
+ *
+ * `outline-width` OR a `box-shadow`: both are legitimate ring mechanisms and
+ * this page uses an outline, but a check that insisted on one would fail a
+ * correct future change.
+ *
+ * My own analysis of this spec recorded SC-009 as having no automated check at
+ * all -- implemented but unverified, with `quickstart.md` saying "confirmed by
+ * tabbing the whole page", by hand. This is that check.
+ */
+async function pressTab(cdp, { shift = false } = {}) {
+  const modifiers = shift ? 8 : 0; // 8 = Shift, per the CDP Input domain
+  await cdp.send("Input.dispatchKeyEvent", {
+    type: "rawKeyDown",
+    key: "Tab",
+    code: "Tab",
+    windowsVirtualKeyCode: 9,
+    nativeVirtualKeyCode: 9,
+    modifiers,
+  });
+  await cdp.send("Input.dispatchKeyEvent", {
+    type: "keyUp",
+    key: "Tab",
+    code: "Tab",
+    modifiers,
+  });
+}
+
+async function focusRingSweep(cdp, limit = 60) {
+  /* Walk BACKWARDS to the top of the document before tabbing forward.
+   *
+   * `document.activeElement.blur()` is not enough, and the first version of
+   * this sweep proved it: it reported 5 stops on a page with about sixteen --
+   * the submit button, "show 25 more" and the three footer links -- and
+   * declared them all ringed. Everything before the point focus already sat
+   * at was never visited, including the skip link and the whole view
+   * navigation. A check that silently covers a third of the page and passes
+   * is worse than no check.
+   *
+   * The cause is in the spec rather than in Chrome: blurring an element sets
+   * the "sequential focus navigation starting point" to that element's
+   * position, so the next Tab resumes from the middle. Real Shift+Tab presses
+   * move that point, which is why the reset is keyboard input and not script.
+   */
+  /* How many stops there SHOULD be, counted from the DOM. The sweep asserts
+   * it reached all of them, and that assertion is the reason this function is
+   * trustworthy: without it, a traversal that started in the middle of the
+   * page reported 5 stops out of thirteen, found them all ringed, and PASSED.
+   * Covering a third of the page silently is the failure mode a ring check is
+   * most likely to have, because every element it does reach is usually fine.
+   */
+  const expected = await evaluate(
+    cdp,
+    `(() => {
+      const nodes = [...document.querySelectorAll(${JSON.stringify(INTERACTIVE)})];
+      return nodes.filter((n) => {
+        if (n.disabled) return false;
+        let p = n;
+        while (p) { if (p.hidden) return false; p = p.parentElement; }
+        const r = n.getBoundingClientRect();
+        // The skip link is parked off-screen but is a real keyboard stop, so
+        // a zero-area test rather than an on-screen one.
+        return r.width > 0 || r.height > 0;
+      }).length;
+    })()`,
+  );
+
+  /* Walk to the top with real Shift+Tab presses before tabbing forward.
+   *
+   * `element.blur()` is not enough and was tried: per spec, blurring sets the
+   * "sequential focus navigation starting point" to the blurred element's
+   * position, so the next Tab resumes from the middle of the document rather
+   * than the beginning. Only real key input moves that point.
+   *
+   * Bounded by `limit` and by focus leaving the document -- at the top,
+   * Shift+Tab hands focus to the browser's own chrome and `activeElement`
+   * becomes <body>, which is the signal to stop. */
+  for (let i = 0; i < limit; i += 1) {
+    await pressTab(cdp, { shift: true });
+    const atTop = await evaluate(
+      cdp,
+      `(!document.activeElement || document.activeElement === document.body)`,
+    );
+    if (atTop) break;
+  }
+  const seen = [];
+  for (let i = 0; i < limit; i += 1) {
+    await pressTab(cdp);
+    const stop = await evaluate(
+      cdp,
+      `(() => {
+        const describe = ${DESCRIBE};
+        const a = document.activeElement;
+        if (!a || a === document.body) return null;
+        const cs = getComputedStyle(a);
+        const outline = parseFloat(cs.outlineWidth) || 0;
+        const shadow = cs.boxShadow && cs.boxShadow !== "none";
+        return {
+          what: describe(a),
+          focusVisible: a.matches(":focus-visible"),
+          outlineWidth: outline,
+          outlineStyle: cs.outlineStyle,
+          boxShadow: shadow,
+          ring: (outline > 0 && cs.outlineStyle !== "none") || shadow,
+        };
+      })()`,
+    );
+    if (!stop) break; // focus left the document: the end of the tab order
+    if (seen.length > 0 && seen[seen.length - 1].what === stop.what) break; // wrapped
+    seen.push(stop);
+  }
+  return { stops: seen, expected };
+}
+
 /** T110 -- prefers-reduced-motion, if the protocol will emulate it.
  *
  * Returns `{ reachable: false }` when `Emulation.setEmulatedMedia` is not
@@ -469,6 +590,25 @@ async function runSweeps(cdp, report, label) {
   }
   await emulate(cdp, FUNCTIONAL);
 
+  /* The focus ring, tabbed rather than asserted (T149, SC-009). */
+  const { stops, expected } = await focusRingSweep(cdp);
+  const ringless = stops.filter((stop) => !stop.ring);
+  check(
+    `${label}: the tab sweep reached every focusable element`,
+    stops.length >= expected,
+    `${stops.length} stop(s) tabbed against ${expected} focusable in the DOM`,
+  );
+  check(
+    `${label}: every keyboard stop shows a visible focus ring`,
+    stops.length > 0 && ringless.length === 0,
+    stops.length === 0
+      ? "no keyboard stop was reached at all -- the sweep found nothing to check"
+      : ringless.length === 0
+        ? `${stops.length} stop(s) tabbed, all ringed`
+        : `${ringless.length} of ${stops.length} with no ring: ` +
+          ringless.map((r) => r.what).join("; "),
+  );
+
   const motion = await reducedMotionSweep(cdp);
   if (motion.reachable) {
     check(
@@ -490,7 +630,13 @@ async function runSweeps(cdp, report, label) {
   }
 
   report.sweeps ??= [];
-  report.sweeps.push({ label, floor: TAP_FLOOR, perWidth, reducedMotion: motion });
+  report.sweeps.push({
+    label,
+    floor: TAP_FLOOR,
+    perWidth,
+    reducedMotion: motion,
+    focusRing: { stops: stops.length, expected, ringless, detail: stops },
+  });
   return { perWidth, motion };
 }
 
@@ -1736,6 +1882,7 @@ async function main() {
         return {
           label: s.label,
           widths: s.perWidth.map((w) => w.width),
+          focusRing: s.focusRing ?? null,
           tapTargets: { floor: s.floor, underCount: under.length, under, ok: under.length === 0 },
           horizontalScroll: { offenderCount: overflowing.length, overflowing, ok: overflowing.length === 0 },
           resultList: { measured: lists, ceiling: 2800, ok: lists.every((l) => l.height <= 2800) },

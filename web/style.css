@@ -270,10 +270,36 @@ code {
   padding-right: var(--gutter);
 }
 
+/* THE SKIP LINK, and the defect that made it 24.8 px. T146.
+ *
+ * `min-height: var(--tap)` was already here and measured 24.8 px on the live
+ * site. The rule was not ignored and the value was not wrong: `min-height`
+ * does not apply to a non-replaced INLINE element, and an <a> is inline by
+ * default. The declaration was inert.
+ *
+ * `inline-flex` is the fix -- it makes the box a flex container, which is
+ * block-level enough for `min-height` to take effect, while still sitting in
+ * the text flow. `align-items: center` then centres the label inside the
+ * 44 px box rather than letting it sit on top of it.
+ *
+ * The same lesson is applied to the view navigation and the footer links
+ * below, and it is why those rules set `display` rather than trusting a
+ * height: a number that cannot apply is worse than no number, because it
+ * reads as a decision that was made. */
 .skip-link {
   position: absolute;
   left: -9999px;
   top: 0;
+  /* The 44 px box applies UNFOCUSED too, and that is deliberate rather than
+     incidental. Parked off-screen the element still has a box -- measured at
+     108.13 x 24.8 -- so a tap-target sweep sees it and is right to: giving the
+     fix only to `:focus` would leave the element 24.8 px in the state it
+     spends almost all its time in, and the sweep would have had to be taught
+     an exemption to stay green. An exemption is a worse answer than a correct
+     box that costs nothing off-screen. */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
 }
 
 .skip-link:focus {
@@ -281,7 +307,7 @@ code {
   top: 8px;
   z-index: 10;
   background: var(--sheet);
-  padding: 10px 14px;
+  padding: 0 14px;
   border: 2px solid var(--mark);
   border-radius: var(--radius);
   min-height: var(--tap);
@@ -943,6 +969,32 @@ details.sessions > summary:focus-visible {
 .licence-links li {
   margin-bottom: 4px;
   overflow-wrap: anywhere;
+}
+
+/* THE THREE FOOTER LINKS. T147.
+ *
+ * Measured on the live site at 375 px: 38 px, 17 px and 17 px. Measured by the
+ * T107 sweep at 390 px and above: 18 px, 18 px and 18 px. Both are real -- the
+ * 38 px one is a link that wraps to two lines in a narrower column -- and all
+ * of them are under the 44 px floor.
+ *
+ * They had no height rule at all. These are the corrections URL, the data
+ * licence file and the project URL, created at `lib/licence.js` and
+ * `app.js`; all three land inside this footer, so one rule here reaches them
+ * without classing three creation sites.
+ *
+ * `inline-flex` for the same reason as the skip link: `min-height` is inert on
+ * an inline <a>. The box grows to 44 px; the TEXT does not, so a list of three
+ * links gains vertical space without gaining three oversized labels. A long
+ * URL still wraps -- `overflow-wrap: anywhere` above -- and the flex box grows
+ * with it rather than clipping. */
+.site-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  /* No horizontal padding: these sit in running text and a padded link would
+     read as a button. The touch box is the height, which is what was missing. */
+  padding: 0;
 }
 
 .licence-links-note {

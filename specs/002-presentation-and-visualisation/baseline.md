@@ -55,9 +55,9 @@ measured by this harness.
 | Result list, 25 results at 390 px | **9,720 px** (388.8 px each) | ≤ 2,800 px | **2,672 px** (106.9 px each) ✓ |
 | Result list, 25 results at 768 px | 6,047 px (241.9 px each) | — | **2,162 px** (86.5 px each) |
 | Result list, 25 results at 1024/1440 px | 6,047 px | — | **2,080 px** (83.2 px each) |
-| Interactive elements under 44 px | **4**, at every width | 0 | *(T148)* |
-| Horizontal scroll, all four widths | **none** | none | *(T151)* |
-| `prefers-reduced-motion` honoured | **yes** | yes | *(T150)* |
+| Interactive elements under 44 px | **4**, at every width | 0 | **0** at all four widths ✓ |
+| Horizontal scroll, all four widths | **none** | none | **none** ✓ |
+| `prefers-reduced-motion` honoured | **yes** | yes | **yes**, browser-checked ✓ |
 | First load, wire | 88,961 B | ≤ 160,000 B | *(T185)* |
 | First load excluding fonts, wire | 88,961 B | ≤ 60,000 B | *(T185)* |
 | First-load requests | 18 | ≤ 16 | *(T185)* |
@@ -189,3 +189,71 @@ field FR-101 requires:
 Both appear from 768 px, where the list measures 2,162 px against the 2,800 px
 ceiling and has room. Every asker of every question remains in the published
 `by-member` files, and the seat view names them on the member's own row.
+
+
+## Phase 6: operability, and the two inert declarations behind it (T146-T151)
+
+`make test-page` is **green for the first time: 89 checks, 0 failures.**
+
+### Why the four links were under the floor
+
+Not a missing rule in two cases and an inert one in the other, and both are the
+same lesson.
+
+**The skip link had `min-height: var(--tap)` already, and measured 24.8 px.**
+The rule was not ignored and the value was not wrong: `min-height` does not
+apply to a non-replaced **inline** element, and an `<a>` is inline by default.
+The declaration was inert — which is worse than an absent one, because it reads
+as a decision that was made. `display: inline-flex` makes the box block-level
+enough for the height to take effect.
+
+The 44 px box is applied **unfocused** too. Parked off-screen the element still
+has a box, so a tap-target sweep sees it and is right to; giving the fix only
+to `:focus` would have left it 24.8 px in the state it spends nearly all its
+time in, and the sweep would have needed an exemption to stay green. An
+exemption is a worse answer than a correct box that costs nothing off-screen.
+
+**The three footer links had no height rule at all.** They are the corrections
+URL, the data licence and the project URL, created in two different modules —
+but all three land inside `.site-footer`, so one rule reaches them without
+classing three creation sites. `inline-flex` again, with no horizontal padding:
+these sit in running text, and a padded link reads as a button.
+
+### Measured heights, live site against this harness
+
+| Element | Live, 375 px | Harness, 390 px+ | Now |
+|---|---|---|---|
+| skip link | 25 | 24.8 | **≥ 44** |
+| project URL | 38 | 18 | **≥ 44** |
+| `DATA-LICENSE.md` | 17 | 18 | **≥ 44** |
+| corrections URL | 17 | 18 | **≥ 44** |
+
+Both columns are real. The 38 px one is a link that wraps to two lines in a
+narrower column; the others differ by a pixel of line-height. The defect is the
+same defect either way.
+
+### SC-009 now has a check, and it caught itself being weak
+
+My own analysis of this spec recorded SC-009 (a visible focus ring on every
+interactive element) as **implemented but unverified** — `quickstart.md` said
+"confirmed by tabbing the whole page", by hand. The sweep added here tabs it
+with real `Input.dispatchKeyEvent` presses rather than `element.focus()`,
+because `:focus-visible` is the property under test and does not reliably match
+on programmatic focus.
+
+**The first version of that sweep passed while covering a third of the page.**
+It reported 5 stops, found all 5 ringed, and went green — on a page with
+fourteen. The cause is in the spec rather than in Chrome: `blur()` sets the
+"sequential focus navigation starting point" to the blurred element's position,
+so the next Tab resumes from the middle of the document. The sweep was starting
+wherever the previous scenario had left focus.
+
+Two changes, and the second is the one that matters:
+
+1. Walk to the top with real Shift+Tab presses, stopping when focus leaves the
+   document and `activeElement` becomes `<body>`.
+2. **Count the focusable elements in the DOM and assert the sweep reached all
+   of them.** Under-coverage is now a failure rather than a silent pass.
+
+Now: **14 stops tabbed against 14 focusable in the DOM, all ringed.** Without
+(2) the first fix could not have been told from the bug.
