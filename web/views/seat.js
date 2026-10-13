@@ -8,7 +8,7 @@
  * the discipline `boot()` has asserted since T088.
  */
 
-import { legend, stackedColumns } from "../lib/chart.js";
+import { horizontalBars, legend, stackedColumns } from "../lib/chart.js";
 import {
   STATE_BASIS_UNIT,
   memberQuestions,
@@ -478,7 +478,23 @@ function renderStateSummary(container, state) {
   );
   frag.append(totals);
 
-  const box = el("div", "subject-tally");
+  /* ---- what the state asks about, as a shape (T167-T170) --------------
+   *
+   * FR-119. The published rows for this state, drawn as bars rather than read
+   * as a 25-row list. ZERO NEW BYTES: `aggregates/state-subjects.jsonl` is
+   * already in hand -- the seat view fetches it on its own first use -- so
+   * this is a second form of data the page had already paid for.
+   *
+   * THE DENOMINATOR is `state_questions`, this state's own question total, and
+   * it is the figure that makes a count mean something: "2 of 639" is a
+   * different statement from "2". FR-120.
+   *
+   * THE UNIT IS NOT THE SAME as the question counts elsewhere on this page.
+   * `state-question` counts a question once if at least one of its identified
+   * asking members holds a seat here, so the same question can be counted for
+   * two states. The basis block below says so, read from the published file
+   * rather than retyped. */
+  const box = el("div", "subject-tally chart-block");
   box.append(
     el(
       "p",
@@ -487,12 +503,77 @@ function renderStateSummary(container, state) {
         `${count(summary.stateSubjects)} distinct lines)`,
     ),
   );
+
+  /* THE ORDERING, stated rather than left to be inferred.
+   *
+   * Several of a state's subject lines share a count -- for Andaman and
+   * Nicobar Islands every one of the 25 published rows has the same figure --
+   * so "most-asked" does not determine the order on its own. The published
+   * order is kept and the tie-break is named, which is the same discipline the
+   * search view applies to its own result order. */
   box.append(
-    list("subject-list", summary.rows, (li, row) => {
-      li.append(el("span", "subject-text", row.subject));
-      li.append(el("span", "subject-count", count(row.questions)));
-    }),
+    el(
+      "p",
+      "order-text",
+      "Ordered as the published aggregate orders them: by question count, " +
+        "descending. Several lines in a state commonly share a count, and " +
+        "those keep the order the published file gives them rather than being " +
+        "re-sorted here.",
+    ),
   );
+
+  const seriesName = "Questions";
+  box.append(legend([seriesName]));
+  box.append(
+    horizontalBars(
+      summary.rows.map((row) => ({
+        label: row.subject,
+        parts: { [seriesName]: row.questions },
+        totals: { [seriesName]: summary.stateQuestions },
+      })),
+      [seriesName],
+      {
+        title: `Most-asked subject lines in ${stated(state)}`,
+        description:
+          "One row per published subject line, each against this state's own " +
+          "question total. The table below carries the same figures.",
+      },
+    ),
+  );
+
+  /* The table, which is the authoritative form (FR-121). The bars above are a
+   * shape; this is the thing a keyboard and a screen reader reach. */
+  const wrap = el("div", "table-wrap");
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", "Most-asked subject lines, scrollable");
+  wrap.tabIndex = 0;
+  const table = el("table");
+  const caption = el("caption", "table-caption");
+  caption.textContent =
+    `The ${count(summary.rows.length)} most-asked published subject lines in ` +
+    `${stated(state)}, each against this state's own question total.`;
+  table.append(caption);
+  const thead = el("thead");
+  const hrow = el("tr");
+  for (const text of ["Subject line", "Questions"]) {
+    const th = el("th", null, text);
+    th.scope = "col";
+    hrow.append(th);
+  }
+  thead.append(hrow);
+  table.append(thead);
+  const tbody = el("tbody");
+  for (const row of summary.rows) {
+    const tr = el("tr");
+    const th = el("th", null, row.subject);
+    th.scope = "row";
+    tr.append(th);
+    tr.append(el("td", "num-col", figureText(row.questions, summary.stateQuestions)));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  wrap.append(table);
+  box.append(wrap);
   frag.append(box);
 
   // The published basis, read from the file. It carries the attribution rule.

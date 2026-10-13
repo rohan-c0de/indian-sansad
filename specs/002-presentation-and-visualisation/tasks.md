@@ -221,12 +221,12 @@ reads it, not two phases later.
 
 **Independent Test**: request one term's breakdown and confirm the categories sum to that term's total membership, with any absent attribute in an explicit "not stated" category.
 
-- [ ] T161 [US5] Add a `composition` loader to `web/lib/fetch.js` reading `aggregates/composition.jsonl` on **first open of the composition view only** (FR-127) — 25,237 B raw, 1,835 B on the wire, and fetched by nothing in `web/` today. Add the `compositionAssetsRequested()` predicate T128 asserts against
-- [ ] T162 [US5] Create `web/views/composition.js` rendering the three published dimensions as horizontal bars paired by term, with `total_members` as the denominator — **559 for the 17th, 544 for the 18th**, verified — and the `member` counting basis rendered from `aggregates/counting-basis.jsonl` (FR-118, FR-120)
-- [ ] T163 [US5] Count a member whose party, state or terms-served is absent in an explicit **"not stated"** category in `web/views/composition.js`, never omitted — omitting it would make the categories stop summing to the total (FR-118)
-- [ ] T164 [US5] Handle the long category list in `web/views/composition.js`: **42 party categories per term** cannot all show at 390 px. Show a head and state the remainder as a counted group, matching what `make composition LS_TERM=18` already prints — twelve categories, then "and 30 further categories" carrying 51 members, reconciling to 544 (FR-103). The chart matches that treatment rather than inventing its own
-- [ ] T165 [US5] Keep the `terms_served` dimension readable in `web/views/composition.js` where one category holds most of the total — **282 of 544** members in the 18th served exactly one term, which flattens every other bar, and the long tail must not round to an invisible zero-width bar
-- [ ] T166 [US5] Add a test in `tests/unit/test_composition_view.py` asserting the view's categories reconcile to `total_members` for both terms and that it requires **no term or session date** — every one reads "not stated", across 9,986 term records and all 21 sessions (FR-124)
+- [X] T161 [US5] Add a `composition` loader to `web/lib/fetch.js` reading `aggregates/composition.jsonl` on **first open of the composition view only** (FR-127) — 25,237 B raw, 1,835 B on the wire, and fetched by nothing in `web/` today. Add the `compositionAssetsRequested()` predicate T128 asserts against
+- [X] T162 [US5] Create `web/views/composition.js` rendering the three published dimensions as horizontal bars paired by term, with `total_members` as the denominator — **559 for the 17th, 544 for the 18th**, verified — and the `member` counting basis rendered from `aggregates/counting-basis.jsonl` (FR-118, FR-120)
+- [X] T163 [US5] Count a member whose party, state or terms-served is absent in an explicit **"not stated"** category in `web/views/composition.js`, never omitted — omitting it would make the categories stop summing to the total (FR-118)
+- [X] T164 [US5] Handle the long category list in `web/views/composition.js`: **42 party categories per term** cannot all show at 390 px. Show a head and state the remainder as a counted group, matching what `make composition LS_TERM=18` already prints — twelve categories, then "and 30 further categories" carrying 51 members, reconciling to 544 (FR-103). The chart matches that treatment rather than inventing its own
+- [X] T165 [US5] Keep the `terms_served` dimension readable in `web/views/composition.js` where one category holds most of the total — **282 of 544** members in the 18th served exactly one term, which flattens every other bar, and the long tail must not round to an invisible zero-width bar
+- [X] T166 [US5] Add a test in `tests/unit/test_composition_view.py` asserting the view's categories reconcile to `total_members` for both terms and that it requires **no term or session date** — every one reads "not stated", across 9,986 term records and all 21 sessions (FR-124)
 
 **Checkpoint**: composition on the page for the first time, reconciling to the published totals.
 
@@ -238,10 +238,10 @@ reads it, not two phases later.
 
 **Independent Test**: pick a state and confirm each count and denominator matches the published rows for it.
 
-- [ ] T167 [US6] Render a state's 25 published subject lines as horizontal bars in `web/views/seat.js` using T154's primitive, each against `state_questions` as the denominator, reading the `aggregates/state-subjects.jsonl` already fetched on first open of the seat view — **no new bytes** (FR-119, FR-120)
-- [ ] T168 [US6] State the `state-question` counting basis explicitly in `web/views/seat.js`, rendered from `aggregates/counting-basis.jsonl`, and make clear it is **not the same unit** as the question counts elsewhere on the page (FR-120)
-- [ ] T169 [US6] Give the subject ordering a stated tie-break in `web/views/seat.js` — several of a state's 25 lines share a count, so order is not determined by count alone — following the search view's existing practice of rendering its ordering statement from the comparator rather than retyping it
-- [ ] T170 [US6] Keep the table beside the chart in `web/views/seat.js` as the authoritative form (FR-121), replacing nothing: the table that exists today stays and the chart is added beside it
+- [X] T167 [US6] Render a state's 25 published subject lines as horizontal bars in `web/views/seat.js` using T154's primitive, each against `state_questions` as the denominator, reading the `aggregates/state-subjects.jsonl` already fetched on first open of the seat view — **no new bytes** (FR-119, FR-120)
+- [X] T168 [US6] State the `state-question` counting basis explicitly in `web/views/seat.js`, rendered from `aggregates/counting-basis.jsonl`, and make clear it is **not the same unit** as the question counts elsewhere on the page (FR-120)
+- [X] T169 [US6] Give the subject ordering a stated tie-break in `web/views/seat.js` — several of a state's 25 lines share a count, so order is not determined by count alone — following the search view's existing practice of rendering its ordering statement from the comparator rather than retyping it
+- [X] T170 [US6] Keep the table beside the chart in `web/views/seat.js` as the authoritative form (FR-121), replacing nothing: the table that exists today stays and the chart is added beside it
 
 **Checkpoint**: all five charts built. Every reader-facing story complete.
 

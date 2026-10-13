@@ -315,3 +315,80 @@ The structural fix, after the fourth: every explanation moved **out** of the
 template literals into the surrounding JavaScript, where backticks, escapes and
 comment terminators are all harmless, and the comments inside the literals are
 one plain line pointing back. Being more careful was not the fix.
+
+
+## Phases 8 and 9: composition and state subjects (T161-T170)
+
+`make test-page` at **138 checks, 0 failures**. All five charts built.
+
+| View | Source | New bytes | Verified |
+|---|---|---|---|
+| House composition | `composition.jsonl` | **1,835 B on the wire** — the only new request in this feature | 3 dimensions, 12 bars + stated remainder, every category in the table |
+| State subjects | `state-subjects.jsonl` | **0** — already in hand from the seat view's first use | 25 bars, 25 table rows, 0 requests to draw |
+
+### Every composition figure reconciles, including the stated remainder
+
+The chart draws twelve categories and states the rest as a counted group. That
+is only honest if the two add up, so it was checked arithmetically against the
+aggregate:
+
+```
+party         term 17: shown 494 + rest  65 =  559  total 559  OK  (42 rest)
+party         term 18: shown 488 + rest  56 =  544  total 544  OK  (42 rest)
+state         term 17: shown 435 + rest 124 =  559  total 559  OK  (24 rest)
+state         term 18: shown 424 + rest 120 =  544  total 544  OK  (24 rest)
+terms_served  term 17: shown 559 + rest   0 =  559  total 559  OK  ( 0 rest)
+terms_served  term 18: shown 544 + rest   0 =  544  total 544  OK  ( 0 rest)
+```
+
+The page says exactly this on screen — *"and 24 further categories, carrying
+124 of 559 members in the 17th and 120 of 544 members in the 18th"* — and the
+driver reads the figures back off the rendered page.
+
+### FR-118's "not stated" case does not arise in the data
+
+FR-118 requires a member whose party, state or terms-served is absent to be
+counted in an explicit "not stated" category rather than omitted. **Measured:
+the aggregate carries no such category, and every dimension sums exactly to
+`total_members`** — so no member is missing any of the three.
+
+The requirement is therefore met by the data, not by code that runs. What
+`tests/unit/test_composition_view.py` asserts instead is the property that
+keeps it met if that changes: the view ranks and slices categories but **never
+filters them**, so a "not stated" row appearing in the aggregate would render
+without an edit. Inventing a "not stated" row that is not in the record would
+have been worse than not having one.
+
+### A real FR-122 defect, caught by the chart check rather than by reading
+
+The composition charts shipped with **no legend**. Two bars per row, and the
+only thing distinguishing the 17th Lok Sabha from the 18th inside the chart was
+the fill — which is meaning carried by colour alone, the one thing the chart
+contract forbids outright.
+
+The information was *reachable*: the table beneath has "17th Lok Sabha" and
+"18th Lok Sabha" as column headers. It was not reachable from the chart, which
+is the part a reader looks at first. Caught by `#composition: every series is
+named in TEXT` failing three times, once per dimension — the first time one of
+these checks found a defect in the page rather than in itself.
+
+### The template-literal trap, finally fixed structurally
+
+Two more instances during this phase: a backslash-n inside a template literal
+becomes a **real newline**, and a regex literal cannot span lines — *"Invalid
+regular expression: missing /"*. That is the fifth and sixth breakage of this
+kind.
+
+The fix is no longer care. Every pattern sent into the page is now a module
+constant in `PATTERN`, interpolated with `JSON.stringify` and rebuilt with
+`new RegExp(...)` on the other side. The escaping is done by a function rather
+than by hand, which survives all four failure modes: eaten escapes, newlines,
+backticks and comment terminators.
+
+### Ordering stated, because the record makes it necessary
+
+Several of a state's subject lines share a count — for Andaman and Nicobar
+Islands **all 25 published rows have the same figure** — so "most-asked" does
+not determine the order on its own. The published order is kept and the
+tie-break is named on the page, the same discipline the search view applies to
+its own result order.

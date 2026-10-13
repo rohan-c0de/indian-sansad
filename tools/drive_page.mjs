@@ -295,6 +295,33 @@ const TAP_FLOOR = 44;
 const INTERACTIVE =
   'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
+/* Patterns sent into the page, as SOURCE STRINGS rather than regex literals.
+ *
+ * Interpolated with JSON.stringify and rebuilt with `new RegExp(...)` on the
+ * other side. That is the only form of this that is safe, and it took five
+ * breakages to stop writing the alternatives:
+ *
+ *   - a regex literal inside a template literal loses its backslash escapes,
+ *     because a template literal consumes escape sequences it does not
+ *     recognise. A digit class becomes a letter class. Still valid, matches
+ *     nothing.
+ *   - a backslash-n inside a template literal becomes a REAL NEWLINE, and a
+ *     regex literal cannot span lines: "Invalid regular expression: missing /".
+ *   - a backtick in a nearby comment ends the string.
+ *   - a star-slash in a nearby comment ends the enclosing block comment.
+ *
+ * A JSON-stringified string survives all four, because the escaping is done by
+ * a function rather than by hand.
+ */
+const PATTERN = Object.freeze({
+  /** "95,268 of 95,268" -- a figure against its denominator. */
+  denominator: "[0-9][0-9,]* of [0-9][0-9,]*",
+  /** An ISO date, which must appear in no composition or term view. */
+  isoDate: "[0-9]{4}-[0-9]{2}-[0-9]{2}",
+  /** Any run of whitespace, for collapsing text before it is reported. */
+  whitespace: "\\s+",
+});
+
 /** A short, stable descriptor for one element, so a failure names itself. */
 const DESCRIBE = `(node) => {
   const id = node.id ? "#" + node.id : "";
@@ -686,6 +713,7 @@ async function chartAssertions(cdp, viewId, { expectCharts = 1 } = {}) {
   const found = await evaluate(
     cdp,
     `(() => {
+      const DENOM = ${JSON.stringify(PATTERN.denominator)};
       const host = document.getElementById("view-" + ${JSON.stringify(viewId)});
       if (!host) return { missing: true };
       const charts = [...host.querySelectorAll("figure.chart")];
@@ -695,7 +723,7 @@ async function chartAssertions(cdp, viewId, { expectCharts = 1 } = {}) {
         tables: host.querySelectorAll("table").length,
         basis: Boolean(host.querySelector(".basis, .basis-text")),
         // See DENOMINATOR_PATTERN above for why this is a character class.
-        denominators: (host.textContent.match(/[0-9][0-9,]* of [0-9][0-9,]*/g) || []).length,
+        denominators: (host.textContent.match(new RegExp(DENOM, "g")) || []).length,
         detail: charts.map((fig) => {
           const svg = fig.querySelector("svg");
           // The legend is a SIBLING of the figure; see the note above.
@@ -1206,6 +1234,84 @@ async function main() {
       "the House load chart draws every covered session, including any with no row",
       loadColumns === 21,
       `${loadColumns} column(s) against 21 covered sessions`,
+    );
+
+    /* House composition (T162-T166). The one view in this feature that adds a
+     * request -- composition.jsonl, 1,835 B on the wire, fetched by nothing
+     * at all before this feature. */
+    const beforeComposition = log.all().length;
+    await openView(
+      cdp,
+      "composition",
+      `(document.getElementById("composition-result") || {}).dataset.state === "ready"`,
+      { label: "House composition" },
+    );
+    const compositionRequests = log.all().slice(beforeComposition);
+    check(
+      "opening composition fetched its aggregate, and only on first open",
+      compositionRequests.some((r) => r.url.includes("composition.jsonl")),
+      compositionRequests.map((r) => r.url.split("/").pop()).join(", ") || "nothing",
+    );
+    report.charts.composition = await chartAssertions(cdp, "composition", { expectCharts: 3 });
+
+    /* Every dimension must account for the whole House. The CHART shows a head
+     * and states the remainder; this reads the figures off the page and checks
+     * the two add up to the published total, which is the claim a head-plus-
+     * remainder chart is only honest if it can make. */
+    const reconcile = await evaluate(
+      cdp,
+      `(() => {
+        const DENOM2 = ${JSON.stringify(PATTERN.denominator)};
+        const out = [];
+        for (const section of document.querySelectorAll("#view-composition .composition-dimension")) {
+          const heading = section.querySelector("h3").textContent;
+          const rest = section.querySelector(".composition-rest");
+          const pairs = section.textContent.match(new RegExp(DENOM2, "g")) || [];
+          out.push({
+            heading,
+            bars: section.querySelectorAll(".bar-row").length,
+            tableRows: section.querySelectorAll("tbody tr").length,
+            statesRemainder: Boolean(rest),
+            remainderText: rest
+              ? rest.textContent.split(/[^\\S]+/).join(" ").trim()
+              : null,
+            pairings: pairs.length,
+          });
+        }
+        return out;
+      })()`,
+    );
+    check(
+      "composition draws all three published dimensions",
+      reconcile.length === 3,
+      reconcile.map((d) => d.heading).join(", "),
+    );
+    for (const dimension of reconcile) {
+      check(
+        `composition / ${dimension.heading}: the table carries every category, not just the charted head`,
+        dimension.tableRows >= dimension.bars,
+        `${dimension.bars} bar(s) drawn, ${dimension.tableRows} table row(s)`,
+      );
+      check(
+        `composition / ${dimension.heading}: every figure carries a denominator`,
+        dimension.pairings > 0,
+        `${dimension.pairings} pairing(s)`,
+      );
+      if (dimension.bars < dimension.tableRows) {
+        check(
+          `composition / ${dimension.heading}: the categories NOT drawn are counted and stated (FR-103)`,
+          dimension.statesRemainder,
+          dimension.remainderText ? dimension.remainderText.slice(0, 96) : "no remainder note",
+        );
+      }
+    }
+    check(
+      "composition names no date -- every published term and session reads 'not stated'",
+      !(await evaluate(
+        cdp,
+        `new RegExp(${JSON.stringify(PATTERN.isoDate)}).test(
+           document.getElementById("view-composition").textContent)`,
+      )),
     );
 
     /* ---------------- the router (T190) ---------------- */
@@ -1772,11 +1878,18 @@ async function main() {
       cdp,
       `(() => {
          const root = document.getElementById("state-summary");
-         const rows = [...root.querySelectorAll(".subject-list li")];
+         /* The subject lines are BAR ROWS now, not list items. T167 replaced
+          * the 25-row list with bars plus the authoritative table, so the
+          * selector moved -- the claim did not. Read from the chart's rows
+          * rather than the table's, because the chart is the form that could
+          * silently draw fewer than the aggregate carries. */
+         const rows = [...root.querySelectorAll(".subject-tally .bar-row")];
          return {
            heading: (root.querySelector(".seat-name") || {}).textContent || null,
            subjects: rows.length,
-           firstSubject: rows.length ? rows[0].querySelector(".subject-text").textContent : null,
+           firstSubject: rows.length
+             ? (rows[0].querySelector(".bar-label") || {}).textContent
+             : null,
            facts: [...root.querySelectorAll(".fact-value")].map((n) => n.textContent),
            basis: (root.querySelector(".basis-text") || {}).textContent || "",
            basisSrc: (root.querySelector(".basis-src") || {}).textContent || "",
@@ -1800,6 +1913,50 @@ async function main() {
       /cannot be attributed to any state and are EXCLUDED/i.test(stateState.basis),
       (stateState.basis.match(/([\d,]+) questions in this window/) || [])[0] ?? "not stated",
     );
+    /* What the state asks about, as a shape (T167-T170). Zero new bytes: the
+     * state-subjects aggregate is already in hand from this view's first use. */
+    const beforeStateChart = log.all().length;
+    report.charts = report.charts ?? {};
+    report.charts.state = await evaluate(
+      cdp,
+      `(() => {
+        const DENOM3 = ${JSON.stringify(PATTERN.denominator)};
+        const box = document.querySelector("#state-summary .subject-tally");
+        if (!box) return { present: false };
+        return {
+          present: true,
+          bars: box.querySelectorAll(".bar-row").length,
+          tableRows: box.querySelectorAll("tbody tr").length,
+          legend: [...box.querySelectorAll(".legend li")].map((n) => n.textContent.trim()),
+          pairings: (box.textContent.match(new RegExp(DENOM3, "g")) || []).length,
+          order: Boolean(box.querySelector(".order-text")),
+          basis: Boolean(box.parentElement.querySelector(".basis-text")),
+        };
+      })()`,
+    );
+    const sc = report.charts.state;
+    check("a state's most-asked subject lines are drawn as a shape", sc.present);
+    check(
+      "the state subject chart draws every published row, and the table carries them too",
+      sc.bars > 0 && sc.tableRows === sc.bars,
+      `${sc.bars} bar(s), ${sc.tableRows} table row(s)`,
+    );
+    check(
+      "each subject line carries this state's own question total as its denominator",
+      sc.pairings >= sc.bars,
+      `${sc.pairings} pairing(s) for ${sc.bars} row(s)`,
+    );
+    check("the state subject chart names its series in text", sc.legend.length > 0, sc.legend.join(" | "));
+    check(
+      "the ordering is stated, because several lines commonly share a count",
+      sc.order,
+    );
+    check(
+      "drawing it fetched NOTHING -- the aggregate was already in hand",
+      log.all().length === beforeStateChart,
+      `${log.all().length - beforeStateChart} request(s)`,
+    );
+
     if (SCREENS) {
       for (const metrics of WIDTHS) {
         await emulate(cdp, metrics);

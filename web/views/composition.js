@@ -17,7 +17,7 @@
  * be ordered and counted; they cannot be placed on a calendar (FR-124).
  */
 
-import { horizontalBars } from "../lib/chart.js";
+import { horizontalBars, legend } from "../lib/chart.js";
 import { loadComposition } from "../lib/fetch.js";
 import { count } from "../lib/format.js";
 import { figure, figureText } from "../lib/marks.js";
@@ -80,7 +80,7 @@ function totalFor(rows, term) {
  */
 function renderDimension(rows, dimension) {
   const terms = termsIn(rows);
-  const section = el("section", "composition-dimension");
+  const section = el("section", "composition-dimension chart-block");
   section.append(el("h3", null, dimension.label));
 
   const series = terms.map((t) => ({ name: `${t}th Lok Sabha`, term: t }));
@@ -111,12 +111,23 @@ function renderDimension(rows, dimension) {
     totals: Object.fromEntries(terms.map((t) => [`${t}th Lok Sabha`, totalFor(rows, t)])),
   }));
 
+  /* The LEGEND, which was missing and which FR-122 requires.
+   *
+   * Found by the driver's chart check rather than by reading this file: with
+   * two bars per row and no legend, the only thing distinguishing the 17th
+   * Lok Sabha from the 18th inside the chart was the FILL -- which is meaning
+   * carried by colour alone, and is the one thing the chart contract forbids
+   * outright. The table beneath has "17th Lok Sabha" and "18th Lok Sabha" as
+   * column headers, so the information was reachable; it was not reachable
+   * from the chart, which is the part a reader looks at first. */
+  section.append(legend(series.map((s) => s.name)));
   section.append(
     horizontalBars(columns, series.map((s) => s.name), {
       title: `House composition by ${dimension.label.toLowerCase()}, by term`,
       description:
-        "Paired bars, one per term. Every figure is in the table below, which " +
-        "carries all categories including the ones grouped here.",
+        "Paired bars, one per term, in the legend's order. Every figure is in " +
+        "the table below, which carries all categories including the ones " +
+        "grouped here.",
     }),
   );
 
