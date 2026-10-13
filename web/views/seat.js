@@ -303,39 +303,78 @@ function renderMemberQuestions(host, entry, records) {
     ),
   );
   listBox.append(
+    /* The SAME denser shape as a search result (T144).
+     *
+     * This was the second five-pair `<dl>` in the codebase, with the same
+     * five labels on the same five lines of their own. Leaving it as it was
+     * would have given the page two vocabularies for one thing: a question
+     * rendered one way under a search and another way under a member, which
+     * is the kind of difference a reader reads as a bug.
+     *
+     * Shared with the search view at the level that matters -- `starMark`,
+     * `typeWord`, `figure` and `statusField` are the same functions, so the
+     * asterisk, the wording of a type, the figure pairing and the status
+     * vocabulary cannot drift apart. The markup is written twice because the
+     * two rows carry different fields: a search result names its askers,
+     * where this one is already inside one member's list and says instead how
+     * many OTHERS asked with them. */
     list("question-list", shown, (li, question) => {
+      li.dataset.questionId = String(question.question_id ?? "");
+
       const subject = el("p", "question-subject");
+      const parsed = parseQuestionId(question.question_id);
+      const type = questionTypeOf(parsed);
+      const star = starMark(type, document);
+      if (star) subject.append(star);
       if (isMissing(question.subject)) {
-        subject.textContent = NOT_STATED;
+        subject.append(document.createTextNode(NOT_STATED));
         subject.classList.add("result-subject-missing");
       } else {
-        subject.textContent = question.subject;
+        subject.append(document.createTextNode(question.subject));
       }
       li.append(subject);
-      const meta = el("dl", "question-meta");
-      meta.append(el("dt", null, "Question"));
-      meta.append(el("dd", "result-id", stated(question.question_id)));
-      meta.append(el("dt", null, "Date"));
-      meta.append(el("dd", null, isoDate(question.date)));
-      meta.append(el("dt", null, "Ministry"));
+
+      const meta = el("p", "result-meta");
+      meta.append(el("span", "result-date", isoDate(question.date)));
+
       const ministry = ministryNameFor(question.ministry_id);
-      const ministryDd = el("dd", ministry.flagged ? "flagged" : null, ministry.text);
-      if (ministry.flagged) ministryDd.append(el("span", "flag-word", "flagged"));
-      meta.append(ministryDd);
+      const ministrySpan = el(
+        "span",
+        ministry.flagged ? "result-ministry flagged" : "result-ministry",
+      );
+      ministrySpan.append(document.createTextNode(ministry.text));
+      if (ministry.flagged) ministrySpan.append(el("span", "flag-word", "flagged"));
+      meta.append(ministrySpan);
+
+      meta.append(el("span", "result-type", typeWord(type)));
+
       const field = statusField(questionBucket(question));
-      meta.append(el("dt", null, "Link status"));
-      const statusDd = el("dd", field && field.flagged ? "flagged" : null);
-      statusDd.append(el("span", "result-status", field ? field.label : NOT_STATED));
-      if (field && field.flagged) statusDd.append(el("span", "flag-word", "flagged"));
-      meta.append(statusDd);
+      const statusSpan = el(
+        "span",
+        field && field.flagged ? "result-status flagged" : "result-status",
+      );
+      statusSpan.append(document.createTextNode(field ? field.label : NOT_STATED));
+      if (field && field.flagged) statusSpan.append(el("span", "flag-word", "flagged"));
+      meta.append(statusSpan);
+      li.append(meta);
+
+      /* Joint asking, as a figure against its denominator.
+       *
+       * The published `question` counting basis is the reason this says
+       * "counted once": 23,385 questions in this window are asked jointly,
+       * the by-member files republish each one per asker, and adding those
+       * files up gives a larger number than there are questions. The row
+       * states that where a reader can see it rather than leaving it to the
+       * basis block below. */
       const askers = (question.asking_members ?? []).length;
       if (askers > 1) {
-        meta.append(el("dt", null, "Asked jointly"));
-        meta.append(
-          el("dd", null, `with ${count(askers - 1)} other member(s); counted once`),
+        const joint = el("p", "result-askers");
+        joint.append(document.createTextNode("asked jointly — "));
+        joint.append(
+          figure(askers, askers, { unit: "question", label: "members, counted once" }),
         );
+        li.append(joint);
       }
-      li.append(meta);
     }),
   );
   if (summary.total > shown.length) {

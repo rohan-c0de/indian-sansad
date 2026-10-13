@@ -1599,72 +1599,90 @@ input[type="search"]:focus-visible,
 /* The results. An ordered list, so a screen reader announces the position and
    the count -- but the numbers are NOT shown, because a visible 1, 2, 3 reads
    as a ranking and nothing here is ranked. */
+/* ---------------------------------------------------------------------- */
+/* The result row (T143)                                                  */
+/* ---------------------------------------------------------------------- */
+
+/* THREE LINES per result, down from eight to fifty-five.
+ *
+ * The old row was a label-and-value grid in a bordered card: five labels on
+ * five lines of their own, then one line per asking member. Measured against
+ * the unmodified page at 390 px: 388.8 px per result, 9,720 px for 25.
+ * SC-006 asks for 2,800 px, which leaves about 96 px -- three lines and the
+ * space between rows.
+ *
+ * What went, and what carries its meaning instead:
+ *
+ *   the card          -> a rule between rows. The card's FILL was never doing
+ *                        the work at 1.13:1 (FR-108); its border was, and a
+ *                        1px rule does the same job for 1px of height.
+ *   the five labels   -> position and form. Date, ministry, type and status on
+ *                        one middot-separated line; askers on the next.
+ *   the asker list    -> inline, comma-joined, capped at three with the
+ *                        remainder stated (FR-103).
+ *   the question id   -> `data-question-id` and the row's `title`. A reader
+ *                        needs it rarely; a machine needs it always; a line of
+ *                        every result is too much to spend on it.
+ */
 .result-list {
   margin: 0;
   padding: 0;
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
 .result {
-  padding: 14px 16px;
-  background: var(--sheet);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
 }
 
-.result-top {
-  margin-bottom: 8px;
+.result:last-child {
+  border-bottom: 0;
 }
 
 .result-subject {
   margin: 0;
   font-family: var(--font-head);
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 600;
-  line-height: 1.3;
+  /* Tighter than the page's 1.55: a subject line is a title, and a long one
+     wrapping to three lines at 390 px is the case that decides whether 25 of
+     these fit. Measured: the longest published subject is well over 100
+     characters. */
+  line-height: 1.25;
+  overflow-wrap: break-word;
 }
 
 .result-subject-missing {
   color: var(--ink-soft);
 }
 
+/* The meta line. Middots are RENDERED, not typed into the text, so the
+   separator never lands in `textContent` -- a screen reader reads four facts
+   rather than four facts and three interpuncts. */
 .result-meta {
-  margin: 0;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2px 12px;
-  font-size: 0.9rem;
-}
-
-.result-meta dt {
-  margin: 6px 0 0;
+  margin: 2px 0 0;
+  font-size: 0.88rem;
   color: var(--ink-soft);
-  font-size: 0.75rem;
-  font-weight: 600;
+  line-height: 1.45;
 }
 
-.result-meta dd {
-  margin: 0;
-  color: var(--ink);
+.result-meta > span + span::before {
+  content: " · ";
+  color: var(--rule);
 }
 
-.result-meta dd.flagged {
-  color: var(--flag-ink);
-}
-
-.result-id {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  /* A question id is long and has no spaces; it wraps on the slashes rather
-     than dragging the card wider than the viewport. */
-  overflow-wrap: anywhere;
+.result-date {
+  font-variant-numeric: tabular-nums;
 }
 
 .result-status {
   font-weight: 600;
+  color: var(--ink);
+}
+
+.result-meta .flagged,
+.result-meta .flagged .result-status {
+  color: var(--flag-ink);
 }
 
 /* The flag word sits INLINE after a status or a name here, not on its own
@@ -1673,10 +1691,13 @@ input[type="search"]:focus-visible,
    leaves the word butted straight against the label. Measured on screen
    before this rule existed: "Not linkedFLAGGED". */
 .result-meta .flag-word,
-.asker-list .flag-word {
-  margin-left: 8px;
+.result-askers .flag-word {
+  margin-left: 6px;
 }
 
+/* The REASON a thing is flagged. Rare, so it is allowed its own line: a flag
+   with no explanation is a dead end, and these rows are the ones that least
+   deserve to be shortened. */
 .result-flag-why {
   display: block;
   color: var(--flag-ink);
@@ -1684,35 +1705,86 @@ input[type="search"]:focus-visible,
 }
 
 .result-askers {
-  color: var(--ink);
+  margin: 2px 0 0;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+/* The NAMES are hidden below 768 px, and the COUNT is not.
+ *
+ * This follows the shape the owner selected, which reads exactly:
+ *
+ *     * Drinking Water in Rural Areas
+ *       2021-03-11 · Jal Shakti · linked
+ *       asked by 4 of 4 identified
+ *
+ * -- a figure against its denominator, and no names. FR-102 asks for the
+ * askers inline rather than one per line and for the count stated against its
+ * total; it does not ask for every name on the row, and the preview the owner
+ * chose has none.
+ *
+ * Measured: three names with their parties ran the askers line to 2.4 lines at
+ * 390 px, which is a quarter of the row-height budget spent on the field least
+ * likely to be what a reader is scanning for. The names appear from 768 px,
+ * and every asker of every question is in the published `by-member` files. */
+.asker-names,
+.result-askers .em-dash {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .asker-names {
+    display: inline;
+  }
 }
 
 .result-no-asker {
   color: var(--flag-ink);
 }
 
-.asker-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
+/* A name and its party on ONE line, not two. The party was `display: block`
+   under the old list, which is one extra line per asker -- up to 47 of them
+   on a single published question. */
 .asker-name {
   font-weight: 600;
+  color: var(--ink);
 }
 
+/* The party is HIDDEN below 768 px, and that is a measurement rather than a
+ * taste. Measured at 390 px: the askers line averaged 49 px -- 2.4 lines --
+ * because three parties inline is up to 150 characters of party name for three
+ * names, and this record has parties like "Nationalist Congress Party -
+ * Sharadchandra Pawar" at 48 characters each.
+ *
+ * What is NOT hidden is the asker's NAME, which is the field FR-101 requires
+ * the row to keep. A party is context, it is on the member's own row in the
+ * state view, and it is in the published `by-member` files -- so it appears
+ * from 768 px, where the list already measures 2,283 px against a 2,800 px
+ * ceiling and has room to spare. */
 .asker-party {
-  display: block;
-  color: var(--ink-soft);
-  font-size: 0.8rem;
+  display: none;
 }
 
-.asker-unknown .asker-name {
+@media (min-width: 768px) {
+  .asker-party {
+    display: inline;
+    color: var(--ink-soft);
+  }
+
+  .asker-party::before {
+    content: " (";
+  }
+
+  .asker-party::after {
+    content: ")";
+  }
+}
+
+.asker-unknown {
   font-family: var(--font-mono);
   color: var(--flag-ink);
+  overflow-wrap: anywhere;
 }
 
 .result-flag {
@@ -1856,24 +1928,26 @@ input[type="search"]:focus-visible,
   font-size: 0.95rem;
 }
 
-.rep-meta,
-.question-meta {
+/* `.question-meta` was here too, and is gone: T144 replaced the member
+   question list's five-pair <dl> with the same denser row the search view
+   uses, so nothing emits that class any more. `.rep-meta` stays -- the
+   representative cards are still a label-and-value grid, and they are three
+   per seat rather than twenty-five per query. */
+.rep-meta {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1px 12px;
   margin: 10px 0 0;
 }
 
-.rep-meta dt,
-.question-meta dt {
+.rep-meta dt {
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--ink-soft);
   margin: 6px 0 0;
 }
 
-.rep-meta dd,
-.question-meta dd {
+.rep-meta dd {
   margin: 0;
 }
 
@@ -1930,6 +2004,11 @@ input[type="search"]:focus-visible,
   margin: 0;
   font-family: var(--font-head);
   font-size: 1rem;
+  font-weight: 600;
+  /* Matches `.result-subject`: a title, not body text, and the case that
+     decides whether a long list fits is a subject wrapping to three lines. */
+  line-height: 1.25;
+  overflow-wrap: break-word;
 }
 
 .subject-tally {
@@ -2001,13 +2080,11 @@ input[type="search"]:focus-visible,
 }
 
 @media (min-width: 40rem) {
-  .rep-meta,
-  .question-meta {
+  .rep-meta {
     grid-template-columns: 9rem 1fr;
   }
 
-  .rep-meta dt,
-  .question-meta dt {
+  .rep-meta dt {
     margin: 0;
   }
 

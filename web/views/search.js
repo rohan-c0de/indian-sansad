@@ -36,6 +36,7 @@ import {
 } from "../lib/shared.js";
 import {
   basisBlockForUnit,
+  ensureMinistryNames,
   ministryNameFor,
   questionTypeOf,
 } from "../lib/viewkit.js";
@@ -76,11 +77,50 @@ function searchStatusLine(text) {
   return node;
 }
 
-/** One result. A list item, so the count is in the accessibility tree. */
+/** How many identified askers a row names before the rest are summarised.
+ *
+ * Three, because the row has to fit inside about 96 px at 390 px for SC-006 to
+ * hold, and a name with its party is roughly a third of a line there. It is a
+ * presentation limit and nothing else: the count is always exact, the number
+ * not shown is always stated (FR-103), and no question is ever filtered out of
+ * the list for having too many askers. 23,385 questions in this window are
+ * asked jointly and one is asked by 47 members. */
+const ASKERS_SHOWN = 3;
+
+/* One result. T139-T142.
+ *
+ * WHAT THIS REPLACED, and the figure that forced it. Every result was a
+ * five-pair `<dl>` -- Question, Date, Ministry, Link status, Asked by -- with
+ * each asker on its own line underneath. Measured by `make test-page` against
+ * the unmodified page: **388.8 px per result at 390 px, 9,720 px for 25**. The
+ * spec estimated "about six thousand pixels"; 6,047 px turned out to be the
+ * figure at 768 px and wider, and nobody had measured the narrow case the page
+ * was designed for.
+ *
+ * SC-006 asks for 2,800 px, which is a 3.5x reduction and leaves about 96 px
+ * per result. A label-and-value grid cannot reach that: five labels are five
+ * lines of their own before any value is shown.
+ *
+ * So the labels go, and what carries their meaning instead is POSITION and
+ * FORM, which is the same vocabulary FR-115 applies to the rest of the page:
+ *
+ *   * Drinking Water in Rural Areas          <- the subject, with the star
+ *     2021-03-11 · Jal Shakti · linked        <- one meta line, middot-joined
+ *     asked by 4 of 4 identified              <- a figure-and-denominator
+ *
+ * Every one of the five fields is still present and still reachable. The
+ * question id moves to the row's `title` and a `data-question-id` attribute --
+ * it is a provenance handle a reader needs rarely and a machine needs always,
+ * and spending a line of every result on it is what made the list unreadable.
+ *
+ * The date is NOT dropped and NOT reformatted: question dates are real in this
+ * record, unlike term and session dates, and `isoDate` keeps the published
+ * spelling.
+ */
 function resultItem(record, position) {
   const li = el("li", "result");
+  li.dataset.questionId = String(record.questionId ?? "");
 
-  const head = el("div", "result-top");
   // tabindex -1 so "Show 25 more" can move focus here without adding a tab
   // stop for a reader who is not using that button.
   const subject = el("h4", "result-subject");
@@ -93,7 +133,8 @@ function resultItem(record, position) {
    * in data/published/ changes. An unstarred question gets no mark; the type
    * is also a word in the meta line, so the glyph is never the only carrier. */
   const parsed = parseQuestionId(record.questionId);
-  const star = starMark(questionTypeOf(parsed), document);
+  const type = questionTypeOf(parsed);
+  const star = starMark(type, document);
   if (star) subject.append(star);
 
   if (isMissing(record.subject)) {
@@ -102,23 +143,25 @@ function resultItem(record, position) {
   } else {
     subject.append(document.createTextNode(record.subject));
   }
-  head.append(subject);
-  li.append(head);
+  li.append(subject);
 
-  const meta = el("dl", "result-meta");
-  const pair = (label, value, className) => {
-    meta.append(el("dt", null, label));
-    meta.append(el("dd", className, value));
-  };
+  /* ---- the meta line: date, ministry, type, link status ----------------
+   *
+   * Separated by middots rendered in CSS rather than typed into the text, so
+   * the separator never lands in `textContent` and a screen reader reads four
+   * facts instead of four facts and three interpuncts. */
+  const meta = el("p", "result-meta");
 
-  pair("Question", record.questionId, "result-id");
-  pair("Date", isoDate(record.date));
+  meta.append(el("span", "result-date", isoDate(record.date)));
+
   const ministry = ministryNameFor(record.ministry_id);
-  meta.append(el("dt", null, "Ministry"));
-  const ministryDd = el("dd", ministry.flagged ? "flagged" : null, ministry.text);
+  const ministrySpan = el("span", ministry.flagged ? "result-ministry flagged" : "result-ministry");
+  ministrySpan.append(document.createTextNode(ministry.text));
   if (ministry.flagged) {
-    ministryDd.append(el("span", "flag-word", "flagged"));
-    ministryDd.append(
+    // A WORD, never colour or position alone (FR-104). The reason is kept too,
+    // because "flagged" without the why is a dead end.
+    ministrySpan.append(el("span", "flag-word", "flagged"));
+    ministrySpan.append(
       el(
         "span",
         "result-flag-why",
@@ -126,53 +169,102 @@ function resultItem(record, position) {
       ),
     );
   }
-  meta.append(ministryDd);
+  meta.append(ministrySpan);
+
+  // The question type as a WORD, beside the asterisk that is its glyph. Both,
+  // so the mark is never the only carrier -- and "unstarred" is a word even
+  // though its absence of a mark is the visual signal.
+  meta.append(el("span", "result-type", typeWord(type)));
 
   /* Link status, in the SAME WORDS as the ministry profile's status strip:
-   * `statusField` reads that view's own list. */
+   * `statusField` reads that view's own list, so the two views cannot drift
+   * into two vocabularies for one fact. */
   const bucket = questionBucket(record);
   const field = statusField(bucket);
-  meta.append(el("dt", null, "Link status"));
-  const statusDd = el("dd", field && field.flagged ? "flagged" : null);
-  statusDd.append(el("span", "result-status", field ? field.label : NOT_STATED));
-  if (field && field.flagged) {
-    // A WORD, never colour alone.
-    statusDd.append(el("span", "flag-word", "flagged"));
-  }
-  meta.append(statusDd);
-
-  /* Askers. The identified ones are named; an id the name lookup does not
-   * carry is shown AS THE ID with a flag, because dropping it would make a
-   * co-asked question look as though fewer people asked it. */
-  const { identified, unknownIds } = askersFor(record, search.names);
-  meta.append(el("dt", null, identified.length === 1 ? "Asked by" : "Asked by"));
-  const askersDd = el("dd", "result-askers");
-  if (identified.length === 0 && unknownIds.length === 0) {
-    askersDd.append(el("span", "result-no-asker", "no asking member is identified"));
-  } else {
-    const ul = el("ul", "asker-list");
-    for (const member of identified) {
-      const item = el("li");
-      item.append(el("span", "asker-name", stated(member.canonical_name)));
-      item.append(el("span", "asker-party", stated(member.party)));
-      ul.append(item);
-    }
-    for (const memberId of unknownIds) {
-      const item = el("li", "asker-unknown");
-      item.append(el("span", "asker-name", memberId));
-      item.append(el("span", "flag-word", "flagged"));
-      item.append(
-        el("span", "result-flag-why", "this member id is not in the published asker names"),
-      );
-      ul.append(item);
-    }
-    askersDd.append(ul);
-  }
-  meta.append(askersDd);
+  const statusSpan = el(
+    "span",
+    field && field.flagged ? "result-status flagged" : "result-status",
+  );
+  statusSpan.append(document.createTextNode(field ? field.label : NOT_STATED));
+  if (field && field.flagged) statusSpan.append(el("span", "flag-word", "flagged"));
+  meta.append(statusSpan);
 
   li.append(meta);
 
-  /* The two flags that are about the RECORD rather than about one field. */
+  /* ---- the askers, INLINE (T140, T141, FR-102, FR-103) -----------------
+   *
+   * These were one list item per asker. The published record has a question
+   * asked by 47 members, and 23,385 questions are asked jointly -- so the old
+   * form spent up to 47 lines on one result, and the spec's complaint about
+   * "twenty asking members listed vertically" was the mild case.
+   *
+   * Inline, comma-joined, with the count as a figure against its denominator.
+   * Past ASKERS_SHOWN the rest are summarised rather than dropped: FR-103
+   * requires the number not shown to be stated, and the full set stays
+   * reachable through the `by-member` files the footer names. */
+  const { identified, unknownIds } = askersFor(record, search.names);
+  const total = identified.length + unknownIds.length;
+  const askers = el("p", "result-askers");
+
+  if (total === 0) {
+    askers.append(el("span", "result-no-asker", "no asking member is identified"));
+  } else {
+    askers.append(document.createTextNode("asked by "));
+    askers.append(
+      figure(identified.length, total, { unit: "question", label: "identified" }),
+    );
+
+    const shown = identified.slice(0, ASKERS_SHOWN);
+    if (shown.length > 0) {
+      // The dash is inside `.asker-names` so it disappears with them below
+      // 768 px -- a trailing em dash with nothing after it is worse than no
+      // dash, and a text node could not be hidden by CSS.
+      const names = el("span", "asker-names");
+      names.append(document.createTextNode(" — "));
+      shown.forEach((member, index) => {
+        if (index > 0) names.append(document.createTextNode(", "));
+        const one = el("span", "asker");
+        one.append(el("span", "asker-name", stated(member.canonical_name)));
+        one.append(el("span", "asker-party", stated(member.party)));
+        names.append(one);
+      });
+      askers.append(names);
+    }
+
+    const hiddenCount = identified.length - shown.length;
+    if (hiddenCount > 0) {
+      // STATED, never silent. The figure is the count not shown, against the
+      // identified total it came out of.
+      askers.append(document.createTextNode(", and "));
+      askers.append(
+        figure(hiddenCount, identified.length, {
+          unit: "question",
+          label: "more not listed here",
+        }),
+      );
+    }
+
+    if (unknownIds.length > 0) {
+      /* An id the name lookup does not carry is shown AS THE ID with a flag,
+       * because dropping it would make a co-asked question look as though
+       * fewer people asked it. */
+      askers.append(document.createTextNode(" — "));
+      const unknown = el("span", "asker-unknown");
+      unknown.append(document.createTextNode(unknownIds.join(", ")));
+      unknown.append(el("span", "flag-word", "flagged"));
+      unknown.append(
+        el("span", "result-flag-why", "this member id is not in the published asker names"),
+      );
+      askers.append(unknown);
+    }
+  }
+  li.append(askers);
+
+  /* The two flags that are about the RECORD rather than about one field. Both
+   * keep their full wording: they are rare, and each explains a disagreement
+   * between two published files that a reader would otherwise have to guess
+   * at. Shortening these would save pixels on the results that least deserve
+   * it. */
   if (field && field.key === "partly_linked") {
     li.append(
       el(
@@ -403,7 +495,16 @@ async function showMore(container) {
 /** Load the index and the asker names. FIRST SEARCH ONLY. */
 async function ensureSearchData() {
   if (search.index && search.names) return;
-  const [index, names] = await Promise.all([loadSearchIndex(), loadAskerNames()]);
+  /* The ministry names come with the search data, not before it: every result
+   * row names a ministry, and without this map `ministryNameFor` flags all of
+   * them as unknown ids. Fetched in parallel with the index -- it is 1,856 B
+   * against the index's 794,402, so it adds nothing measurable to a first
+   * search, and it is memoised so opening a ministry view later is free. */
+  const [index, names] = await Promise.all([
+    loadSearchIndex(),
+    loadAskerNames(),
+    ensureMinistryNames(),
+  ]);
   search.index = index;
   search.names = askerIndex(names);
 }

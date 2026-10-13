@@ -406,6 +406,9 @@ async function bootViews(doc) {
   if (ministries.status === "fulfilled") {
     views.ministryNames = new Map(ministries.value.map((m) => [m.ministry_id, m]));
   }
+  /* And if THIS view's fetch failed while the search view had already loaded
+   * the names, the map is left as it was rather than blanked. `fetchMinistries`
+   * is memoised, so the two views share one request either way. */
 
   /* The search and seat views used to be built HERE, by this function, which
    * is why it was called `bootViews` rather than something about ministries.

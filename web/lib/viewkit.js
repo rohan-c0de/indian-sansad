@@ -19,6 +19,7 @@ import { legend, stackedColumns } from "./chart.js";
 import { longSessionLabel } from "./coverage.js";
 import { NOT_STATED, count, isMissing, percent, stated } from "./format.js";
 import { STATUS_FIELDS, basisFor, share } from "./profile.js";
+import { fetchMinistries } from "./fetch.js";
 import { el, list, views } from "./shared.js";
 
 export function option(value, label, selected) {
@@ -204,6 +205,36 @@ export function mixTable(span, types, totals) {
     ),
   );
   return section;
+}
+
+/** Load the ministry NAME lookup, once, for whichever view needs it first.
+ *
+ * `reference/ministries.jsonl` used to be fetched by `bootViews()` on page
+ * load, so `views.ministryNames` was always populated by the time anything
+ * read it. T137 took that file off the first load -- it is 1,856 B on the wire
+ * and a visitor who never opens a ministry view should not pay for it -- and
+ * the ministry views were wired to fetch it on first open.
+ *
+ * The SEARCH view was not, and it reads this lookup for every result row. The
+ * measured consequence: opening `#search` without opening `#ministry` first
+ * left the map empty, so `ministryNameFor` fell through to its unknown-id
+ * branch and **every row was flagged** "this ministry id is not in the
+ * published ministry reference set" -- on a reference set that contains all 56
+ * of them. 57 px of false flag on every result, which is also what made the
+ * row-height measurement unreadable.
+ *
+ * Memoised in `lib/fetch.js`, so a reader who opens both views pays once. */
+export async function ensureMinistryNames() {
+  if (views.ministryNames && views.ministryNames.size > 0) return;
+  try {
+    const rows = await fetchMinistries();
+    views.ministryNames = new Map(rows.map((m) => [m.ministry_id, m]));
+  } catch {
+    /* Left empty deliberately. A failed name lookup must not take the result
+     * list off the page: `ministryNameFor` then shows the raw id WITH a flag,
+     * which is the honest rendering of "the name could not be read" and is
+     * exactly what the flag is for. */
+  }
 }
 
 export function ministryNameFor(ministryId) {

@@ -904,7 +904,18 @@ async function main() {
            count: root.querySelectorAll(".result").length,
            summary: (root.querySelector(".search-count") || {}).textContent || null,
            order: (root.querySelector(".order-text") || {}).textContent || null,
-           ids: [...root.querySelectorAll(".result-id")].map((n) => n.textContent),
+           /* From the data-question-id attribute, not from a .result-id
+            * element. T139 moved the question id off the visible row -- it
+            * cost a line of every result for a provenance handle a reader
+            * needs rarely -- and onto the row itself. An attribute is the
+            * better source anyway: it cannot be reflowed or truncated.
+            *
+            * No backticks in this comment: it lives inside a template
+            * literal, and one would end the string. That is exactly how this
+            * line broke the file a moment ago. */
+           ids: [...root.querySelectorAll(".result[data-question-id]")].map(
+             (n) => n.dataset.questionId,
+           ),
            hasShowMore: Boolean(root.querySelector(".show-more")),
            live: root.getAttribute("aria-live"),
            role: root.getAttribute("role"),

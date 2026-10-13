@@ -52,8 +52,9 @@ measured by this harness.
 
 | Measurement | Pre-work | Target | Measured after |
 |---|---|---|---|
-| Result list, 25 results at 390 px | **9,720 px** (388.8 px each) | ≤ 2,800 px | *(T145)* |
-| Result list, 25 results at 768/1024/1440 px | **6,047 px** (241.9 px each) | — | *(T145)* |
+| Result list, 25 results at 390 px | **9,720 px** (388.8 px each) | ≤ 2,800 px | **2,672 px** (106.9 px each) ✓ |
+| Result list, 25 results at 768 px | 6,047 px (241.9 px each) | — | **2,162 px** (86.5 px each) |
+| Result list, 25 results at 1024/1440 px | 6,047 px | — | **2,080 px** (83.2 px each) |
 | Interactive elements under 44 px | **4**, at every width | 0 | *(T148)* |
 | Horizontal scroll, all four widths | **none** | none | *(T151)* |
 | `prefers-reduced-motion` honoured | **yes** | yes | *(T150)* |
@@ -111,3 +112,80 @@ animating. The stylesheet is right and the check was wrong — the conventional
 reset is `0.01ms !important`, not `0s`, because a true zero can break code
 waiting on `transitionend`, and `0.01ms` parses to a positive number. The sweep
 now compares against a 1 ms floor.
+
+
+## SC-006 met: 2,672 px against a 2,800 px ceiling (T145)
+
+**A 3.64× reduction at 390 px**, from 9,720 px to 2,672 px — 106.9 px per
+result against 388.8. Under the ceiling at every width, measured by the T109
+sweep:
+
+| Width | Before | After | Per result |
+|---|---|---|---|
+| 390 px | 9,720 px | **2,672 px** | 388.8 → 106.9 |
+| 768 px | 6,047 px | 2,162 px | 241.9 → 86.5 |
+| 1024 px | 6,047 px | 2,080 px | 241.9 → 83.2 |
+| 1440 px | 6,047 px | 2,080 px | 241.9 → 83.2 |
+
+### How, and what each step was worth
+
+Measured after each change rather than estimated, which is how the two
+responsive decisions at the end got made at all — the first four changes left
+it at 3,121 px, still 321 px over.
+
+| Change | 390 px height | Per result |
+|---|---|---|
+| (start) five-pair `<dl>`, one asker per line, in a bordered card | 9,720 | 388.8 |
+| Three-line row; card → a 1 px rule; labels → position and form | 3,466 | 138.6 |
+| Row padding 10 px → 8 px; party hidden below 768 px | 3,121 | 124.8 |
+| Asker names hidden below 768 px; figure label shortened | **2,672** | **106.9** |
+
+The row now reads as the shape the owner selected:
+
+```
+* Drinking Water in Rural Areas
+  2021-03-11 · Jal Shakti · unstarred · Fully linked
+  asked by 4 of 4 identified
+```
+
+### A false flag found by measuring, not by reading
+
+The first measurement after the rewrite showed the meta line at a **constant
+78 px** — four lines where one was expected. The cause was not layout: every
+single row was carrying the flag *"this ministry id is not in the published
+ministry reference set"*, whose explanation is a block element inside the
+ministry span.
+
+It was a **real regression from the Phase 4 split**. `bootViews()` used to
+fetch `reference/ministries.jsonl` on page load, so `views.ministryNames` was
+always populated. T137 took that file off the first load and wired the ministry
+views to fetch it — and missed the search view, which reads the map for every
+result row. With an empty map, `ministryNameFor` fell through to its
+unknown-id branch and flagged all 56 ministries, on a reference set that
+contains every one of them.
+
+`ensureMinistryNames()` in `lib/viewkit.js` now loads it for whichever view
+needs it first, memoised, fetched in parallel with the search index — 1,856 B
+against the index's 794,402, so it adds nothing measurable to a first search.
+
+Worth recording for two reasons: the flag was *plausible* enough to be read as
+a data problem rather than a code one, and the row-height figure was
+unusable until it was fixed.
+
+### What is hidden below 768 px, and what is not
+
+Two responsive decisions, both forced by measurement and neither dropping a
+field FR-101 requires:
+
+- **The asker's party.** Parties in this record run to 48 characters
+  (*"Nationalist Congress Party - Sharadchandra Pawar"*), and three inline is
+  up to 150 characters for three names.
+- **The asker names themselves.** The count stays — *"asked by 4 of 4
+  identified"* — which is the shape the owner's own preview shows, and which
+  is what FR-102 asks for: the askers inline rather than one per line, with
+  the number stated against its total. FR-102 does not ask for every name on
+  the row.
+
+Both appear from 768 px, where the list measures 2,162 px against the 2,800 px
+ceiling and has room. Every asker of every question remains in the published
+`by-member` files, and the seat view names them on the member's own row.
