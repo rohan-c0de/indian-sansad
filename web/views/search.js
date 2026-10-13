@@ -15,7 +15,7 @@ import {
   loadSearchIndex,
 } from "../lib/fetch.js";
 import { NOT_STATED, count, isMissing, isoDate, sessionLabel, stated } from "../lib/format.js";
-import { figure, figureText, starMark, typeWord } from "../lib/marks.js";
+import { STARRED, UNSTARRED, figure, figureText, starMark, typeWord } from "../lib/marks.js";
 import { questionBucket, statusField } from "../lib/profile.js";
 import {
   ORDER_STATEMENT,
@@ -23,6 +23,7 @@ import {
   askerIndex,
   askersFor,
   createResultSet,
+  documentCount,
   parseQuestionId,
   planSearch,
 } from "../lib/search.js";
@@ -398,11 +399,166 @@ function searchSummary(page, plan) {
   return box;
 }
 
+/* ====================================================================== */
+/* A searched subject's trend across the covered sessions. T156            */
+/* ====================================================================== */
+
+/* FR-145, and SC-019: **zero additional requests.**
+ *
+ * This is the view the owner chose when asked what "question load over
+ * twenty-one sessions" meant -- not instead of the House total, but as well
+ * as it. It answers "has this been asked before, and when" as a shape rather
+ * than as a list.
+ *
+ * WHERE THE NUMBERS COME FROM, and why nothing is fetched. `planSearch` has
+ * already grouped every matching question id by session -- that is how the
+ * result list knows which digests to ask for -- and the question TYPE is
+ * inside the id itself (`lok-sabha/18/7/starred/1`). So the per-session
+ * starred and unstarred counts are a derivation over data already in memory
+ * after the search, and no digest, no aggregate and no new file is touched.
+ *
+ * `aggregates/subject-trends.jsonl` is the file that looks like it should be
+ * used here, and it must never be: 13,178,975 B raw, which is an order of
+ * magnitude past any budget this page has. Verified against the published
+ * index: the term "water" resolves to 1,423 documents across all 21 sessions,
+ * splitting 123 starred and 1,300 unstarred, summing exactly to the total the
+ * index reports before any record is read.
+ *
+ * THE SESSION LIST comes from the index's own `prefixes`, not from the matched
+ * sessions, so a session where the subject was never raised is drawn as a zero
+ * rather than omitted. A chart of only the sessions with hits would show a
+ * flat line for a subject that appeared twice and vanished.
+ */
+function sessionsInIndex(index) {
+  const seen = new Map();
+  for (const prefix of index?.prefixes ?? []) {
+    const parts = String(prefix).split("/");
+    if (parts.length < 4) continue;
+    const sessionId = parts.slice(0, 3).join("/");
+    if (!seen.has(sessionId)) {
+      seen.set(sessionId, { sessionId, term: Number(parts[1]), number: Number(parts[2]) });
+    }
+  }
+  // Oldest first, which is the direction a trend is read in -- the opposite of
+  // the result list, which is newest first. Both orders are stated where they
+  // are used rather than assumed to be the same.
+  return [...seen.values()].sort((a, b) => a.term - b.term || a.number - b.number);
+}
+
+function subjectTrend(container, plan, index) {
+  const all = sessionsInIndex(index);
+  if (all.length === 0 || !plan || plan.total === 0) return;
+
+  const matched = new Map(plan.sessions.map((s) => [s.sessionId, s.questionIds]));
+  const columns = all.map((session) => {
+    const ids = matched.get(session.sessionId) ?? [];
+    const parts = { [STARRED]: 0, [UNSTARRED]: 0 };
+    for (const id of ids) {
+      const type = parseQuestionId(id)?.type;
+      const key = typeof type === "string" ? type.toUpperCase() : null;
+      if (key === STARRED || key === UNSTARRED) parts[key] += 1;
+    }
+    return { session, label: `S${session.number}`, total: ids.length, parts };
+  });
+
+  const types = [STARRED, UNSTARRED].filter((t) =>
+    columns.some((c) => c.parts[t] > 0),
+  );
+  const matchedTotal = columns.reduce((n, c) => n + c.total, 0);
+
+  const box = el("section", "chart-block trend");
+  box.append(el("h4", null, "This subject across the covered sessions"));
+
+  const lede = el("p", "trend-lede");
+  lede.append(document.createTextNode("These "));
+  lede.append(
+    figure(matchedTotal, documentCount(index), {
+      unit: "question",
+      label: "matching questions",
+    }),
+  );
+  lede.append(
+    document.createTextNode(
+      ` fall across ${count(columns.filter((c) => c.total > 0).length)} of the ` +
+        `${count(columns.length)} covered sessions. Drawn from the search index ` +
+        "already in memory — nothing further was downloaded to show this.",
+    ),
+  );
+  box.append(lede);
+
+  if (types.length > 0) {
+    box.append(legend(types.map((t) => typeWord(t))));
+    box.append(
+      stackedColumns(
+        columns.map((c) => ({
+          label: c.label,
+          total: c.total,
+          parts: Object.fromEntries(types.map((t) => [typeWord(t), c.parts[t]])),
+        })),
+        types.map((t) => typeWord(t)),
+        {
+          title: "Matching questions per session, by question type",
+          description:
+            "A stacked column per session, oldest first. Sessions where this " +
+            "subject was not raised are drawn as zero. The same figures are in " +
+            "the table below.",
+        },
+      ),
+    );
+  }
+
+  /* The table, which is the authoritative form (FR-121). Every session,
+   * including the zeros, with the matched total as the denominator. */
+  const wrap = el("div", "table-wrap");
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", "This subject per session, scrollable");
+  wrap.tabIndex = 0;
+  const table = el("table");
+  const caption = el("caption", "table-caption");
+  caption.textContent =
+    "Every covered session, including those where this subject was not raised, " +
+    "with each figure against the matching total.";
+  table.append(caption);
+  const thead = el("thead");
+  const hrow = el("tr");
+  for (const text of ["Session", "Matching", ...types.map((t) => typeWord(t))]) {
+    const th = el("th", null, text);
+    th.scope = "col";
+    hrow.append(th);
+  }
+  thead.append(hrow);
+  table.append(thead);
+  const tbody = el("tbody");
+  for (const c of columns) {
+    const tr = el("tr");
+    const th = el("th", null, c.session.sessionId);
+    th.scope = "row";
+    tr.append(th);
+    tr.append(el("td", "num-col", figureText(c.total, matchedTotal)));
+    for (const t of types) tr.append(el("td", "num-col", count(c.parts[t])));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  wrap.append(table);
+  box.append(wrap);
+
+  container.append(box);
+}
+
 function renderSearchResults(container, { page, plan, focusFrom }) {
   const frag = document.createDocumentFragment();
   frag.append(searchSummary(page, plan));
   const ignored = ignoredBlock(plan);
   if (ignored) frag.append(ignored);
+
+  /* The trend goes ABOVE the list, not below it.
+   *
+   * It answers a different question from the list -- "when was this raised"
+   * against "what exactly was raised" -- and it is the cheaper one to read.
+   * Below a list that is 2,672 px tall at 390 px it would be past the end of
+   * what most readers scroll to, which is the same mistake as burying a
+   * denominator in a footnote. */
+  subjectTrend(frag, plan, search.index);
   frag.append(searchOrderNote());
 
   const ul = el("ol", "result-list");

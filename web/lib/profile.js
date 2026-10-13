@@ -180,6 +180,82 @@ export function selectSpan(rows, { ministryId, fromSession, toSession, allSessio
 }
 
 /** Every question type seen across a span, in a stable order. */
+/**
+ * The WHOLE HOUSE per session, summed across every ministry. T155.
+ *
+ * Returns the same shape `selectSpan` does, deliberately: the chart, the
+ * figure table and the basis block that render a single ministry then render
+ * the House with no changes at all, and the two views cannot drift into two
+ * ways of drawing one aggregate.
+ *
+ * Summing across ministries is valid on this aggregate and that is worth
+ * stating, because summing the WRONG axis is the trap the published counting
+ * basis warns about. A question belongs to exactly one ministry, so the
+ * per-ministry rows of a session partition that session's questions and add up
+ * to it. What must never be added is the `by-member` files, where a question
+ * asked jointly appears once per asker -- 23,385 of them in this window.
+ *
+ * A session with no rows at all still appears, with zero. Session
+ * `lok-sabha/18/8` has 0 sitting days, and a chart that silently dropped it
+ * would show 20 sessions where the record covers 21.
+ */
+export function houseSpan(rows, { allSessions } = {}) {
+  const sessions = allSessions ?? profileSessions(rows);
+  const bySession = new Map();
+  for (const row of rows ?? []) {
+    const key = row.session;
+    const acc =
+      bySession.get(key) ??
+      {
+        questions: 0,
+        typeMix: {},
+        fully_linked: 0,
+        partly_linked: 0,
+        not_linked: 0,
+        ambiguous: 0,
+        ministries: 0,
+        unit: null,
+      };
+    acc.questions += Number(row.questions ?? 0);
+    for (const [type, n] of Object.entries(row.question_type_mix ?? {})) {
+      acc.typeMix[type] = (acc.typeMix[type] ?? 0) + Number(n ?? 0);
+    }
+    for (const key2 of ["fully_linked", "partly_linked", "not_linked", "ambiguous"]) {
+      acc[key2] += Number(row[key2] ?? 0);
+    }
+    acc.ministries += 1;
+    acc.unit = acc.unit ?? row.counting_basis_unit ?? null;
+    bySession.set(key, acc);
+  }
+
+  return sessions.map((session) => {
+    const acc = bySession.get(session.sessionId) ?? null;
+    const base = {
+      ministry_id: null,
+      session: session.sessionId,
+      questions: acc ? acc.questions : 0,
+      question_type_mix: acc ? acc.typeMix : {},
+      fully_linked: acc ? acc.fully_linked : 0,
+      partly_linked: acc ? acc.partly_linked : 0,
+      not_linked: acc ? acc.not_linked : 0,
+      ambiguous: acc ? acc.ambiguous : 0,
+      counting_basis_unit: acc ? acc.unit : null,
+      basis_version: null,
+    };
+    const status = statusCounts(base);
+    return {
+      session,
+      row: base,
+      present: acc !== null,
+      questions: base.questions,
+      typeMix: { ...base.question_type_mix },
+      status: status.counts,
+      flagged: status.flagged,
+      ministries: acc ? acc.ministries : 0,
+    };
+  });
+}
+
 export function typesIn(span) {
   const types = new Set();
   for (const entry of span ?? []) {

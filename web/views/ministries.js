@@ -11,7 +11,7 @@
  * of them pays for all three and the other two then cost nothing.
  */
 
-import { legend, stackedColumns } from "../lib/chart.js";
+import { groupedColumns, legend, stackedColumns } from "../lib/chart.js";
 import { longSessionLabel } from "../lib/coverage.js";
 import { fetchMinistries, fetchMinistryProfile } from "../lib/fetch.js";
 import { NOT_STATED, count, isMissing, percent, sessionLabel, stated } from "../lib/format.js";
@@ -20,6 +20,7 @@ import {
   STATUS_FIELDS,
   basisFor,
   compare,
+  houseSpan,
   profileMinistries,
   profileSessions,
   questionBucket,
@@ -250,6 +251,101 @@ function renderCompareResult(container, { ministries, result }) {
   }
   frag.append(cards);
 
+  /* ---- the comparison as a chart (T157, FR-117) -----------------------
+   *
+   * GROUPED, not stacked, and the difference is the whole point: stacking two
+   * ministries' question counts would draw a combined column whose height
+   * means nothing. Nobody wants "Jal Shakti plus Railways". Grouped columns
+   * put them on ONE SCALE so they can be compared, without implying a sum.
+   *
+   * One scale is what makes the comparison honest, and it is also what
+   * FR-117 asks for: two charts with independent y-axes would make a ministry
+   * with a tenth of the load look identical to one with ten times it.
+   *
+   * Each session's columns carry both ministries' own totals as their
+   * denominators (FR-120), so a column can be read as a share of that
+   * ministry's span rather than only against the other ministry. */
+  const leftName = names.get(left.ministryId);
+  const rightName = names.get(right.ministryId);
+  const series = [leftName, rightName];
+  const byLeft = new Map(left.span.map((e) => [e.session.sessionId, e.questions]));
+  const byRight = new Map(right.span.map((e) => [e.session.sessionId, e.questions]));
+
+  const chartBox = el("section", "chart-block");
+  chartBox.append(el("h4", null, "Questions per session, both ministries"));
+  chartBox.append(legend(series));
+  chartBox.append(
+    groupedColumns(
+      span.map((entry) => ({
+        label: `S${entry.session.number}`,
+        parts: {
+          [leftName]: byLeft.get(entry.session.sessionId) ?? 0,
+          [rightName]: byRight.get(entry.session.sessionId) ?? 0,
+        },
+        totals: {
+          [leftName]: left.totals.questions,
+          [rightName]: right.totals.questions,
+        },
+      })),
+      series,
+      {
+        title: `Questions per session: ${leftName} against ${rightName}`,
+        description:
+          "One pair of columns per session, on a single scale. The same figures " +
+          "are in the table above, which is the authoritative form.",
+      },
+    ),
+  );
+
+  /* The per-session figures as a table, because the chart above is the only
+   * place the per-session breakdown appears -- the table at the top of this
+   * view carries SPAN TOTALS, not per-session numbers, so without this the
+   * chart would be the only form of its data (FR-121). */
+  const perSession = el("div", "table-wrap");
+  perSession.setAttribute("role", "region");
+  perSession.setAttribute("aria-label", "Questions per session for both ministries, scrollable");
+  perSession.tabIndex = 0;
+  const pst = el("table", "table-compare");
+  const pcap = el("caption", "table-caption");
+  pcap.textContent =
+    "Every figure in the chart above, per session, with each ministry's span " +
+    "total as its denominator.";
+  pst.append(pcap);
+  const psHead = el("thead");
+  const psHeadRow = el("tr");
+  for (const text of ["Session", leftName, rightName]) {
+    const th = el("th", null, text);
+    th.scope = "col";
+    psHeadRow.append(th);
+  }
+  psHead.append(psHeadRow);
+  pst.append(psHead);
+  const psBody = el("tbody");
+  for (const entry of span) {
+    const tr = el("tr");
+    const th = el("th", null, longSessionLabel(entry.session));
+    th.scope = "row";
+    tr.append(th);
+    for (const [name, lookup, side] of [
+      [leftName, byLeft, left],
+      [rightName, byRight, right],
+    ]) {
+      void name;
+      tr.append(
+        el(
+          "td",
+          "num-col",
+          figureText(lookup.get(entry.session.sessionId) ?? 0, side.totals.questions),
+        ),
+      );
+    }
+    psBody.append(tr);
+  }
+  pst.append(psBody);
+  perSession.append(pst);
+  frag.append(chartBox);
+  frag.append(perSession);
+
   frag.append(
     basisBlock(span, { head: "The counting basis used for BOTH columns" }),
   );
@@ -449,11 +545,125 @@ async function bootViews(doc) {
   buildCompareView(doc);
 }
 
+/* ====================================================================== */
+/* The whole House's question load across the covered sessions. T155       */
+/* ====================================================================== */
+
+/* FR-116. Twenty-one columns, summed across every ministry.
+ *
+ * ZERO NEW BYTES: this reads `views.rows`, the ministry-profile aggregate the
+ * other two views in this module already hold. Opening any of the three pays
+ * for all three.
+ *
+ * Why summing across ministries is valid here, when the published counting
+ * basis warns against summing: a question belongs to exactly ONE ministry, so
+ * a session's per-ministry rows partition that session's questions. Checked
+ * rather than assumed -- `houseSpan` over the whole aggregate totals 95,268,
+ * which is the figure the coverage statement publishes. What must never be
+ * summed is the `by-member` files, where a jointly asked question appears once
+ * per asker; 23,385 questions in this window are asked jointly.
+ */
+function renderHouseLoad(container) {
+  if (!views.ready) {
+    renderUnavailable(
+      container,
+      "The ministry profile could not be read, so the House's question load cannot be drawn.",
+    );
+    return;
+  }
+
+  const span = houseSpan(views.rows, { allSessions: views.sessions });
+  const totals = spanTotals(span);
+  const types = [...new Set(span.flatMap((e) => Object.keys(e.typeMix)))].sort();
+  const frag = document.createDocumentFragment();
+
+  /* The headline figure, against the window total it was drawn from. They are
+   * the same number here and that is the point: this view accounts for every
+   * published question, so the pairing reads as a reconciliation rather than
+   * as a share. */
+  const head = el("p", "load-head");
+  head.append(document.createTextNode("Across the covered window the House put "));
+  head.append(
+    figure(totals.questions, totals.questions, {
+      unit: "question",
+      label: `questions in ${count(span.length)} sessions`,
+    }),
+  );
+  head.append(
+    document.createTextNode(
+      ". Every published question is counted here, so this total reconciles with " +
+        "the coverage statement rather than being a share of it.",
+    ),
+  );
+  frag.append(head);
+
+  frag.append(statusStrip(totals, { heading: "How completely each question is linked to a member" }));
+  frag.append(basisBlock(span));
+
+  if (types.length > 0 && totals.questions > 0) {
+    const chartBox = el("section", "chart-block");
+    chartBox.append(el("h4", null, "Questions per session, by type"));
+    chartBox.append(legend(types));
+    chartBox.append(
+      stackedColumns(
+        span.map((entry) => ({
+          label: `S${entry.session.number}`,
+          total: entry.questions,
+          parts: entry.typeMix,
+        })),
+        types,
+        {
+          title: "Questions put to every ministry per session, by question type",
+          description:
+            "A stacked column per session, oldest first, across both covered terms. " +
+            "The same figures are given in the table below.",
+        },
+      ),
+    );
+    frag.append(chartBox);
+  }
+
+  /* The same table the single-ministry view renders, from the same function.
+   * It carries every column's figures and is what a keyboard and a screen
+   * reader reach (FR-121). */
+  frag.append(mixTable(span, types, totals));
+
+  /* A session the aggregate carries no row for at all. Not the same thing as a
+   * session with no sitting days: `lok-sabha/18/8` publishes 0 sitting_days
+   * and 4,500 questions, so "zero days" is not "zero questions" and a chart
+   * that conflated them would be wrong about the record. A genuinely absent
+   * session is named rather than dropped. */
+  const absent = span.filter((entry) => !entry.present);
+  if (absent.length > 0) {
+    frag.append(
+      el(
+        "p",
+        "load-absent",
+        `${count(absent.length)} of the ${count(span.length)} covered sessions carry no row ` +
+          `in this aggregate at all and are drawn as zero: ` +
+          `${absent.map((e) => e.session.sessionId).join(", ")}. ` +
+          "They are shown rather than omitted, so the column count matches the " +
+          "sessions the coverage statement claims.",
+      ),
+    );
+  }
+
+  replaceChildren(container, frag);
+  container.dataset.state = "ready";
+}
+
 /* ---------------------------------------------------------------------- */
 /* The view's entry point, called by the router in app.js                 */
 /* ---------------------------------------------------------------------- */
 
-/** Build all three ministry views and load the pair of files they share. */
+/** Build all three ministry views and load the pair of files they share.
+ *
+ * One mount for three routes (`#ministry`, `#compare`, `#load`), because they
+ * read one pair of files between them: opening any of the three pays for all
+ * three and the other two then cost nothing. The router memoises the module,
+ * so a reader moving between them mounts once. */
 export async function mount(doc = document) {
   await bootViews(doc);
+  const loadResult = doc.getElementById("load-result");
+  if (loadResult) renderHouseLoad(loadResult);
 }

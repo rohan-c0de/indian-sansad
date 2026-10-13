@@ -641,6 +641,142 @@ async function runSweeps(cdp, report, label) {
 }
 
 /* ---------------------------------------------------------------------- */
+/* Chart assertions -- T160, SC-014 and SC-015                            */
+/* ---------------------------------------------------------------------- */
+
+/* The five obligations `contracts/chart-contract.md` puts on every chart,
+ * checked against what actually rendered rather than against the code:
+ *
+ *   1. its counting basis is on the page
+ *   2. every figure is shown against a denominator
+ *   3. a table beside it carries the same figures
+ *   4. every series is identifiable from TEXT with colour removed
+ *   5. the SVG is role="img" with a title and a description, and its internals
+ *      are hidden from assistive technology
+ *
+ * (4) is the one a static check cannot make: whether a series is named in text
+ * is a fact about the rendered legend and table headers, not about the source.
+ */
+/* TWO TRAPS IN THE EXPRESSIONS BELOW, both found by them failing, and both
+ * recorded here rather than inside the template literal -- which is itself the
+ * point.
+ *
+ * **A template literal eats regex escapes.** A backslash-d is not a recognised
+ * escape sequence, so a template literal collapses it to a bare "d" -- and a
+ * digit-matching pattern silently becomes one that matches the letter d
+ * instead. It is still a perfectly valid regex, and it matches nothing.
+ * Measured: this check reported **0 denominator pairings** on text that plainly
+ * read "95,268 of 95,268". Every pattern sent into the page therefore uses a
+ * character class in square brackets, which has no backslash to lose.
+ * DESCRIBE at the top of this file gets it right with a DOUBLED backslash, and
+ * the contrast between the two is exactly the bug.
+ *
+ * **Prose near these expressions breaks the file.** A backtick ends the
+ * template literal; a star-slash -- which is how a digit class followed by a
+ * quantifier ends -- closes the enclosing block comment. Both happened here,
+ * more than once, including in the first version of THIS comment. So no
+ * example pattern is written out in full anywhere near them.
+ *
+ * The legend is also a SIBLING of `figure.chart`, inside the enclosing
+ * `.chart-block` -- the views append the legend and the figure separately.
+ * Looking inside the figure found nothing and reported "no legend items" for
+ * charts that are correctly labelled.
+ */
+async function chartAssertions(cdp, viewId, { expectCharts = 1 } = {}) {
+  const found = await evaluate(
+    cdp,
+    `(() => {
+      const host = document.getElementById("view-" + ${JSON.stringify(viewId)});
+      if (!host) return { missing: true };
+      const charts = [...host.querySelectorAll("figure.chart")];
+      return {
+        missing: false,
+        count: charts.length,
+        tables: host.querySelectorAll("table").length,
+        basis: Boolean(host.querySelector(".basis, .basis-text")),
+        // See DENOMINATOR_PATTERN above for why this is a character class.
+        denominators: (host.textContent.match(/[0-9][0-9,]* of [0-9][0-9,]*/g) || []).length,
+        detail: charts.map((fig) => {
+          const svg = fig.querySelector("svg");
+          // The legend is a SIBLING of the figure; see the note above.
+          const block = fig.closest(".chart-block") ?? fig.parentElement ?? fig;
+          const legendItems = [...block.querySelectorAll(".legend li")].map((n) =>
+            n.textContent.trim(),
+          );
+          return {
+            hasSvg: Boolean(svg),
+            role: svg ? svg.getAttribute("role") : null,
+            title: svg ? (svg.querySelector("title") || {}).textContent : null,
+            desc: svg ? (svg.querySelector("desc") || {}).textContent : null,
+            focusable: svg ? svg.getAttribute("focusable") : null,
+            legend: legendItems,
+            // Bars drawn, so an empty chart cannot pass by having nothing to
+            // check. Horizontal bars are spans, columns are <rect>.
+            marks:
+              fig.querySelectorAll("svg rect").length +
+              fig.querySelectorAll(".bar").length,
+            caption: Boolean(fig.querySelector("figcaption")),
+          };
+        }),
+      };
+    })()`,
+  );
+
+  if (found.missing) {
+    check(`#${viewId}: the view exists for its chart checks`, false, "no container");
+    return found;
+  }
+
+  check(
+    `#${viewId}: ${expectCharts} chart(s) rendered`,
+    found.count >= expectCharts,
+    `${found.count} figure.chart found`,
+  );
+  check(
+    `#${viewId}: the counting basis is on the page beside the chart (FR-120)`,
+    found.basis,
+  );
+  check(
+    `#${viewId}: figures are shown against denominators (FR-114, FR-120)`,
+    found.denominators > 0,
+    `${found.denominators} "N of M" pairing(s)`,
+  );
+  check(
+    `#${viewId}: a table accompanies the chart, as the authoritative form (FR-121)`,
+    found.tables >= 1,
+    `${found.tables} table(s)`,
+  );
+
+  found.detail.forEach((chart, index) => {
+    const which = found.detail.length > 1 ? ` [${index + 1}]` : "";
+    check(
+      `#${viewId}${which}: the chart draws marks, so these checks have something to check`,
+      chart.marks > 0,
+      `${chart.marks} mark(s)`,
+    );
+    if (chart.hasSvg) {
+      check(
+        `#${viewId}${which}: the SVG is role=img with a title and a description`,
+        chart.role === "img" && Boolean(chart.title) && Boolean(chart.desc),
+        `role=${chart.role} title=${JSON.stringify((chart.title || "").slice(0, 44))}`,
+      );
+      check(
+        `#${viewId}${which}: the SVG is not a tab stop -- the table is what a keyboard reaches`,
+        chart.focusable === "false",
+        `focusable=${chart.focusable}`,
+      );
+    }
+    check(
+      `#${viewId}${which}: every series is named in TEXT, so removing colour loses nothing (FR-122)`,
+      chart.legend.length > 0 && chart.legend.every((name) => name.length > 0),
+      chart.legend.length > 0 ? chart.legend.join(" | ") : "no legend items",
+    );
+  });
+
+  return found;
+}
+
+/* ---------------------------------------------------------------------- */
 /* Router assertions -- T190, SC-017 and SC-018                           */
 /* ---------------------------------------------------------------------- */
 
@@ -1026,6 +1162,52 @@ async function main() {
       loadRequests.filter((r) => r.url.includes("/search/")).map((r) => r.url).join(", ") || "none",
     );
 
+    /* ---------------- the charts (T160) ----------------
+     *
+     * The ministry view is already open and ready at this point; the House
+     * load view shares its module and its two files, so opening it costs
+     * nothing and is checked here too. */
+    currentPhase = "charts";
+    console.log("");
+    console.log("Charts — basis, denominator, table, text-identifiable series");
+    report.charts = {};
+    report.charts.ministry = await chartAssertions(cdp, "ministry");
+    await openView(
+      cdp,
+      "load",
+      `(document.getElementById("load-result") || {}).dataset.state === "ready"`,
+      { label: "the House load view" },
+    );
+    report.charts.load = await chartAssertions(cdp, "load");
+
+    /* The whole House's total must RECONCILE with the coverage statement --
+     * 95,268 published questions. A per-session chart that silently dropped a
+     * session, or double-counted a ministry, would still look plausible; this
+     * is the check that it sums to the record. */
+    const houseTotal = await evaluate(
+      cdp,
+      `(() => {
+        const head = document.querySelector("#view-load .load-head");
+        // A character class, not a backslash escape -- see chartAssertions.
+        const m = head ? head.textContent.match(/([0-9,]+) of ([0-9,]+)/) : null;
+        return m ? { shown: m[1], of: m[2] } : null;
+      })()`,
+    );
+    check(
+      "the House load total reconciles with the published question count",
+      Boolean(houseTotal) && houseTotal.shown === houseTotal.of,
+      houseTotal ? `${houseTotal.shown} of ${houseTotal.of}` : "no headline figure found",
+    );
+    const loadColumns = await evaluate(
+      cdp,
+      `document.querySelectorAll("#view-load .chart-labels li").length`,
+    );
+    check(
+      "the House load chart draws every covered session, including any with no row",
+      loadColumns === 21,
+      `${loadColumns} column(s) against 21 covered sessions`,
+    );
+
     /* ---------------- the router (T190) ---------------- */
     await routerAssertions(cdp, log, report);
 
@@ -1126,6 +1308,47 @@ async function main() {
      * page ever lays out (SC-007). Sweeping the bare landing view would report
      * a clean bill of health for a page nobody had used. */
     await runSweeps(cdp, report, "search results open");
+
+    /* The subject trend (T156, SC-019). Drawn from the search index already in
+     * memory, so the assertion that matters is that NOTHING was fetched for
+     * it -- in particular not `aggregates/subject-trends.jsonl`, which is
+     * 13,178,975 B raw and is the file this view looks like it should use. */
+    const trend = await evaluate(
+      cdp,
+      `(() => {
+        const t = document.querySelector("#search-result .trend");
+        if (!t) return { present: false };
+        return {
+          present: true,
+          columns: t.querySelectorAll(".chart-labels li").length,
+          rows: t.querySelectorAll("tbody tr").length,
+          legend: [...t.querySelectorAll(".legend li")].map((n) => n.textContent.trim()),
+          lede: (t.querySelector(".trend-lede") || {}).textContent,
+        };
+      })()`,
+    );
+    check("a searched subject's trend is drawn across the covered sessions", trend.present);
+    check(
+      "the trend draws every covered session, not only the ones with a match",
+      trend.columns === 21 && trend.rows === 21,
+      `${trend.columns} column(s), ${trend.rows} table row(s)`,
+    );
+    check(
+      "the trend names its series in text",
+      Array.isArray(trend.legend) && trend.legend.length > 0,
+      (trend.legend || []).join(" | "),
+    );
+    check(
+      "NOTHING was fetched to draw the trend -- subject-trends.jsonl is never requested",
+      !log.all().some((r) => r.url.includes("subject-trends")),
+      log
+        .all()
+        .filter((r) => r.url.includes("subject-trends"))
+        .map((r) => r.url)
+        .join(", ") || "never requested",
+    );
+    report.charts = report.charts ?? {};
+    report.charts.trend = trend;
 
     /* ---------------- phase: show more ---------------- */
     currentPhase = "more";

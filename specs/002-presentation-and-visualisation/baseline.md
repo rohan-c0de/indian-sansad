@@ -257,3 +257,61 @@ Two changes, and the second is the one that matters:
 
 Now: **14 stops tabbed against 14 focusable in the DOM, all ringed.** Without
 (2) the first fix could not have been told from the bug.
+
+
+## Phase 7: the three new series (T155-T160)
+
+`make test-page` at **111 checks, 0 failures**.
+
+| Chart | Source | New bytes | Verified |
+|---|---|---|---|
+| House question load, 21 sessions | `ministry-profile`, summed over ministries | **0** | 21 columns; total **95,268 of 95,268** |
+| Searched subject's trend | the search index already in memory | **0** | 21 columns, 21 table rows; `subject-trends.jsonl` never requested |
+| Two-ministry comparison | `ministry-profile` | **0** | grouped, one scale, both names in the legend |
+
+### The House total reconciles with the record
+
+`houseSpan` sums the per-ministry rows of each session and totals **95,268** —
+the figure the coverage statement publishes. Summing that axis is valid because
+a question belongs to exactly one ministry, so a session's per-ministry rows
+partition it. What must never be summed is the `by-member` files, where a
+jointly asked question appears once per asker; 23,385 questions in this window
+are asked jointly. The driver asserts the reconciliation rather than trusting
+it: a chart that dropped a session or double-counted a ministry would still
+look entirely plausible.
+
+### Grouped, not stacked, for the comparison
+
+Stacking two ministries' counts would draw a combined column whose height means
+nothing — nobody wants "Jal Shakti plus Railways". Grouped columns put them on
+**one scale**, which is what makes the comparison honest: two charts with
+independent axes would make a ministry with a tenth of the load look identical
+to one with ten times it.
+
+### Four self-inflicted bugs in the chart checks, all in one file
+
+Worth recording because every one of them produced a *plausible* result rather
+than an obvious break, and because they are all the same root cause — prose and
+patterns written inside a CDP template literal.
+
+1. **A template literal eats regex escapes.** A backslash-d is not a recognised
+   escape, so it collapses to a bare `d`: a digit-matching pattern became one
+   matching the letter d. Still valid, matches nothing. **The check reported "0
+   denominator pairings" on text that plainly read "95,268 of 95,268".**
+   `DESCRIBE` at the top of the same file gets this right with a doubled
+   backslash, and the contrast between the two is exactly the bug. Every
+   pattern sent into the page now uses a character class, which has no
+   backslash to lose.
+2. **A backtick in a comment ends the template literal.** Broke the file twice.
+3. **A star-slash in a comment ends the enclosing block comment** — which is
+   how a digit class followed by a quantifier ends, so writing the example
+   pattern out broke the file again, including inside the comment explaining
+   (1).
+4. **The legend is a sibling of `figure.chart`**, not inside it, so looking
+   within the figure reported "no legend items" for charts that are correctly
+   labelled.
+
+The structural fix, after the fourth: every explanation moved **out** of the
+template literals into the surrounding JavaScript, where backticks, escapes and
+comment terminators are all harmless, and the comments inside the literals are
+one plain line pointing back. Being more careful was not the fix.
