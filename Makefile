@@ -595,6 +595,14 @@ validate:
 	 step "10 all three scopes present and clean" \
 	   "$(VENV_PY)" tools/guard_no_raw_payloads.py "$(REPO_ROOT)" --audit-fields --require-present; \
 	 echo ""; \
+	 echo "Scenario 10b -- the presentation gates (feature 002)"; \
+	 step "10b every palette ratio recomputed from the tokens, floors met" \
+	   $(MAKE) --no-print-directory check-contrast; \
+	 step "10c no Devanagari inside a font, and the SC-002 byte ceiling" \
+	   $(MAKE) --no-print-directory check-fonts; \
+	 step "10d every published field name against the FR-008 set" \
+	   $(MAKE) --no-print-directory check-field-scope; \
+	 echo ""; \
 	 echo "Scenario 11 -- coverage honesty (FR-013)"; \
 	 step "11 a statement per House, Lok Sabha only while RS is absent" \
 	   $(MAKE) --no-print-directory coverage; \
@@ -621,6 +629,12 @@ validate:
 	 echo "make validate: PASS -- $$n check(s): quickstart.md scenarios 1-12 and the full test suite."; \
 	 echo ""; \
 	 echo "What a green run here does NOT cover (quickstart.md -> Full gate):"; \
+	 echo "  SC-001  the LIVE first-load bytes on the wire"; \
+	 echo "          -- make serve-local compresses nothing; only the deployment's"; \
+	 echo "             own response headers carry the real figure"; \
+	 echo "  SC-025  zero running cost -- observable only over a billing period"; \
+	 echo "  SC-011  the screenshots are CAPTURED, not judged. 68 images prove a"; \
+	 echo "          layout rendered, never that it reads well"; \
 	 echo "  SC-003  newly published material picked up with no manual step"; \
 	 echo "          -- needs a SCHEDULED run nobody started"; \
 	 echo "  SC-004  upkeep within about 2 hours a week"; \
