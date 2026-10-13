@@ -255,9 +255,15 @@ def test_no_page_code_references_a_shipped_doc() -> None:
     for doc in SHIPPED_DOCS:
         basename = Path(doc).name
         for name in PAGE_FILES:
-            text = (WEB / name).read_text(encoding="utf-8")
-            if basename in text:
-                offenders.append(f"{name} references {doc}")
+            # CODE lines only. The stylesheet header cites
+            # `web/fonts/PROVENANCE.md` in prose, which is the file telling a
+            # reader where the fonts came from -- documentation pointing at
+            # documentation, not a request. The first version of this test read
+            # the raw text and failed on exactly that, which is the same
+            # prose/code confusion `_code_lines` exists to resolve.
+            for number, line in _code_lines(WEB / name):
+                if basename in line:
+                    offenders.append(f"{name}:{number} references {doc}")
     assert offenders == [], (
         "page code points at shipped documentation, so its URLs are reachable "
         f"from the page and the off-host waiver no longer holds: {offenders}"
@@ -287,11 +293,56 @@ def test_no_page_file_imports_anything_but_a_relative_path(name: str) -> None:
             )
 
 
-def test_the_stylesheet_fetches_nothing() -> None:
+def test_the_stylesheet_fetches_nothing_from_another_host() -> None:
+    """FR-112: the no-`url()` invariant is NARROWED, not removed.
+
+    This test asserted `"url(" not in body` until feature 002, and that was a
+    PROXY for the thing actually wanted: that the stylesheet makes no request to
+    another host. With no fonts to self-host, forbidding `url()` outright was the
+    cheapest way to get there and cost nothing.
+
+    Three self-hosted `woff2` files make it wrong rather than merely strict, so
+    the invariant becomes what it always meant, plus one thing the old form could
+    not check at all:
+
+      * no `@import`, as before;
+      * every `url()` is RELATIVE -- not absolute, not protocol-relative, not
+        root-relative (which would 404 on the published branch, where the page
+        sits at the branch root and a leading `/` resolves to the domain root);
+      * no `data:` URI, which would inline bytes the byte budget cannot see;
+      * and the target EXISTS. That is strictly stronger than the old
+        assertion: a typo'd font path was unreachable before this test could
+        notice, because a stylesheet with no url() at all cannot have a broken
+        one.
+    """
     css = (WEB / "style.css").read_text(encoding="utf-8")
     body = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
-    assert "@import" not in body
-    assert "url(" not in body, "url() would be a request for a font or an image"
+    assert "@import" not in body, "@import is a request, and a blocking one"
+
+    targets = re.findall(r"url\(\s*['\"]?([^'\")]+)['\"]?\s*\)", body)
+    assert targets, (
+        "no url() in the stylesheet at all. Not a failure in itself -- but the "
+        "three @font-face blocks need three, so either the fonts stopped being "
+        "self-hosted or this regex stopped matching."
+    )
+
+    offenders: list[str] = []
+    for target in (t.strip() for t in targets):
+        if target.startswith(("http://", "https://", "//")):
+            offenders.append(f"{target} names a host")
+        elif target.startswith("data:"):
+            offenders.append(f"{target[:32]}… is a data: URI")
+        elif target.startswith("/"):
+            offenders.append(f"{target} is root-relative, which 404s on the published branch")
+        elif not (WEB / target).is_file():
+            offenders.append(f"{target} does not exist under web/")
+    assert offenders == [], f"style.css url() findings: {offenders}"
+
+    # And the fonts are what those url()s point at, so this test cannot pass on
+    # a stylesheet that dropped them.
+    assert sorted(t.strip() for t in targets) == sorted(
+        f"fonts/{Path(b).name}" for b in SHIPPED_BINARIES
+    )
 
 
 def test_the_shell_loads_the_module_and_the_stylesheet_relatively() -> None:

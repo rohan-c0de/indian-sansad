@@ -1,79 +1,181 @@
-/* Indian Sansad — question explorer. T075.
+/* Indian Sansad — the published Lok Sabha question record. T116, T117.
  *
- * Hand-written. No framework, no build step, no preprocessor. And no
- * reference of any kind to another file or another host: no @import, no
- * url(), no web font. The font stacks below name faces the operating system
- * already has, which is why there is no network request for type.
+ * Hand-written. No framework, no build step, no preprocessor.
  *
- * Designed at 390 px FIRST (owner decision 2026-10-10). Every rule outside a
- * media query is the narrow layout; the one `min-width` block widens it. The
- * page must never scroll horizontally, so anything that cannot shrink -- the
- * session table -- scrolls inside its own container instead.
+ * ONE reference to another file, and none to another host: the three
+ * `@font-face` blocks below load three `woff2` files from `web/fonts/`, by
+ * relative path, from this same origin. That is a change of invariant and it
+ * is stated rather than discovered -- this file previously recorded "no
+ * @import, no url(), no web font", and `tools/list_page_urls.py` plus
+ * `tests/unit/test_page_fetch_layer.py` enforced it literally. FR-112 narrows
+ * it: `url()` is permitted, and only a url() that is relative, resolves inside
+ * `web/`, and names a file that exists. The page still contacts no other host.
  *
- * Contrast, against the --surface and --ground grounds, computed with the
- * WCAG relative-luminance formula. RECOMPUTED 2026-10-10 -- three of the
- * figures previously recorded here were wrong, all of them understated:
- * --ink on white was given as 14.07:1 and is 15.97:1, --ink on the ground as
- * 12.98:1 and is 14.51:1, --accent as 7.33:1 and is 8.03:1. They were
- * conservative rather than dangerous, but a recorded measurement that nobody
- * can reproduce is not a measurement.
+ * Designed at 390 px FIRST. Every rule outside a media query is the narrow
+ * layout; the `min-width` blocks widen it. The page must never scroll
+ * horizontally, so anything that cannot shrink scrolls inside its own
+ * container instead.
+ *
+ * ---------------------------------------------------------------------------
+ * THE PALETTE (owner decision, feature 002 FR-105)
+ * ---------------------------------------------------------------------------
+ * Six named tokens, replacing the framework-default grey ramp this file
+ * carried. `--house #1F5D3E` is the Lok Sabha chamber colour and is an
+ * INSTITUTIONAL MARKER ONLY -- rules and marks, never a background field
+ * (FR-106). It also reserves red for the Rajya Sabha if a second House is ever
+ * covered. `--mark #8C3325` is unchanged from the previous palette.
+ *
+ * Three further tokens are NOT in the owner's six, and are named here as
+ * additions rather than smuggled in as values: `--series-2` (the second chart
+ * series), `--rule` (a decorative hairline) and the `--flag-*` set (the
+ * flagged-row treatment). Each is recorded below with its measured ratio and
+ * its floor, or with "decorative" and why it has none.
+ *
+ * Every ratio RECOMPUTED 2026-10-13 with the WCAG relative-luminance formula,
+ * and `tools/check_contrast.py` recomputes them from these token values on
+ * every run and fails if a figure here disagrees. That check exists because
+ * three of the figures recorded in this header before feature 002 were simply
+ * wrong -- conservative, but unreproducible, and a measurement nobody can
+ * reproduce is not a measurement.
  *
  *   TEXT, floor 4.5:1
- *   --ink    #14213D on #FFFFFF = 15.97:1   body text
- *   --ink    #14213D on #F3F4F6 = 14.51:1
- *   --ink    #14213D on #FFF9EE = 15.24:1   text on a flagged row
- *   --muted  #4B5563 on #FFFFFF =  7.56:1   notes and captions
- *   --muted  #4B5563 on #F3F4F6 =  6.87:1
- *   --accent #8C3325 on #FFFFFF =  8.03:1   links and focus ring
- *   --flag-text #7A3B06 on #FFF4E0 = 7.85:1 flagged text, flagged ground
- *   --flag-text #7A3B06 on #FFF9EE = 8.16:1
+ *   --ink      #15253A on --paper #EEEFEA = 13.38:1   body text
+ *   --ink      #15253A on --sheet #FDFDFB = 15.19:1
+ *   --ink-soft #4A5663 on --paper          =  6.48:1   notes and meta
+ *   --ink-soft #4A5663 on --sheet          =  7.36:1
+ *   --house    #1F5D3E on --paper          =  6.75:1   institutional marker
+ *   --house    #1F5D3E on --sheet          =  7.66:1
+ *   --mark     #8C3325 on --paper          =  6.95:1   links, focus ring
+ *   --mark     #8C3325 on --sheet          =  7.88:1
+ *   --ink      #15253A on --flag #FBF3E2  = 14.01:1   text on a flagged box
+ *   --ink      #15253A on --flag-row      = 14.48:1   text in a flagged row
+ *   --flag-ink #6E3A10 on --flag          =  8.36:1   flagged text
+ *   --flag-ink #6E3A10 on --flag-row      =  8.64:1
  *
- *   NON-TEXT marks that carry meaning, floor 3:1
- *   --accent        #8C3325 on #FFFFFF = 8.03:1  focus ring, starred bars
- *   --bar-unstarred #6F88BD on #FFFFFF = 3.54:1  unstarred bars
- *   --control-border #767F8F on #FFFFFF = 4.04:1 select boundary
- *   --control-border #767F8F on #F3F4F6 = 3.67:1
+ *   NON-TEXT MARKS that carry meaning, floor 3:1
+ *   --mark        #8C3325 on --paper =  6.95:1  focus ring, series 1 alternate
+ *   --house       #1F5D3E on --paper =  6.75:1  rules, the starred asterisk
+ *   --series-2    #5F7D94 on --paper =  3.75:1  the second chart series
+ *   --series-2    #5F7D94 on --sheet =  4.25:1
+ *   --control-ink #6B7280 on --paper =  4.18:1  a <select> boundary
+ *   --control-ink #6B7280 on --sheet =  4.75:1
  *
- *   The two bar fills are only 2.27:1 against EACH OTHER, which is below the
- *   3:1 adjacent-mark floor. They are never adjacent: every segment is
- *   stroked with --surface, and at 1280 px that separator is about 3.8 px of
- *   white between them. The numbers are also in the table beside the chart,
- *   which is the authoritative form.
+ *   BELOW A FLOOR, each recorded with what carries the meaning instead.
+ *   An unrecorded shortfall is a finding; `check_contrast.py` fails on one.
  *
- *   --flag-border #D9A441 on #FFF4E0 = 1.63:1  <-- decorative only; the flag
- *     is also carried by a word ("flagged", "Not built yet", "not stated")
- *     and never by colour alone, so the border is not the signal.
+ *   --paper vs --sheet = 1.13:1
+ *     A surface is NOT distinguished from the page ground by this fill
+ *     difference -- it cannot be, at 1.13:1. FR-108: a rule, a boundary or
+ *     space carries it. This is also why the uniform card could go without
+ *     losing information: the card's BORDER was doing the work, not its fill.
+ *
+ *   --house vs --mark = 1.03:1
+ *     Nearly identical in luminance, separable only by hue, so unavailable to
+ *     a reader with a red-green deficiency. FR-109: these two are never the
+ *     only difference between two meanings. --house marks the institution and
+ *     --mark marks interaction; nothing is distinguished by which it is.
+ *
+ *   --series-2 vs --house = 1.80:1
+ *     Below the 3:1 adjacent-mark floor, and UNAVOIDABLY so. No colour can
+ *     clear 3:1 against both the near-white grounds and --house: a darker one
+ *     would need 20.25:1 against --paper and pure black reaches only 18.17:1,
+ *     and a lighter one needs paper:house >= 9:1 where it is 6.75:1. The
+ *     window is empty. FR-122 therefore applies by necessity: adjacent chart
+ *     segments are stroked in --sheet, every series is named in text, and the
+ *     table beside the chart is the authoritative form.
+ *
+ *   --rule #D2D4CC = 1.30:1 on --paper, 1.47:1 on --sheet
+ *     DECORATIVE. A hairline separator carries no meaning on this page --
+ *     every distinction a reader needs is a word -- so it has no floor. It
+ *     exists to be seen, not to be read.
+ *
+ *   --flag-edge #BF9A4E = 2.39:1 on --flag
+ *     DECORATIVE. The flag is always carried by a WORD ("flagged",
+ *     "not stated"), never by this border.
  *
  * Nothing on this page carries meaning by colour alone. "not stated" is a
- * word. A gap is a list item. A region that is not built says so in text.
+ * word. A gap is a list item. A flag is a word. A starred question carries the
+ * asterisk Parliament itself prints AND the word "starred" for assistive
+ * technology.
+ *
+ * ---------------------------------------------------------------------------
+ * THE TYPE (owner decision, FR-110)
+ * ---------------------------------------------------------------------------
+ * Newsreader for headings, IBM Plex Sans for body and data. Self-hosted,
+ * same-origin, Latin subset only, `font-display: swap`, with the previous
+ * system stacks retained as the fallbacks -- so a blocked or failed font
+ * leaves the page reading exactly as it did before.
+ *
+ * THREE static instances, 60,684 B total, not two variable fonts: two variable
+ * faces measure 98,392 B and break SC-002's 95,000 B ceiling, and narrowing
+ * the weight axis does not help because the whole axis ships regardless.
+ * Weights 400 and 600 are the only ones shipped and the only ones used -- any
+ * other would be synthesised, which on a serif heading reads as a defect.
+ *
+ * Latin-only is a Constitution Principle IV requirement, not a preference, and
+ * `tools/check_font_scope.py` asserts zero Devanagari from each font's cmap.
+ * See `web/fonts/PROVENANCE.md` for the sources, the licences, and the three
+ * dataset codepoints that fall back to a system face.
  */
 
-:root {
-  --ground: #f3f4f6;
-  --surface: #ffffff;
-  --ink: #14213d;
-  --muted: #4b5563;
-  --rule: #d5d9e0;
-  --accent: #8c3325;
-  --flag-bg: #fff4e0;
-  --flag-border: #d9a441;
-  --flag-text: #7a3b06;
-  /* A flagged TABLE ROW: lighter than --flag-bg so a flagged cell inside a
-     flagged row is still distinguishable. */
-  --flag-row: #fff9ee;
-  /* The second chart series. Previously named by chart.js and DEFINED
-     NOWHERE, so every unstarred bar rendered black and the legend swatch
-     rendered blank -- an undefined var() falls back to the property's initial
-     value and reports nothing. */
-  --bar-unstarred: #6f88bd;
-  /* The boundary of a <select>. #8A93A3 was the fallback hiding in a var()
-     default; it is 3.10:1 on white but only 2.81:1 on --ground, i.e. below
-     the 3:1 non-text floor exactly where a control sits on the page ground.
-     #767F8F clears it on both. */
-  --control-border: #767f8f;
+/* Each `src` is a RELATIVE path to a file in this repository. No other host is
+ * named here or anywhere in web/. `unicode-range` is Google's declared range
+ * for the `latin` subset, reproduced exactly. */
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(fonts/newsreader-600.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
-  --font-head: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/ibm-plex-sans-400.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(fonts/ibm-plex-sans-600.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  /* The owner's six. */
+  --paper: #eeefea;
+  --sheet: #fdfdfb;
+  --ink: #15253a;
+  --ink-soft: #4a5663;
+  --house: #1f5d3e;
+  --mark: #8c3325;
+
+  /* Named additions, each measured in the header above. */
+  --series-2: #5f7d94;
+  --rule: #d2d4cc;
+  --control-ink: #6b7280;
+  --flag: #fbf3e2;
+  --flag-row: #fcf7ec;
+  --flag-ink: #6e3a10;
+  --flag-edge: #bf9a4e;
+
+  --font-head: "Newsreader", Charter, "Iowan Old Style", "Palatino Linotype",
+    Georgia, serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --container: 1120px;
@@ -95,7 +197,7 @@ html {
 
 body {
   margin: 0;
-  background: var(--ground);
+  background: var(--paper);
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 16px;
@@ -131,7 +233,7 @@ p {
 }
 
 a {
-  color: var(--accent);
+  color: var(--mark);
   text-underline-offset: 2px;
 }
 
@@ -141,7 +243,7 @@ a:hover {
 
 /* Keyboard operability: a visible ring everywhere, never removed. */
 :focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--mark);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -156,7 +258,7 @@ table,
 code {
   font-family: var(--font-mono);
   font-size: 0.9em;
-  background: var(--ground);
+  background: var(--paper);
   padding: 1px 4px;
   border-radius: 3px;
 }
@@ -178,9 +280,9 @@ code {
   left: 8px;
   top: 8px;
   z-index: 10;
-  background: var(--surface);
+  background: var(--sheet);
   padding: 10px 14px;
-  border: 2px solid var(--accent);
+  border: 2px solid var(--mark);
   border-radius: var(--radius);
   min-height: var(--tap);
 }
@@ -190,7 +292,7 @@ code {
 /* ---------------------------------------------------------------------- */
 
 .site-header {
-  background: var(--surface);
+  background: var(--sheet);
   border-bottom: 1px solid var(--rule);
   padding: 18px 0;
 }
@@ -203,7 +305,7 @@ code {
 }
 
 .tagline {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.9rem;
   margin-top: 2px;
 }
@@ -218,14 +320,49 @@ main {
 }
 
 .section,
-.card {
+/* The uniform card is gone (FR-115). It was ONE bordered box around every
+ * kind of content -- a coverage statement, a picker, a chart, a result list --
+ * which told a reader nothing about what they were looking at, and it was the
+ * single loudest reason the page read as generated.
+ *
+ * What replaces it is not a second card. Three treatments, by what the content
+ * IS:
+ *
+ *   .sheet  a surface a reader reads FROM -- the coverage statement, a licence
+ *           block. It gets the --sheet fill and a rule, because at 1.13:1 the
+ *           fill alone is invisible (FR-108): the rule is what makes it a
+ *           surface, not the colour.
+ *   .tool   a surface a reader acts ON -- the pickers and the search box. No
+ *           fill at all; it sits on --paper and is bounded by space and the
+ *           controls' own edges. A control already looks like a control.
+ *   (none)  everything else. A result list, a chart, a table and a note are
+ *           page content, not objects on a tray, and they are separated by
+ *           space and rules rather than wrapped.
+ *
+ * `--radius` survives only on the two that are actually surfaces. */
+.sheet {
   margin-top: 24px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--house);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 18px 16px;
 }
 
+.tool {
+  margin-top: 24px;
+  padding: 0;
+}
+
+/* `.card` is retained as an ALIAS for `.sheet` for exactly as long as the
+ * markup still emits it. It is not a third treatment: it resolves to the same
+ * rules, so nothing can look different depending on which class it got. */
 .card {
-  background: var(--surface);
+  margin-top: 24px;
+  background: var(--sheet);
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
+  border-left: 3px solid var(--house);
+  border-radius: 0 var(--radius) var(--radius) 0;
   padding: 18px 16px;
 }
 
@@ -233,23 +370,14 @@ main {
   margin-bottom: 12px;
 }
 
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-
 .lede {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.94rem;
   margin-top: 4px;
 }
 
 .status {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.94rem;
   padding: 6px 0;
 }
@@ -259,7 +387,7 @@ main {
 /* ---------------------------------------------------------------------- */
 
 .houses {
-  border-left: 4px solid var(--accent);
+  border-left: 4px solid var(--mark);
   padding: 2px 0 2px 12px;
   margin-bottom: 18px;
 }
@@ -272,7 +400,7 @@ main {
 
 .houses-note,
 .houses-why {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.88rem;
   margin-top: 3px;
 }
@@ -288,16 +416,14 @@ main {
 }
 
 .fact {
-  background: var(--surface);
+  background: var(--sheet);
   padding: 12px 14px;
 }
 
 .fact-label {
   font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 700;
-  color: var(--muted);
+  font-weight: 600;
+  color: var(--ink-soft);
 }
 
 .fact-value {
@@ -308,7 +434,7 @@ main {
 }
 
 .fact-note {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.84rem;
   margin-top: 4px;
 }
@@ -316,19 +442,17 @@ main {
 /* The counting basis. Read at runtime; never retyped in the page. */
 .basis {
   margin-top: 18px;
-  background: var(--ground);
+  background: var(--paper);
   border: 1px solid var(--rule);
-  border-left: 4px solid var(--muted);
+  border-left: 4px solid var(--ink-soft);
   border-radius: var(--radius);
   padding: 14px;
 }
 
 .basis-head {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 0.86rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .basis-text {
@@ -339,7 +463,7 @@ main {
 .basis-src {
   margin-top: 8px;
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -355,7 +479,7 @@ main {
 }
 
 .gaps-lede {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.88rem;
   margin-top: 4px;
   margin-bottom: 10px;
@@ -401,10 +525,8 @@ td {
 }
 
 thead th {
-  background: var(--ground);
+  background: var(--paper);
   font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   position: sticky;
   top: 0;
 }
@@ -420,9 +542,14 @@ tbody tr:last-child td {
 
 /* An absent value is a WORD, never an empty cell and never a dash whose
    meaning a reader has to guess. */
+/* No italic face ships (FR-110, three static romans), so absence is carried by
+ * the WORD plus --ink-soft rather than by a slant. All three of these mark
+ * absence and all three are already worded -- "not stated", the missing-subject
+ * text, "no asking member is identified" -- so the italic was a third,
+ * redundant cue. Synthetic oblique is not used in its place: the browser would
+ * shear the roman, and a sheared serif reads as a rendering fault. */
 .not-stated {
-  color: var(--muted);
-  font-style: italic;
+  color: var(--ink-soft);
 }
 
 /* The session table is collapsed by default: 21 rows is a wall in front of
@@ -439,7 +566,7 @@ details.sessions > summary {
 }
 
 details.sessions > summary:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--mark);
   outline-offset: 2px;
 }
 
@@ -450,7 +577,7 @@ details.sessions > summary:focus-visible {
 }
 
 .summary-note {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.84rem;
 }
 
@@ -459,20 +586,20 @@ details.sessions > summary:focus-visible {
 .zero-days-note {
   margin: 0 0 10px;
   padding: 8px 10px;
-  background: var(--flag-bg);
-  border-left: 4px solid var(--flag-text);
+  background: var(--flag);
+  border-left: 4px solid var(--flag-ink);
   border-radius: var(--radius);
-  color: var(--flag-text);
+  color: var(--flag-ink);
   font-size: 0.84rem;
 }
 
 .zero-days-value {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .zero-days-flag {
   display: block;
-  color: var(--flag-text);
+  color: var(--flag-ink);
   font-size: 0.74rem;
   font-weight: 600;
   white-space: normal;
@@ -486,18 +613,16 @@ details.sessions > summary:focus-visible {
 /* ---------------------------------------------------------------------- */
 
 .not-built {
-  background: var(--flag-bg);
-  border-color: var(--flag-border);
+  background: var(--flag);
+  border-color: var(--flag-edge);
   /* A second, non-colour signal: the heavy left rule plus the text tag. */
-  border-left: 5px solid var(--flag-text);
-  color: var(--flag-text);
+  border-left: 5px solid var(--flag-ink);
+  color: var(--flag-ink);
 }
 
 .not-built-tag {
   font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-weight: 600;
   margin-bottom: 6px;
 }
 
@@ -510,7 +635,7 @@ details.sessions > summary:focus-visible {
 }
 
 .not-built-note {
-  border-top: 1px solid var(--flag-border);
+  border-top: 1px solid var(--flag-edge);
   padding-top: 8px;
 }
 
@@ -523,17 +648,17 @@ details.sessions > summary:focus-visible {
 /* ---------------------------------------------------------------------- */
 
 .unavailable {
-  background: var(--flag-bg);
-  border: 1px solid var(--flag-border);
-  border-left: 5px solid var(--flag-text);
+  background: var(--flag);
+  border: 1px solid var(--flag-edge);
+  border-left: 5px solid var(--flag-ink);
   border-radius: var(--radius);
-  color: var(--flag-text);
+  color: var(--flag-ink);
   padding: 14px;
   font-size: 0.9rem;
 }
 
 .unavailable-head {
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 4px;
 }
 
@@ -553,13 +678,13 @@ details.sessions > summary:focus-visible {
 /* ---------------------------------------------------------------------- */
 
 .site-footer {
-  background: var(--surface);
+  background: var(--sheet);
   border-top: 1px solid var(--rule);
   padding: 22px 0 36px;
 }
 
 .origin-note {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.86rem;
   max-width: 62ch;
 }
@@ -573,10 +698,8 @@ details.sessions > summary:focus-visible {
 
 .licence-head {
   font-size: 0.76rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
+  font-weight: 600;
+  color: var(--ink-soft);
   margin-top: 14px;
 }
 
@@ -592,14 +715,14 @@ details.sessions > summary:focus-visible {
 
 .licence-scope {
   font-size: 0.86rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   margin-top: 4px;
 }
 
 .attribution {
   margin: 6px 0 0;
   padding: 10px 12px;
-  background: var(--ground);
+  background: var(--paper);
   border-left: 4px solid var(--rule);
   border-radius: var(--radius);
   font-size: 0.86rem;
@@ -617,13 +740,13 @@ details.sessions > summary:focus-visible {
 }
 
 .licence-links-note {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .licence-src {
   margin-top: 12px;
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -700,10 +823,8 @@ details.sessions > summary:focus-visible {
 
 .field-label {
   font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  font-weight: 600;
+  color: var(--ink-soft);
 }
 
 /* (b) The table caption used the class `visually-hidden`, which style.css
@@ -717,8 +838,8 @@ caption.table-caption {
   white-space: normal;
   padding: 10px 12px;
   font-size: 0.82rem;
-  color: var(--muted);
-  background: var(--ground);
+  color: var(--ink-soft);
+  background: var(--paper);
   border-bottom: 1px solid var(--rule);
 }
 
@@ -733,8 +854,8 @@ select {
   font: inherit;
   font-size: 1rem;
   color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--control-border);
+  background: var(--sheet);
+  border: 1px solid var(--control-ink);
   border-radius: var(--radius);
   padding: 10px 12px;
   min-height: var(--tap);
@@ -743,7 +864,7 @@ select {
 }
 
 select:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--mark);
   outline-offset: 2px;
 }
 
@@ -760,7 +881,7 @@ select:focus-visible {
 }
 
 .result-span {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.88rem;
   margin-top: 3px;
 }
@@ -768,7 +889,7 @@ select:focus-visible {
 .former-names {
   margin-top: 8px;
   padding: 10px 12px;
-  background: var(--ground);
+  background: var(--paper);
   border-left: 4px solid var(--rule);
   border-radius: var(--radius);
   font-size: 0.84rem;
@@ -780,13 +901,13 @@ select:focus-visible {
 }
 
 .helper {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.86rem;
   margin-top: 4px;
 }
 
 .footnote {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.8rem;
   margin-top: 10px;
 }
@@ -795,7 +916,7 @@ select:focus-visible {
 .chart-block,
 .mix-block,
 .status-strip {
-  background: var(--surface);
+  background: var(--sheet);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   padding: 16px;
@@ -816,11 +937,9 @@ select:focus-visible {
 }
 
 .change-label {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .change-value {
@@ -830,7 +949,7 @@ select:focus-visible {
 }
 
 .change-from {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
 }
@@ -841,10 +960,8 @@ select:focus-visible {
 
 .strip-head {
   font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  font-weight: 600;
+  color: var(--ink-soft);
 }
 
 .status-list {
@@ -861,7 +978,7 @@ select:focus-visible {
 }
 
 .status-item {
-  background: var(--surface);
+  background: var(--sheet);
   padding: 10px 12px;
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -872,17 +989,15 @@ select:focus-visible {
 /* The amber ground is decoration. The WORD "flagged" is the signal, and it is
    present whether or not colour renders. */
 .status-item.flagged {
-  background: var(--flag-bg);
-  color: var(--flag-text);
+  background: var(--flag);
+  color: var(--flag-ink);
 }
 
 .flag-word {
   grid-column: 1 / -1;
   font-size: 0.66rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--flag-text);
+  font-weight: 600;
+  color: var(--flag-ink);
 }
 
 .status-label {
@@ -891,23 +1006,23 @@ select:focus-visible {
 
 .status-value {
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .status-share {
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.86rem;
 }
 
 .status-item.flagged .status-share {
-  color: var(--flag-text);
+  color: var(--flag-ink);
 }
 
 .strip-note {
   margin-top: 10px;
   font-size: 0.82rem;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -946,7 +1061,7 @@ figure.chart {
   width: 100%;
   height: 180px;
   display: block;
-  background: var(--surface);
+  background: var(--sheet);
 }
 
 .chart-labels {
@@ -969,7 +1084,7 @@ figure.chart {
   min-width: 0;
   text-align: center;
   font-size: 0.68rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   overflow: hidden;
 }
 
@@ -982,7 +1097,7 @@ figure.chart {
 
 figure.chart figcaption {
   margin-top: 8px;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.8rem;
 }
 
@@ -995,14 +1110,14 @@ figure.chart figcaption {
 }
 
 tr.row-absent th {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .row-absent-note {
   display: block;
   font-size: 0.7rem;
   font-weight: 400;
-  color: var(--muted);
+  color: var(--ink-soft);
   white-space: normal;
   max-width: 20ch;
 }
@@ -1041,7 +1156,7 @@ tr.tr-flag {
 }
 
 .cc-list dt {
-  color: var(--muted);
+  color: var(--ink-soft);
   padding: 5px 0;
   border-top: 1px solid var(--rule);
 }
@@ -1056,7 +1171,7 @@ tr.tr-flag {
 }
 
 .cc-list dt.flagged {
-  color: var(--flag-text);
+  color: var(--flag-ink);
 }
 
 .cc-list dt .flag-word {
@@ -1111,7 +1226,7 @@ tr.tr-flag {
 /* A pre-selection, or the lack of one, explained in words. */
 .picker-note {
   margin-top: 12px;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.82rem;
 }
 
@@ -1148,9 +1263,9 @@ input[type="search"] {
   width: 100%;
   min-height: var(--tap);
   padding: 8px 10px;
-  border: 1px solid var(--control-border);
+  border: 1px solid var(--control-ink);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--sheet);
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 1rem;
@@ -1164,17 +1279,17 @@ input[type="search"]:focus-visible,
 .search-submit:focus-visible,
 .show-more:focus-visible,
 .result-subject:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--mark);
   outline-offset: 2px;
 }
 
 .search-submit {
   min-height: var(--tap);
   padding: 8px 18px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--mark);
   border-radius: var(--radius);
-  background: var(--accent);
-  color: var(--surface);
+  background: var(--mark);
+  color: var(--sheet);
   font-family: var(--font-body);
   font-size: 1rem;
   font-weight: 600;
@@ -1184,10 +1299,10 @@ input[type="search"]:focus-visible,
 .search-status {
   margin: 0;
   padding: 14px 16px;
-  background: var(--surface);
+  background: var(--sheet);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 #search-result > * {
@@ -1196,7 +1311,7 @@ input[type="search"]:focus-visible,
 
 .search-summary {
   padding: 14px 16px;
-  background: var(--surface);
+  background: var(--sheet);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
 }
@@ -1210,7 +1325,7 @@ input[type="search"]:focus-visible,
 
 .search-count-note {
   margin: 4px 0 0;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.85rem;
 }
 
@@ -1218,7 +1333,7 @@ input[type="search"]:focus-visible,
    page, so this styles a sentence the code owns. */
 .order-note {
   padding: 12px 16px;
-  background: var(--ground);
+  background: var(--paper);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
 }
@@ -1227,9 +1342,7 @@ input[type="search"]:focus-visible,
   margin: 0;
   font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .order-text {
@@ -1242,10 +1355,10 @@ input[type="search"]:focus-visible,
    page made to the reader's query. */
 .ignored {
   padding: 12px 16px;
-  background: var(--flag-bg);
-  border: 1px solid var(--flag-border);
+  background: var(--flag);
+  border: 1px solid var(--flag-edge);
   border-radius: var(--radius);
-  color: var(--flag-text);
+  color: var(--flag-ink);
 }
 
 .ignored-head {
@@ -1291,7 +1404,7 @@ input[type="search"]:focus-visible,
 
 .result {
   padding: 14px 16px;
-  background: var(--surface);
+  background: var(--sheet);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
 }
@@ -1309,8 +1422,7 @@ input[type="search"]:focus-visible,
 }
 
 .result-subject-missing {
-  color: var(--muted);
-  font-style: italic;
+  color: var(--ink-soft);
 }
 
 .result-meta {
@@ -1323,11 +1435,9 @@ input[type="search"]:focus-visible,
 
 .result-meta dt {
   margin: 6px 0 0;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .result-meta dd {
@@ -1336,7 +1446,7 @@ input[type="search"]:focus-visible,
 }
 
 .result-meta dd.flagged {
-  color: var(--flag-text);
+  color: var(--flag-ink);
 }
 
 .result-id {
@@ -1363,7 +1473,7 @@ input[type="search"]:focus-visible,
 
 .result-flag-why {
   display: block;
-  color: var(--flag-text);
+  color: var(--flag-ink);
   font-size: 0.8rem;
 }
 
@@ -1372,8 +1482,7 @@ input[type="search"]:focus-visible,
 }
 
 .result-no-asker {
-  color: var(--flag-text);
-  font-style: italic;
+  color: var(--flag-ink);
 }
 
 .asker-list {
@@ -1391,22 +1500,22 @@ input[type="search"]:focus-visible,
 
 .asker-party {
   display: block;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.8rem;
 }
 
 .asker-unknown .asker-name {
   font-family: var(--font-mono);
-  color: var(--flag-text);
+  color: var(--flag-ink);
 }
 
 .result-flag {
   margin: 10px 0 0;
   padding: 8px 10px;
-  background: var(--flag-bg);
-  border: 1px solid var(--flag-border);
+  background: var(--flag);
+  border: 1px solid var(--flag-edge);
   border-radius: var(--radius);
-  color: var(--flag-text);
+  color: var(--flag-ink);
   font-size: 0.82rem;
 }
 
@@ -1414,10 +1523,10 @@ input[type="search"]:focus-visible,
   min-height: var(--tap);
   width: 100%;
   padding: 8px 18px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--mark);
   border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--accent);
+  background: var(--sheet);
+  color: var(--mark);
   font-family: var(--font-body);
   font-size: 1rem;
   font-weight: 600;
@@ -1426,7 +1535,7 @@ input[type="search"]:focus-visible,
 
 .show-more-note {
   margin-top: 8px;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.82rem;
 }
 
@@ -1487,7 +1596,7 @@ input[type="search"]:focus-visible,
    without it, so this is not a subtitle -- it is part of the identity. */
 .seat-state {
   margin: 2px 0 0;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
 }
 
@@ -1495,7 +1604,7 @@ input[type="search"]:focus-visible,
   margin: 2px 0 0;
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .seat-history {
@@ -1515,7 +1624,7 @@ input[type="search"]:focus-visible,
 .rep {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--sheet);
   padding: 14px;
   margin: 0 0 12px;
 }
@@ -1552,10 +1661,8 @@ input[type="search"]:focus-visible,
 .rep-meta dt,
 .question-meta dt {
   font-size: 0.74rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  font-weight: 600;
+  color: var(--ink-soft);
   margin: 6px 0 0;
 }
 
@@ -1567,7 +1674,7 @@ input[type="search"]:focus-visible,
 .rep-id {
   font-family: var(--font-mono);
   font-size: 0.82rem;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .rep-open {
@@ -1575,16 +1682,16 @@ input[type="search"]:focus-visible,
   min-height: var(--tap);
   padding: 0 16px;
   font: inherit;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
-  background: var(--ground);
-  border: 1px solid var(--control-border);
+  background: var(--paper);
+  border: 1px solid var(--control-ink);
   border-radius: var(--radius);
   cursor: pointer;
 }
 
 .rep-open:hover {
-  border-color: var(--accent);
+  border-color: var(--mark);
 }
 
 .rep-questions[data-state="empty"] {
@@ -1640,7 +1747,7 @@ input[type="search"]:focus-visible,
   flex: 0 0 auto;
   font-family: var(--font-head);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .match-host:empty {
@@ -1679,11 +1786,11 @@ input[type="search"]:focus-visible,
 }
 
 .match-name {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .match-state {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.88rem;
 }
 

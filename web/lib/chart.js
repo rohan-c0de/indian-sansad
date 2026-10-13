@@ -21,7 +21,7 @@
 const NS = "http://www.w3.org/2000/svg";
 
 /** Distinct fills, in order. Each is >= 3:1 on white; see the header. */
-export const SERIES_FILLS = Object.freeze(["var(--accent)", "var(--bar-unstarred)"]);
+export const SERIES_FILLS = Object.freeze(["var(--mark)", "var(--series-2)"]);
 
 /** A hatch for any series beyond the two measured fills. */
 const HATCH_ID = "sansad-hatch";
@@ -68,7 +68,7 @@ export function stackedColumns(columns, series, { title, description, height = 1
     id: HATCH_ID, width: 4, height: 4, patternUnits: "userSpaceOnUse",
     patternTransform: "rotate(45)",
   });
-  pattern.append(svgEl("rect", { width: 4, height: 4, fill: "var(--surface)" }));
+  pattern.append(svgEl("rect", { width: 4, height: 4, fill: "var(--sheet)" }));
   pattern.append(svgEl("rect", { width: 2, height: 4, fill: "var(--ink)" }));
   defs.append(pattern);
   svg.append(defs);
@@ -88,7 +88,7 @@ export function stackedColumns(columns, series, { title, description, height = 1
           width: colWidth * 0.72,
           height: h,
           fill: s < SERIES_FILLS.length ? SERIES_FILLS[s] : `url(#${HATCH_ID})`,
-          stroke: "var(--surface)",
+          stroke: "var(--sheet)",
           "stroke-width": 0.3,
         }),
       );
