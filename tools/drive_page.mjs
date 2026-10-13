@@ -228,7 +228,7 @@ async function emulate(cdp, metrics) {
  * the document with 25 results open is far taller than a sane bitmap. The
  * clip bounds the image to the region being looked at, which fixes both.
  */
-async function shoot(cdp, dir, name, metrics, selector = "#subject-search") {
+async function shoot(cdp, dir, name, metrics, selector = "#view-search") {
   const box = await evaluate(
     cdp,
     `(() => {
@@ -244,6 +244,17 @@ async function shoot(cdp, dir, name, metrics, selector = "#subject-search") {
      })()`,
   );
   if (!box) throw new Error(`no node matches ${selector}`);
+  /* A hidden view has a 0x0 box, and clipping a capture to it produces either
+   * an error or a 1px image -- neither of which is a screenshot of anything.
+   * With the router, six of seven views are hidden at any moment, so this is
+   * the common case rather than the exceptional one and it says which view
+   * was not open rather than failing on a geometry error. */
+  if (box.width < 1 || box.height < 1) {
+    throw new Error(
+      `${selector} has a ${box.width}x${box.height} box -- the view is hidden, ` +
+        `so open it before photographing it`,
+    );
+  }
   // A capture taller than this is not a reviewable image, and asking for one
   // is how the unclipped version hung. Say so rather than produce nothing.
   const height = Math.min(box.height, 12000);
@@ -878,7 +889,7 @@ async function viewState(cdp, id) {
  * `log` is the network recorder, so "returning refetches nothing" is read off
  * real requests rather than inferred from the code.
  */
-async function routerAssertions(cdp, log, report) {
+async function routerAssertions(cdp, log, report, { screens = null } = {}) {
   console.log("");
   console.log("Router — one view at a time, deep-linkable, no refetch on return");
 
@@ -910,6 +921,20 @@ async function routerAssertions(cdp, log, report) {
     );
     check(`#${id} moved focus into the view`, state.focusInView, `focus on ${state.focusTag}`);
     check(`#${id} is marked current in the navigation`, state.current === id, `aria-current: ${state.current}`);
+
+    /* T111 -- one screenshot per view per width, taken HERE because this is
+     * the only point in the run where every view is opened in turn. A view is
+     * hidden the rest of the time, and a hidden view has a 0x0 box, so there
+     * is nothing to photograph anywhere else. */
+    if (screens) {
+      for (const metrics of WIDTHS) {
+        await emulate(cdp, metrics);
+        report.screenshots.push(
+          await shoot(cdp, screens, `view-${id}`, metrics, `#view-${id}`),
+        );
+      }
+      await emulate(cdp, FUNCTIONAL);
+    }
   }
 
   /* SC-018 -- returning to a view refetches nothing.
@@ -1315,7 +1340,7 @@ async function main() {
     );
 
     /* ---------------- the router (T190) ---------------- */
-    await routerAssertions(cdp, log, report);
+    await routerAssertions(cdp, log, report, { screens: SCREENS });
 
     /* ---------------- phase: first search, keyboard only ---------------- */
     currentPhase = "search";
@@ -1861,7 +1886,7 @@ async function main() {
     if (SCREENS) {
       for (const metrics of WIDTHS) {
         await emulate(cdp, metrics);
-        report.screenshots.push(await shoot(cdp, SCREENS, "18-seat-name-two-states", metrics, "#constituency"));
+        report.screenshots.push(await shoot(cdp, SCREENS, "18-seat-name-two-states", metrics, "#view-seat"));
       }
       await emulate(cdp, FUNCTIONAL);
     }
