@@ -1,0 +1,2307 @@
+/* Indian Sansad — page entry point. T074/T077.
+ *
+ * An ES module, loaded directly by index.html with no build step. Everything
+ * it renders is read at runtime from this project's own published files; no
+ * figure, licence line or basis sentence is typed into the page.
+ *
+ * What this part implements: the shell (T074), the stylesheet (T075), the
+ * fetch layer (T076) and the coverage display (T077). The ministry profile
+ * (T078), subject search (T079) and comparison (T080) are deliberately empty
+ * regions in index.html, marked as such on screen.
+ *
+ * Rendering rule: nothing from a published file ever reaches `innerHTML`.
+ * Every value goes in through `textContent`. The records are this project's
+ * own, but they are built from an upstream payload nobody controls, and a page
+ * that interpolated them into markup would be one upstream change away from
+ * executing it.
+ */
+
+import { legend, stackedColumns } from "./lib/chart.js";
+import {
+  CrossOriginRefused,
+  fetchCountingBasis,
+  fetchCoverage,
+  fetchManifest,
+  fetchMinistries,
+  fetchMinistryProfile,
+  fetchSessions,
+  loadAskerNames,
+  loadMemberQuestions,
+  loadSearchDigest,
+  loadSearchIndex,
+  loadSeats,
+  loadStateSubjects,
+  searchAssetsRequested,
+  seatAssetsRequested,
+} from "./lib/fetch.js";
+import {
+  STATE_BASIS_UNIT,
+  nameKey,
+  memberQuestions,
+  representativesOf,
+  seatById,
+  seatHistory,
+  seatsInState,
+  seatsMatching,
+  seatsNamed,
+  stateSubjects,
+  statesIn,
+  statesWithSubjects,
+  subjectTally,
+  termsPhrase,
+} from "./lib/constituency.js";
+import {
+  STATUS_FIELDS,
+  basisFor,
+  compare,
+  profileMinistries,
+  profileSessions,
+  questionBucket,
+  selectSpan,
+  share,
+  spanChange,
+  spanTotals,
+  statusField,
+} from "./lib/profile.js";
+import {
+  ORDER_STATEMENT,
+  PAGE_SIZE,
+  askerIndex,
+  askersFor,
+  createResultSet,
+  planSearch,
+} from "./lib/search.js";
+import { renderDisclosure } from "./lib/licence.js";
+import {
+  coveredRows,
+  housesClaim,
+  housesNotCovered,
+  longSessionLabel,
+  sessionRows,
+  ZERO_SITTING_DAYS_FLAG,
+} from "./lib/coverage.js";
+import { count, isMissing, isoDate, NOT_STATED, percent, stated } from "./lib/format.js";
+
+/* ---------------------------------------------------------------------- */
+/* Small DOM helpers. No library.                                         */
+/* ---------------------------------------------------------------------- */
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined && text !== null) node.textContent = String(text);
+  return node;
+}
+
+function replaceChildren(node, ...children) {
+  node.replaceChildren(...children);
+}
+
+/** A labelled figure with the sentence that says how it was counted. */
+function fact(label, value, note) {
+  const wrap = el("div", "fact");
+  wrap.append(el("p", "fact-label", label), el("p", "fact-value", value));
+  if (note) wrap.append(el("p", "fact-note", note));
+  return wrap;
+}
+
+function list(className, items, render) {
+  const ul = el("ul", className);
+  for (const item of items) {
+    const li = el("li");
+    render(li, item);
+    ul.append(li);
+  }
+  return ul;
+}
+
+/* ---------------------------------------------------------------------- */
+/* T077 — the coverage statement                                          */
+/* ---------------------------------------------------------------------- */
+
+function renderCoverage(container, { coverage, sessions, basis }) {
+  // Whichever Houses carry questions, largest first. No House is named here:
+  // naming one would decide whose figures appear, and that is the drift the
+  // derived claim exists to remove.
+  const covered = coveredRows(coverage);
+  if (covered.length === 0) {
+    renderUnavailable(
+      container,
+      "The coverage statement carries no House with any published question.",
+    );
+    return;
+  }
+  const lok = covered[0];
+
+  const frag = document.createDocumentFragment();
+
+  /* --- Houses. The one claim the page must make loudly (FR-013).
+         DERIVED from which rows actually carry questions, never typed: if a
+         Rajya Sabha route is ever found, this changes by itself rather than
+         by someone remembering to edit a string. ------------------------- */
+  const houses = el("div", "houses");
+  houses.append(el("p", "houses-value", housesClaim(coverage)));
+  const absent = housesNotCovered(coverage);
+  if (absent.length > 0) {
+    houses.append(
+      el(
+        "p",
+        "houses-note",
+        `${absent.map((h) => h.name).join(", ")} is not covered by this dataset.`,
+      ),
+    );
+    for (const row of absent) {
+      if (row.reason) houses.append(el("p", "houses-why", `Why: ${row.reason}`));
+    }
+  }
+  frag.append(houses);
+
+  /* --- The figures. ---------------------------------------------------- */
+  const grid = el("div", "fact-grid");
+
+  const period = `${isoDate(lok.period_start)} – ${isoDate(lok.period_end)}`;
+  grid.append(
+    fact(
+      "Period covered",
+      period,
+      `${count(lok.sessions_covered_count)} sessions, listed below`,
+    ),
+  );
+
+  grid.append(
+    fact(
+      "Questions published",
+      count(lok.total_questions),
+      declaredDuplicates(lok),
+    ),
+  );
+
+  grid.append(
+    fact(
+      "Asking members identified, automatically",
+      percent(lok.resolution_rate_automatic),
+      `${count(lok.resolved_automatic)} of ${count(lok.total_questions)} questions. ` +
+        `Target ${percent(lok.sc_002_target, { decimals: 0 })} — ` +
+        (lok.sc_002_met_on_automatic_rate ? "met." : "NOT met on this figure."),
+    ),
+  );
+
+  grid.append(
+    fact(
+      "Identified, including maintainer corrections",
+      percent(lok.resolution_rate_including_assertions),
+      `${count(lok.resolved_including_assertions)} of ${count(lok.total_questions)}, ` +
+        `with ${count(lok.assertions_in_effect)} confirmed corrections ` +
+        `(${count(lok.assertions_overriding_an_automatic_match)} of which override an ` +
+        `automatic match). Target ${percent(lok.sc_002_target, { decimals: 0 })} — ` +
+        (lok.sc_002_met_on_published_rate ? "met." : "NOT met on this figure."),
+    ),
+  );
+
+  grid.append(
+    fact(
+      "Ministries",
+      count(lok.ministry_ids),
+      `from ${count(lok.ministry_names_observed)} distinct names in the source. ` +
+        `No confirmed rename mapping covers ${count(lok.ministry_names_without_confirmed_mapping)} ` +
+        `of those names, so UP TO ${count(lok.ministry_names_without_confirmed_mapping)} of them ` +
+        "could turn out to be renames of one another — the record does not claim that any of " +
+        "them is. A rename cannot be detected automatically here, so each one waits on a " +
+        "maintainer decision.",
+    ),
+  );
+
+  grid.append(
+    fact(
+      "Last rebuilt",
+      isoDate(lok.last_refreshed),
+      lok.last_known_good === "current"
+        ? "This is a current record."
+        : `This is the last known good record: ${stated(lok.last_known_good)}.`,
+    ),
+  );
+
+  frag.append(grid);
+
+  /* --- The counting basis, read at runtime, never retyped. ------------- */
+  const questionBasis = basis.find((row) => row.unit === "question");
+  if (questionBasis) {
+    const box = el("div", "basis");
+    box.append(el("p", "basis-head", "How these questions were counted"));
+    box.append(el("p", "basis-text", questionBasis.counting_basis));
+    box.append(
+      el(
+        "p",
+        "basis-src",
+        `Read from aggregates/counting-basis.jsonl, unit "${questionBasis.unit}", ` +
+          `basis version ${stated(questionBasis.basis_version)}. This page does not ` +
+          "keep its own copy of this text.",
+      ),
+    );
+    frag.append(box);
+  }
+
+  /* --- Sessions, ordered by (term, number). ---------------------------- */
+  for (const row of covered) {
+    frag.append(renderSessions(row, sessions));
+  }
+
+  /* --- Known gaps, verbatim. ------------------------------------------- */
+  const gaps = Array.isArray(lok.known_gaps) ? lok.known_gaps : [];
+  const gapBox = el("section", "gaps");
+  gapBox.append(el("h3", null, `Known gaps (${count(gaps.length)})`));
+  gapBox.append(
+    el(
+      "p",
+      "gaps-lede",
+      "Declared, not implied. Each is published in the record as written here.",
+    ),
+  );
+  if (gaps.length === 0) {
+    gapBox.append(el("p", "status", "The record declares no gaps."));
+  } else {
+    gapBox.append(list("gap-list", gaps, (li, gap) => {
+      li.textContent = String(gap);
+    }));
+  }
+  frag.append(gapBox);
+
+  /* --- Merged ministry names. The owner's condition on the fold: every
+         merged group is listed, so a merge can never be silent. ---------- */
+  const merged = Array.isArray(lok.ministry_name_groups_merged_by_normalisation)
+    ? lok.ministry_name_groups_merged_by_normalisation
+    : [];
+  const mergeBox = el("section", "merges");
+  mergeBox.append(el("h3", null, "Ministry names merged as spelling variants"));
+  if (merged.length === 0) {
+    mergeBox.append(el("p", "status", "No names were merged."));
+  } else {
+    mergeBox.append(
+      el(
+        "p",
+        "gaps-lede",
+        "These groups were treated as one ministry because normalising their " +
+          "spelling made them identical. No rename was assumed.",
+      ),
+    );
+    mergeBox.append(list("merge-list", merged, (li, group) => {
+      li.textContent = (Array.isArray(group) ? group : [group]).join("  ·  ");
+    }));
+  }
+  frag.append(mergeBox);
+
+  replaceChildren(container, frag);
+  container.dataset.state = "ready";
+}
+
+function declaredDuplicates(row) {
+  const dupes = Array.isArray(row.duplicate_records_declared)
+    ? row.duplicate_records_declared
+    : [];
+  if (dupes.length === 0) return "No duplicate source record was declared.";
+  return (
+    `${count(dupes.length)} record the source served more than once is kept ` +
+    `once, and declared: ${dupes.join(", ")}.`
+  );
+}
+
+function renderSessions(lok, sessions) {
+  const rows = sessionRows(lok, sessions);
+
+  /* (b) Twenty-one rows is a wall in front of the figures that matter, so the
+     table is COLLAPSED by default. What stays visible above it: the Houses
+     claim, the period, the question count, both identification rates and the
+     known-gaps list. A <details> needs no script and is keyboard-operable and
+     announced by screen readers for free. */
+  const box = el("details", "sessions");
+  const summary = el("summary");
+  summary.append(el("span", "summary-label", `${count(rows.length)} sessions`));
+  summary.append(
+    el("span", "summary-note", "ordered by term and session number · dates not stated"),
+  );
+  box.append(summary);
+
+  const zeroDay = rows.filter((row) => row.zeroSittingDays);
+  box.append(
+    el(
+      "p",
+      "gaps-lede",
+      "The published record carries no start or end date for any session, so every " +
+        `date below reads "${NOT_STATED}" — the page does not estimate one.`,
+    ),
+  );
+  if (zeroDay.length > 0) {
+    /* (c) A text flag, above the table as well as in it, so the reader meets
+       it whether or not they scan the rows. Never colour alone. */
+    box.append(
+      el(
+        "p",
+        "zero-days-note",
+        `${count(zeroDay.length)} session carries ${ZERO_SITTING_DAYS_FLAG}. ` +
+          "Any per-sitting-day figure for it reads n/a rather than dividing by zero.",
+      ),
+    );
+  }
+
+  const wrap = el("div", "table-wrap");
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", "Sessions covered, scrollable");
+  wrap.tabIndex = 0;
+
+  const table = el("table");
+  const thead = el("thead");
+  const hrow = el("tr");
+  for (const [text, cls] of [
+    ["Session", null],
+    ["Dates", null],
+    ["Sitting days", "num-col"],
+  ]) {
+    const th = el("th", cls, text);
+    th.scope = "col";
+    hrow.append(th);
+  }
+  thead.append(hrow);
+  table.append(thead);
+
+  const tbody = el("tbody");
+  for (const session of rows) {
+    const tr = el("tr");
+    const th = el("th", null, longSessionLabel(session));
+    th.scope = "row";
+    tr.append(th);
+
+    const start = isoDate(session.startDate);
+    const end = isoDate(session.endDate);
+    const dates =
+      start === NOT_STATED && end === NOT_STATED ? NOT_STATED : `${start} – ${end}`;
+    tr.append(el("td", dates === NOT_STATED ? "not-stated" : null, dates));
+
+    const cell = el("td", "num-col");
+    if (session.sittingDays === null) {
+      cell.classList.add("not-stated");
+      cell.textContent = NOT_STATED;
+    } else if (session.zeroSittingDays) {
+      cell.append(el("span", "zero-days-value", "0"));
+      cell.append(el("span", "zero-days-flag", ZERO_SITTING_DAYS_FLAG));
+    } else {
+      cell.textContent = count(session.sittingDays);
+    }
+    tr.append(cell);
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  wrap.append(table);
+  box.append(wrap);
+  return box;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Footer — licence, scope, source terms, corrections, attribution        */
+/* ---------------------------------------------------------------------- */
+
+function renderLicence(container, manifest) {
+  const frag = document.createDocumentFragment();
+  const box = el("div", "licence");
+
+  box.append(el("p", "licence-head", "Licence"));
+  box.append(
+    el(
+      "p",
+      "licence-id",
+      `Added work: ${stated(manifest.license)}`,
+    ),
+  );
+  box.append(el("p", "licence-scope", stated(manifest.license_scope)));
+
+  // The source-terms disclosure sits directly under the licence scope: the
+  // scope says what IS licensed, and this says what was never determined. A
+  // reader who stops after the grant has read half of it.
+  box.append(renderDisclosure(container.ownerDocument, manifest));
+
+  box.append(el("p", "licence-head", "How to attribute this data"));
+  const quote = el("blockquote", "attribution");
+  quote.append(el("p", null, stated(manifest.attribution)));
+  box.append(quote);
+
+  const links = el("ul", "licence-links");
+  if (!isMissing(manifest.license_file)) {
+    const li = el("li");
+    const a = el("a", null, manifest.license_file);
+    // Relative: the licence file sits at the root of the published branch
+    // beside this page, copied there by the refresh workflow.
+    a.href = `./${manifest.license_file}`;
+    li.append(a);
+    li.append(el("span", "licence-links-note", " — the full dataset licence"));
+    links.append(li);
+  }
+  if (!isMissing(manifest.project_url)) {
+    const li = el("li");
+    // The ONE outbound link on the page. A link is not a request: nothing is
+    // fetched from it unless a reader clicks.
+    const a = el("a", null, manifest.project_url);
+    a.href = manifest.project_url;
+    // (d) The one link that leaves this host. New tab, and `noopener` so the
+    // opened page gets no handle on this one; `noreferrer` so it is not told
+    // where the reader came from.
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    li.append(a);
+    li.append(el("span", "licence-links-note", " (opens in a new tab)"));
+    li.append(el("span", "licence-links-note", " — the project"));
+    links.append(li);
+  }
+  box.append(links);
+
+  box.append(
+    el(
+      "p",
+      "licence-src",
+      `Read at runtime from manifest.json, rebuilt ${isoDate(manifest.last_refreshed)}. ` +
+        "None of the above is written into this page.",
+    ),
+  );
+
+  frag.append(box);
+  replaceChildren(container, frag);
+  container.dataset.state = "ready";
+}
+
+/* ---------------------------------------------------------------------- */
+/* Failure — quiet for the visitor, specific enough to act on (FR-010)    */
+/* ---------------------------------------------------------------------- */
+
+function renderUnavailable(container, message, detail) {
+  const box = el("div", "unavailable");
+  box.append(el("p", "unavailable-head", "This could not be read"));
+  box.append(el("p", null, message));
+  if (detail) box.append(el("p", "unavailable-detail", detail));
+  box.append(
+    el(
+      "p",
+      "unavailable-note",
+      "Nothing above is estimated or filled in. The published files are still " +
+        "downloadable directly.",
+    ),
+  );
+  replaceChildren(container, box);
+  container.dataset.state = "error";
+}
+
+/* ---------------------------------------------------------------------- */
+/* Boot                                                                   */
+/* ---------------------------------------------------------------------- */
+
+export async function boot(doc = document) {
+  const coverageBody = doc.getElementById("coverage-body");
+  const licenceBody = doc.getElementById("licence-body");
+
+  // NO search file -- index, asker names or digest -- may have been touched by
+  // anything above. This is an assertion about the page, not a decision: if it
+  // is ever false, a visitor who never searches is paying 2.37 MiB plus a
+  // digest and T019's budget is wrong. The broader `searchAssetsRequested`
+  // rather than `searchIndexRequested`, because a digest fetched at boot would
+  // pass the narrower check.
+  if (searchAssetsRequested()) {
+    throw new Error("a search file was requested during boot; all of them must be lazy");
+  }
+  /* The same assertion for T088's two files and for any by-member file.
+   * Owner decision 2026-10-10: "Nothing for this view loads on page load." */
+  if (seatAssetsRequested()) {
+    throw new Error("a seat file was requested during boot; all of them must be lazy");
+  }
+
+  const results = await Promise.allSettled([
+    fetchCoverage(),
+    fetchSessions(),
+    fetchCountingBasis(),
+    fetchManifest(),
+  ]);
+  const [coverage, sessions, basis, manifest] = results;
+
+  if (coverage.status === "fulfilled") {
+    try {
+      renderCoverage(coverageBody, {
+        coverage: coverage.value,
+        sessions: sessions.status === "fulfilled" ? sessions.value : [],
+        basis: basis.status === "fulfilled" ? basis.value : [],
+      });
+    } catch (error) {
+      renderUnavailable(
+        coverageBody,
+        "The coverage statement was read but could not be displayed.",
+        String(error && error.message),
+      );
+    }
+  } else {
+    renderUnavailable(
+      coverageBody,
+      "The coverage statement could not be read from the published files.",
+      describe(coverage.reason),
+    );
+  }
+
+  if (basis.status === "fulfilled") views.basis = basis.value;
+
+  if (manifest.status === "fulfilled") {
+    renderLicence(licenceBody, manifest.value);
+  } else {
+    renderUnavailable(
+      licenceBody,
+      "The licence could not be read from the published manifest.",
+      describe(manifest.reason),
+    );
+  }
+
+  await bootViews(doc);
+}
+
+function describe(error) {
+  if (!error) return "";
+  if (error instanceof CrossOriginRefused) {
+    return `${error.name}: ${error.message}`;
+  }
+  return `${error.name || "Error"}: ${error.message || String(error)}`;
+}
+
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      boot();
+    });
+  } else {
+    boot();
+  }
+}
+
+/* ====================================================================== */
+/* T078 — ministry profile, and T080 — two-ministry comparison            */
+/* ====================================================================== */
+
+/** Everything the two views read. Fetched once, shared. */
+const views = {
+  rows: [],
+  ministries: [],
+  /** The FULL ministry reference, by id. T079 resolves a result's
+   * `ministry_id` through this: a question can be put to a ministry that has
+   * no row in the profile aggregate for the selected span. */
+  ministryNames: new Map(),
+  sessions: [],
+  basis: [],
+  ready: false,
+};
+
+function option(value, label, selected) {
+  const node = el("option", null, label);
+  node.value = value;
+  if (selected) node.selected = true;
+  return node;
+}
+
+function labelledSelect(id, labelText, options, selectedValue) {
+  const wrap = el("label", "field");
+  wrap.htmlFor = id;
+  wrap.append(el("span", "field-label", labelText));
+  const select = el("select");
+  select.id = id;
+  select.name = id;
+  for (const [value, text] of options) {
+    select.append(option(value, text, value === selectedValue));
+  }
+  wrap.append(select);
+  return { wrap, select };
+}
+
+/** The counting basis, read from the published file and rendered beside the
+ * figures. Never retyped: `basisFor` looks it up by the unit the rows name. */
+function basisBlock(span, { head = "How these figures were counted" } = {}) {
+  const record = basisFor(span, views.basis);
+  const box = el("div", "basis");
+  box.append(el("p", "basis-head", head));
+  if (!record) {
+    box.append(
+      el("p", "basis-text", "The counting basis could not be read from the published files."),
+    );
+    return box;
+  }
+  box.append(el("p", "basis-text", record.counting_basis));
+  box.append(
+    el(
+      "p",
+      "basis-src",
+      `Read from aggregates/counting-basis.jsonl, unit "${record.unit}", ` +
+        `basis version ${stated(record.basis_version)}.`,
+    ),
+  );
+  return box;
+}
+
+function changeText(c) {
+  if (!c) return NOT_STATED;
+  const sign = c.absolute > 0 ? "+" : "";
+  const abs = `${sign}${count(c.absolute)}`;
+  if (c.percent === null) {
+    // A percent change from zero is undefined, not infinite and not 100%.
+    return `${abs} (no percentage: the first session was zero)`;
+  }
+  const pSign = c.percent > 0 ? "+" : "";
+  return `${abs} (${pSign}${c.percent.toFixed(1)}%)`;
+}
+
+function statusStrip(totals, { heading }) {
+  const box = el("div", "status-strip");
+  box.append(el("p", "strip-head", heading));
+  const ul = el("ul", "status-list");
+  for (const field of STATUS_FIELDS) {
+    const value = totals.status[field.key];
+    const li = el("li", field.flagged ? "status-item flagged" : "status-item");
+    if (field.flagged) {
+      // The flag is a WORD, not a colour. Removing every colour from this
+      // page leaves the meaning intact.
+      li.append(el("span", "flag-word", "flagged"));
+    }
+    li.append(el("span", "status-label", field.label));
+    li.append(el("span", "status-value", count(value)));
+    const pct = share(value, totals.questions);
+    li.append(el("span", "status-share", pct === null ? NOT_STATED : `${pct.toFixed(1)}%`));
+    ul.append(li);
+  }
+  box.append(ul);
+  box.append(
+    el(
+      "p",
+      "strip-note",
+      `These four account for all ${count(totals.questions)} questions — they are a ` +
+        "split of the same total, not a subset of it. A question whose asking members " +
+        "were not all identified is counted in every figure here and flagged, never " +
+        "filtered out.",
+    ),
+  );
+  return box;
+}
+
+function mixTable(span, types, totals) {
+  const section = el("section", "mix-block");
+  section.append(el("h4", null, "Question type mix, by session"));
+  section.append(
+    el(
+      "p",
+      "helper",
+      "ALL questions, whether or not the asking member was identified. The " +
+        "ministry and the question type are read off the question record, not " +
+        "off resolution — so this is not a resolved-only figure. Session dates " +
+        "are not stated in the published record.",
+    ),
+  );
+
+  const wrap = el("div", "table-wrap");
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", "Questions per session by type, scrollable");
+  wrap.tabIndex = 0;
+  const table = el("table");
+  // The caption stays SHORT. It lives inside the table, and the table lives
+  // inside a horizontal scroller -- so a long caption is 974 px wide at a
+  // 390 px viewport and a reader has to scroll sideways to read prose. The
+  // long description is the page-width paragraph above, which wraps.
+  const caption = el("caption", "table-caption");
+  caption.textContent = "Questions per session, by type and by link status";
+  table.append(caption);
+
+  const thead = el("thead");
+  const hrow = el("tr");
+  const headings = ["Session", "Questions", ...types];
+  for (const field of STATUS_FIELDS) headings.push(field.label);
+  for (const text of headings) {
+    const th = el("th", text === "Session" ? null : "num-col", text);
+    th.scope = "col";
+    hrow.append(th);
+  }
+  thead.append(hrow);
+  table.append(thead);
+
+  const tbody = el("tbody");
+  for (const entry of span) {
+    const tr = el("tr");
+    const th = el("th", null, longSessionLabel(entry.session));
+    th.scope = "row";
+    tr.append(th);
+    tr.append(el("td", "num-col", count(entry.questions)));
+    for (const type of types) tr.append(el("td", "num-col", count(entry.typeMix[type] ?? 0)));
+    for (const field of STATUS_FIELDS) {
+      tr.append(
+        el("td", field.flagged ? "num-col td-flag" : "num-col", count(entry.status[field.key])),
+      );
+    }
+    if (!entry.present) {
+      tr.classList.add("row-absent");
+      th.append(el("span", "row-absent-note", "no questions in the record"));
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+
+  const tfoot = el("tfoot");
+  const frow = el("tr");
+  const fth = el("th", null, "Total");
+  fth.scope = "row";
+  frow.append(fth);
+  frow.append(el("td", "num-col", count(totals.questions)));
+  for (const type of types) frow.append(el("td", "num-col", count(totals.typeMix[type] ?? 0)));
+  for (const field of STATUS_FIELDS) {
+    frow.append(
+      el("td", field.flagged ? "num-col td-flag" : "num-col", count(totals.status[field.key])),
+    );
+  }
+  tfoot.append(frow);
+  table.append(tfoot);
+
+  wrap.append(table);
+  section.append(wrap);
+  section.append(
+    el(
+      "p",
+      "footnote",
+      '"Partly linked": at least one asking member was identified and at least one was ' +
+        'not. "Not linked": none were. "Ambiguous": the name matched more than one ' +
+        "member and the page will not guess. All three are still counted as questions " +
+        "in every column to their left.",
+    ),
+  );
+  return section;
+}
+
+function renderProfileResult(container, { ministry, span }) {
+  const totals = spanTotals(span);
+  const delta = spanChange(span);
+  const types = [...new Set(span.flatMap((e) => Object.keys(e.typeMix)))].sort();
+
+  const frag = document.createDocumentFragment();
+
+  const head = el("div", "result-head");
+  head.append(el("h3", null, ministry.name));
+  head.append(
+    el(
+      "p",
+      "result-span",
+      `${longSessionLabel(span[0].session)} to ${longSessionLabel(span[span.length - 1].session)}` +
+        ` · ${count(span.length)} sessions · session dates are ${NOT_STATED}`,
+    ),
+  );
+  if (ministry.formerNames.length > 0) {
+    // Rename DATES are not published. Showing "(renamed 2021)" would be a
+    // claim the record does not support.
+    head.append(
+      el(
+        "p",
+        "former-names",
+        `Formerly: ${ministry.formerNames.join("; ")}. Questions under every name ` +
+          "above are counted together. The record does not publish when a rename " +
+          `happened, so no date is shown — it is ${NOT_STATED}.`,
+      ),
+    );
+  }
+  frag.append(head);
+
+  const stats = el("div", "fact-grid");
+  stats.append(
+    fact("Questions asked", count(totals.questions), `across ${count(span.length)} sessions`),
+  );
+  for (const type of types) {
+    const pct = share(totals.typeMix[type] ?? 0, totals.questions);
+    stats.append(
+      fact(
+        `${type.charAt(0)}${type.slice(1).toLowerCase()} share`,
+        pct === null ? NOT_STATED : `${pct.toFixed(1)}%`,
+        `${count(totals.typeMix[type] ?? 0)} of ${count(totals.questions)} questions`,
+      ),
+    );
+  }
+  stats.append(
+    fact(
+      "Not fully linked to a member",
+      count(totals.flagged),
+      "counted in every figure on this page, never filtered out",
+    ),
+  );
+  frag.append(stats);
+
+  /* How both changed across the span: first selected session vs last. */
+  const changeBox = el("section", "change-block");
+  changeBox.append(el("h4", null, "How this changed across the span"));
+  if (delta.singleSession) {
+    changeBox.append(
+      el("p", "helper", "One session is selected, so there is nothing to compare it with."),
+    );
+  } else {
+    changeBox.append(
+      el(
+        "p",
+        "helper",
+        `First selected session (${longSessionLabel(delta.firstSession)}) against last ` +
+          `(${longSessionLabel(delta.lastSession)}).`,
+      ),
+    );
+    const ul = el("ul", "change-list");
+    const q = el("li");
+    q.append(el("span", "change-label", "Questions"));
+    q.append(el("span", "change-value", changeText(delta.questions)));
+    q.append(
+      el("span", "change-from", `${count(delta.questions.first)} → ${count(delta.questions.last)}`),
+    );
+    ul.append(q);
+    for (const entry of delta.byType) {
+      const li = el("li");
+      li.append(el("span", "change-label", entry.type));
+      li.append(el("span", "change-value", changeText(entry.count)));
+      const sf = entry.shareFirst === null ? NOT_STATED : `${entry.shareFirst.toFixed(1)}%`;
+      const sl = entry.shareLast === null ? NOT_STATED : `${entry.shareLast.toFixed(1)}%`;
+      li.append(el("span", "change-from", `share ${sf} → ${sl}`));
+      ul.append(li);
+    }
+    changeBox.append(ul);
+  }
+  frag.append(changeBox);
+
+  frag.append(statusStrip(totals, { heading: "How completely each question is linked to a member" }));
+  frag.append(basisBlock(span));
+
+  if (types.length > 0 && totals.questions > 0) {
+    const chartBox = el("section", "chart-block");
+    chartBox.append(el("h4", null, "Questions per session, by type"));
+    chartBox.append(legend(types));
+    chartBox.append(
+      stackedColumns(
+        span.map((entry) => ({
+          label: `S${entry.session.number}`,
+          total: entry.questions,
+          parts: entry.typeMix,
+        })),
+        types,
+        {
+          title: `Questions per session for ${ministry.name}, by question type`,
+          description:
+            "A stacked column per session. The same figures are given in the table below.",
+        },
+      ),
+    );
+    frag.append(chartBox);
+  }
+
+  frag.append(mixTable(span, types, totals));
+  replaceChildren(container, frag);
+  container.dataset.state = "ready";
+}
+
+function renderCompareResult(container, { ministries, result }) {
+  const frag = document.createDocumentFragment();
+  const [left, right] = result.sides;
+  const names = new Map(ministries.map((m) => [m.ministryId, m.name]));
+  const span = left.span;
+
+  frag.append(
+    el(
+      "p",
+      "helper",
+      `${longSessionLabel(span[0].session)} to ${longSessionLabel(span[span.length - 1].session)}` +
+        ` · ${count(span.length)} sessions · the same span and the same counting basis for both.`,
+    ),
+  );
+
+  const rows = [
+    ["Questions asked", (side) => count(side.totals.questions)],
+    ...result.types.map((type) => [
+      `${type} share`,
+      (side) => {
+        const pct = share(side.totals.typeMix[type] ?? 0, side.totals.questions);
+        return pct === null ? NOT_STATED : `${pct.toFixed(1)}% (${count(side.totals.typeMix[type] ?? 0)})`;
+      },
+    ]),
+    ...STATUS_FIELDS.map((field) => [
+      field.label,
+      (side) => count(side.totals.status[field.key]),
+      field.flagged,
+    ]),
+    [
+      "Change across the span",
+      (side) => (side.change.singleSession ? NOT_STATED : changeText(side.change.questions)),
+    ],
+  ];
+
+  /* The table, for a wide screen -- inside its own scroll container. */
+  const wrap = el("div", "table-wrap");
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", "Two-ministry comparison, scrollable");
+  wrap.tabIndex = 0;
+  const table = el("table", "table-compare");
+  const thead = el("thead");
+  const hrow = el("tr");
+  for (const text of ["Figure", names.get(left.ministryId), names.get(right.ministryId)]) {
+    const th = el("th", null, text);
+    th.scope = "col";
+    hrow.append(th);
+  }
+  thead.append(hrow);
+  table.append(thead);
+  const tbody = el("tbody");
+  for (const [label, render, flagged] of rows) {
+    const tr = el("tr", flagged ? "tr-flag" : null);
+    const th = el("th", null, label);
+    th.scope = "row";
+    if (flagged) th.append(el("span", "flag-word", "flagged"));
+    tr.append(th);
+    tr.append(el("td", "num-col", render(left)));
+    tr.append(el("td", "num-col", render(right)));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  wrap.append(table);
+  frag.append(wrap);
+
+  /* The same totals as cards, for a phone. Identical numbers by construction:
+   * both forms render from the same `rows` list. */
+  const cards = el("ul", "compare-cards");
+  for (const side of result.sides) {
+    const li = el("li", "card");
+    li.append(el("p", "cc-name", names.get(side.ministryId)));
+    const dl = el("dl", "cc-list");
+    for (const [label, render, flagged] of rows) {
+      const dt = el("dt", flagged ? "flagged" : null, label);
+      if (flagged) dt.append(el("span", "flag-word", "flagged"));
+      dl.append(dt);
+      dl.append(el("dd", null, render(side)));
+    }
+    li.append(dl);
+    cards.append(li);
+  }
+  frag.append(cards);
+
+  frag.append(
+    basisBlock(span, { head: "The counting basis used for BOTH columns" }),
+  );
+  replaceChildren(container, frag);
+  container.dataset.state = "ready";
+}
+
+/* ---------------------------------------------------------------------- */
+/* Pickers and wiring                                                     */
+/* ---------------------------------------------------------------------- */
+
+function sessionOptions() {
+  return views.sessions.map((s) => [s.sessionId, longSessionLabel(s)]);
+}
+
+function ministryOptions() {
+  return views.ministries.map((m) => [m.ministryId, m.name]);
+}
+
+function buildProfileView(doc) {
+  const picker = doc.getElementById("profile-picker");
+  const result = doc.getElementById("profile-result");
+  if (!picker || !result) return;
+
+  const sessions = sessionOptions();
+  const ministries = ministryOptions();
+  const first = sessions[0]?.[0];
+  const last = sessions[sessions.length - 1]?.[0];
+
+  const ministry = labelledSelect("profile-ministry", "Ministry", ministries, ministries[0]?.[0]);
+  const from = labelledSelect("profile-from", "From session", sessions, first);
+  const to = labelledSelect("profile-to", "To session", sessions, last);
+
+  const form = el("div", "picker");
+  form.append(ministry.wrap, from.wrap, to.wrap);
+  replaceChildren(picker, form);
+  // (d) A pre-selection is a choice the page made, not one the reader made.
+  // Say so, or the first ministry reads as a recommendation.
+  picker.append(
+    el(
+      "p",
+      "picker-note",
+      "A ministry is pre-selected so the view has something to show: it is the " +
+        "first of " +
+        `${count(ministries.length)} by name, and the span is every published session. ` +
+        "It is not a recommendation and nothing is ranked. Change any of the three above.",
+    ),
+  );
+
+  const draw = () => {
+    const chosen = views.ministries.find((m) => m.ministryId === ministry.select.value);
+    const span = selectSpan(views.rows, {
+      ministryId: ministry.select.value,
+      fromSession: from.select.value,
+      toSession: to.select.value,
+      allSessions: views.sessions,
+    });
+    if (span.length === 0) {
+      renderUnavailable(result, "That span contains no session.");
+      return;
+    }
+    try {
+      renderProfileResult(result, { ministry: chosen, span });
+    } catch (error) {
+      // A status split that does not account for every question is a data
+      // fault, not a rendering preference. Say so rather than show it.
+      renderUnavailable(result, "These figures did not add up and were not shown.", describe(error));
+    }
+  };
+
+  for (const select of [ministry.select, from.select, to.select]) {
+    select.addEventListener("change", draw);
+  }
+  draw();
+}
+
+function buildCompareView(doc) {
+  const picker = doc.getElementById("compare-picker");
+  const result = doc.getElementById("compare-result");
+  if (!picker || !result) return;
+
+  const sessions = sessionOptions();
+  const ministries = ministryOptions();
+  const first = sessions[0]?.[0];
+  const last = sessions[sessions.length - 1]?.[0];
+
+  // (d) No pre-selection here: a comparison the page chose would put two
+  // ministries side by side as though someone had asked the question.
+  const NONE = "";
+  const choices = [[NONE, "Choose a ministry…"], ...ministries];
+  const a = labelledSelect("compare-a", "First ministry", choices, NONE);
+  const b = labelledSelect("compare-b", "Second ministry", choices, NONE);
+  const from = labelledSelect("compare-from", "From session", sessions, first);
+  const to = labelledSelect("compare-to", "To session", sessions, last);
+
+  const form = el("div", "picker");
+  form.append(a.wrap, b.wrap, from.wrap, to.wrap);
+  replaceChildren(picker, form);
+  picker.append(
+    el(
+      "p",
+      "picker-note",
+      "Choose two ministries to compare. Nothing is pre-selected: a pair the page " +
+        "picked would read as a comparison someone had asked for.",
+    ),
+  );
+
+  const draw = () => {
+    if (!a.select.value || !b.select.value) {
+      const waiting = el("p", "status", "Choose two ministries above to compare them.");
+      replaceChildren(result, waiting);
+      result.dataset.state = "empty";
+      return;
+    }
+    if (a.select.value === b.select.value) {
+      replaceChildren(
+        result,
+        el("p", "status", "Those are the same ministry. Choose a different second one."),
+      );
+      result.dataset.state = "empty";
+      return;
+    }
+    try {
+      const comparison = compare(views.rows, {
+        ministryIds: [a.select.value, b.select.value],
+        fromSession: from.select.value,
+        toSession: to.select.value,
+        allSessions: views.sessions,
+      });
+      if (comparison.sides[0].span.length === 0) {
+        renderUnavailable(result, "That span contains no session.");
+        return;
+      }
+      renderCompareResult(result, { ministries: views.ministries, result: comparison });
+    } catch (error) {
+      renderUnavailable(result, "These figures did not add up and were not shown.", describe(error));
+    }
+  };
+
+  for (const select of [a.select, b.select, from.select, to.select]) {
+    select.addEventListener("change", draw);
+  }
+  draw();
+}
+
+async function bootViews(doc) {
+  const profileResult = doc.getElementById("profile-result");
+  const compareResult = doc.getElementById("compare-result");
+  const [rows, ministries] = await Promise.allSettled([
+    fetchMinistryProfile(),
+    fetchMinistries(),
+  ]);
+
+  if (ministries.status === "fulfilled") {
+    views.ministryNames = new Map(ministries.value.map((m) => [m.ministry_id, m]));
+  }
+
+  // Search does not read the ministry-profile aggregate, so it is built
+  // whether or not that fetch succeeded. A view that works should not be
+  // taken off the page by another view's failed download. The same goes for
+  // T088's state and constituency view, which reads neither of the two files
+  // above -- and which fetches NOTHING here: it only renders its open button.
+  buildSearchView(doc);
+  buildConstituencyView(doc);
+
+  if (rows.status !== "fulfilled") {
+    for (const node of [profileResult, compareResult]) {
+      if (node) {
+        renderUnavailable(
+          node,
+          "The ministry profile could not be read from the published files.",
+          describe(rows.reason),
+        );
+      }
+    }
+    return;
+  }
+
+  views.rows = rows.value;
+  views.sessions = profileSessions(views.rows);
+  // `views.ministryNames` is already set above, before the early return.
+  views.ministries = profileMinistries(
+    views.rows,
+    ministries.status === "fulfilled" ? ministries.value : [],
+  );
+  views.ready = true;
+
+  buildProfileView(doc);
+  buildCompareView(doc);
+}
+
+/* ====================================================================== */
+/* T079 — subject search                                                  */
+/* ====================================================================== */
+
+/* THE ORDER, the AND rule and the no-ranking rule all live in
+ * `lib/search.js`; this file renders what that returns and adds nothing of
+ * its own. In particular:
+ *
+ *   - ORDER_STATEMENT is RENDERED, not retyped, so the sentence on screen
+ *     cannot describe an order the code does not implement.
+ *   - the status label comes from `statusField()`, which reads the ministry
+ *     profile's own STATUS_FIELDS list -- one vocabulary, two views.
+ *   - no result carries a position, a score or a grade, and neither of the
+ *     two match labels the owner prohibited appears anywhere -- they are not
+ *     spelled out here either, for the reason recorded in `lib/search.js`.
+ *
+ * Everything from a published file goes in through `textContent`. A subject
+ * line is upstream text this project does not control.
+ */
+
+/** Everything the search view holds between queries. */
+const search = {
+  index: null,
+  names: null,
+  /** The in-flight or finished result set for the current query. */
+  set: null,
+  plan: null,
+  busy: false,
+};
+
+/** A one-line politely-announced summary, and the node a screen reader reads. */
+function searchStatusLine(text) {
+  const node = el("p", "search-status", text);
+  return node;
+}
+
+function ministryNameFor(ministryId) {
+  if (isMissing(ministryId)) return { text: NOT_STATED, flagged: true };
+  const record = views.ministryNames.get(ministryId);
+  if (!record) {
+    // An id the reference set does not carry. Shown AS TEXT with a flag --
+    // never silently blank, and never guessed at from the slug.
+    return { text: String(ministryId), flagged: true };
+  }
+  return { text: record.canonical_name ?? String(ministryId), flagged: false };
+}
+
+/** One result. A list item, so the count is in the accessibility tree. */
+function resultItem(record, position) {
+  const li = el("li", "result");
+
+  const head = el("div", "result-top");
+  // tabindex -1 so "Show 25 more" can move focus here without adding a tab
+  // stop for a reader who is not using that button.
+  const subject = el("h4", "result-subject");
+  subject.tabIndex = -1;
+  subject.id = `result-${position}`;
+  if (isMissing(record.subject)) {
+    subject.textContent = NOT_STATED;
+    subject.classList.add("result-subject-missing");
+  } else {
+    subject.textContent = record.subject;
+  }
+  head.append(subject);
+  li.append(head);
+
+  const meta = el("dl", "result-meta");
+  const pair = (label, value, className) => {
+    meta.append(el("dt", null, label));
+    meta.append(el("dd", className, value));
+  };
+
+  pair("Question", record.questionId, "result-id");
+  pair("Date", isoDate(record.date));
+  const ministry = ministryNameFor(record.ministry_id);
+  meta.append(el("dt", null, "Ministry"));
+  const ministryDd = el("dd", ministry.flagged ? "flagged" : null, ministry.text);
+  if (ministry.flagged) {
+    ministryDd.append(el("span", "flag-word", "flagged"));
+    ministryDd.append(
+      el(
+        "span",
+        "result-flag-why",
+        "this ministry id is not in the published ministry reference set",
+      ),
+    );
+  }
+  meta.append(ministryDd);
+
+  /* Link status, in the SAME WORDS as the ministry profile's status strip:
+   * `statusField` reads that view's own list. */
+  const bucket = questionBucket(record);
+  const field = statusField(bucket);
+  meta.append(el("dt", null, "Link status"));
+  const statusDd = el("dd", field && field.flagged ? "flagged" : null);
+  statusDd.append(el("span", "result-status", field ? field.label : NOT_STATED));
+  if (field && field.flagged) {
+    // A WORD, never colour alone.
+    statusDd.append(el("span", "flag-word", "flagged"));
+  }
+  meta.append(statusDd);
+
+  /* Askers. The identified ones are named; an id the name lookup does not
+   * carry is shown AS THE ID with a flag, because dropping it would make a
+   * co-asked question look as though fewer people asked it. */
+  const { identified, unknownIds } = askersFor(record, search.names);
+  meta.append(el("dt", null, identified.length === 1 ? "Asked by" : "Asked by"));
+  const askersDd = el("dd", "result-askers");
+  if (identified.length === 0 && unknownIds.length === 0) {
+    askersDd.append(el("span", "result-no-asker", "no asking member is identified"));
+  } else {
+    const ul = el("ul", "asker-list");
+    for (const member of identified) {
+      const item = el("li");
+      item.append(el("span", "asker-name", stated(member.canonical_name)));
+      item.append(el("span", "asker-party", stated(member.party)));
+      ul.append(item);
+    }
+    for (const memberId of unknownIds) {
+      const item = el("li", "asker-unknown");
+      item.append(el("span", "asker-name", memberId));
+      item.append(el("span", "flag-word", "flagged"));
+      item.append(
+        el("span", "result-flag-why", "this member id is not in the published asker names"),
+      );
+      ul.append(item);
+    }
+    askersDd.append(ul);
+  }
+  meta.append(askersDd);
+
+  li.append(meta);
+
+  /* The two flags that are about the RECORD rather than about one field. */
+  if (field && field.key === "partly_linked") {
+    li.append(
+      el(
+        "p",
+        "result-flag",
+        "Some of this question's asking members were not identified. The ones above " +
+          "are those that were; the question is counted in full and is not filtered " +
+          "out of this list.",
+      ),
+    );
+  }
+  if (record.notInDigest) {
+    li.append(
+      el(
+        "p",
+        "result-flag",
+        "The search index matched this question but the published search digest for " +
+          "its session does not carry it, so there is nothing here to show but the " +
+          "id. Two published files disagree; it is listed rather than dropped so the " +
+          "count above still accounts for it.",
+      ),
+    );
+  }
+  return li;
+}
+
+function ignoredBlock(plan) {
+  if (plan.ignored.length === 0) return null;
+  const box = el("div", "ignored");
+  box.append(
+    el(
+      "p",
+      "ignored-head",
+      `Ignored: ${plan.ignored.map((i) => i.word).join(", ")}`,
+    ),
+  );
+  box.append(
+    el(
+      "p",
+      "ignored-note",
+      "The index stores a subject's words the same way this box reads your query: " +
+        "lowercased, split on anything that is not a letter or a digit, and with " +
+        "words under three characters and 36 very common words left out. These were " +
+        "left out of the search, not searched for and missed.",
+    ),
+  );
+  box.append(
+    list("ignored-list", plan.ignored, (li, entry) => {
+      li.append(el("span", "ignored-word", entry.word));
+      li.append(el("span", "ignored-why", entry.reason));
+    }),
+  );
+  return box;
+}
+
+function searchOrderNote() {
+  const box = el("div", "order-note");
+  box.append(el("p", "order-head", "The order these are listed in"));
+  // RENDERED from lib/search.js, never retyped here: the sentence on screen
+  // and the comparator are then one thing.
+  box.append(el("p", "order-text", ORDER_STATEMENT));
+  return box;
+}
+
+function renderSearchEmpty(container, plan) {
+  const frag = document.createDocumentFragment();
+  if (plan.blank) {
+    frag.append(searchStatusLine("Type a word or two above and press Search."));
+  } else if (plan.noLetters) {
+    frag.append(
+      searchStatusLine(
+        "That query has no letters or digits in it, so there is nothing to look up.",
+      ),
+    );
+  } else if (plan.emptyQuery) {
+    frag.append(
+      searchStatusLine(
+        "Every word in that query is one the index does not store, so there is " +
+          "nothing left to look up.",
+      ),
+    );
+    const ignored = ignoredBlock(plan);
+    if (ignored) frag.append(ignored);
+  } else if (plan.missingWords.length > 0) {
+    // The NAMED reason for zero results. "No results" alone tells a visitor
+    // nothing about what to do next.
+    const words = plan.missingWords.map((w) => `"${w}"`).join(" and ");
+    frag.append(
+      searchStatusLine(
+        `No questions match. ${words} ${plan.missingWords.length === 1 ? "does" : "do"} ` +
+          "not appear in any published subject line, so no question could match " +
+          "whatever else you searched for.",
+      ),
+    );
+    const ignored = ignoredBlock(plan);
+    if (ignored) frag.append(ignored);
+  } else {
+    frag.append(
+      searchStatusLine(
+        `No questions match. Every word you searched for appears in some subject, ` +
+          `but no single subject carries all ${plan.words.length} of them — this ` +
+          "search requires every word, not any.",
+      ),
+    );
+    const ignored = ignoredBlock(plan);
+    if (ignored) frag.append(ignored);
+  }
+  replaceChildren(container, frag);
+  container.dataset.state = "empty";
+}
+
+/** The summary line. The total comes from the INDEX, before any digest. */
+function searchSummary(page, plan) {
+  const box = el("div", "search-summary");
+  box.append(
+    el(
+      "p",
+      "search-count",
+      `${count(page.shown)} of ${count(page.total)} matching questions shown`,
+    ),
+  );
+  box.append(
+    el(
+      "p",
+      "search-count-note",
+      `The total is counted in the published index itself, before any question ` +
+        `record is fetched. Searched for: ${plan.words.join(" + ")} — every word ` +
+        "must appear in the subject.",
+    ),
+  );
+  return box;
+}
+
+function renderSearchResults(container, { page, plan, focusFrom }) {
+  const frag = document.createDocumentFragment();
+  frag.append(searchSummary(page, plan));
+  const ignored = ignoredBlock(plan);
+  if (ignored) frag.append(ignored);
+  frag.append(searchOrderNote());
+
+  const ul = el("ol", "result-list");
+  page.results.forEach((record, position) => {
+    ul.append(resultItem(record, position));
+  });
+  frag.append(ul);
+
+  if (!page.done) {
+    const more = el("button", "show-more");
+    more.type = "button";
+    const remaining = page.total - page.shown;
+    more.textContent = `Show ${Math.min(PAGE_SIZE, remaining)} more`;
+    more.addEventListener("click", () => {
+      void showMore(container);
+    });
+    frag.append(more);
+    frag.append(
+      el(
+        "p",
+        "show-more-note",
+        `${count(remaining)} more match. Each session's records are fetched only ` +
+          "when a page of results needs them, and only for sessions that contain a " +
+          "match — so this button may fetch one file, or none at all if the next " +
+          "results are in a session already read.",
+      ),
+    );
+  } else if (page.total > 0) {
+    frag.append(el("p", "show-more-note", "That is every matching question."));
+  }
+
+  replaceChildren(container, frag);
+  container.dataset.state = "ready";
+
+  /* Focus after "Show 25 more": the first NEWLY added result, so a keyboard
+   * or screen-reader user lands where the new content starts rather than at
+   * the top of the page or on a button that has moved. On the first page
+   * nothing is moved -- focus stays in the search box where the reader put
+   * it. */
+  if (typeof focusFrom === "number" && focusFrom > 0) {
+    const target = container.querySelector(`#result-${focusFrom}`);
+    if (target) target.focus();
+  }
+}
+
+/** The error a failed digest produces, shown BESIDE results already on screen
+ * rather than instead of them. */
+function searchDigestError(container, error, { keepResults }) {
+  const box = el("div", "unavailable");
+  box.append(el("p", "unavailable-head", "Some of these results could not be read"));
+  box.append(
+    el(
+      "p",
+      null,
+      "The published records for one session did not load, so the questions in it " +
+        "are not listed below.",
+    ),
+  );
+  box.append(el("p", "unavailable-detail", describe(error)));
+  box.append(
+    el(
+      "p",
+      "unavailable-note",
+      "Nothing above is estimated or filled in, and the list is not silently short: " +
+        "the count says how many questions match. Searching again will retry.",
+    ),
+  );
+  if (keepResults) {
+    container.prepend(box);
+  } else {
+    replaceChildren(container, box);
+    container.dataset.state = "error";
+  }
+}
+
+async function showMore(container) {
+  if (search.busy || !search.set) return;
+  search.busy = true;
+  const before = search.set.shown;
+  try {
+    const page = await search.set.next();
+    renderSearchResults(container, { page, plan: search.plan, focusFrom: before });
+  } catch (error) {
+    searchDigestError(container, error, { keepResults: true });
+  } finally {
+    search.busy = false;
+  }
+}
+
+/** Load the index and the asker names. FIRST SEARCH ONLY. */
+async function ensureSearchData() {
+  if (search.index && search.names) return;
+  const [index, names] = await Promise.all([loadSearchIndex(), loadAskerNames()]);
+  search.index = index;
+  search.names = askerIndex(names);
+}
+
+async function runSearch(container, query) {
+  if (search.busy) return;
+  search.busy = true;
+  container.dataset.state = "loading";
+  replaceChildren(
+    container,
+    searchStatusLine(
+      search.index
+        ? "Searching…"
+        : "Reading the search index — this is the one file the page fetches only when " +
+            "you search, so the first search takes longer than the next.",
+    ),
+  );
+
+  try {
+    await ensureSearchData();
+  } catch (error) {
+    // A failed index fetch shows a visible error and NEVER an empty list: an
+    // empty list would read as "no such subject", which is a claim about the
+    // record rather than about the network.
+    renderUnavailable(
+      container,
+      "The search index could not be read from the published files, so no search " +
+        "could run. This is a failed download, not an empty result.",
+      describe(error),
+    );
+    search.busy = false;
+    return;
+  }
+
+  let plan;
+  try {
+    plan = planSearch(search.index, query);
+  } catch (error) {
+    renderUnavailable(container, "The published search index could not be read.", describe(error));
+    search.busy = false;
+    return;
+  }
+
+  search.plan = plan;
+  search.set = null;
+
+  if (plan.total === 0) {
+    renderSearchEmpty(container, plan);
+    search.busy = false;
+    return;
+  }
+
+  search.set = createResultSet(plan, { loadDigest: (sessionId) => loadSearchDigest(sessionId) });
+  try {
+    const page = await search.set.next();
+    renderSearchResults(container, { page, plan });
+  } catch (error) {
+    searchDigestError(container, error, { keepResults: false });
+  } finally {
+    search.busy = false;
+  }
+}
+
+function buildSearchView(doc) {
+  const host = doc.getElementById("search-form-host");
+  const result = doc.getElementById("search-result");
+  if (!host || !result) return;
+
+  const form = el("form", "search-form");
+  // No action and no method: there is no server. Submit is handled here, and
+  // prevented, so Enter in the field works exactly like the button.
+  form.setAttribute("role", "search");
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void runSearch(result, input.value);
+  });
+
+  const label = el("label", "field");
+  label.htmlFor = "search-query";
+  label.append(el("span", "field-label", "Search question subjects"));
+  const input = el("input");
+  input.type = "search";
+  input.id = "search-query";
+  input.name = "search-query";
+  input.autocomplete = "off";
+  input.spellcheck = false;
+  input.setAttribute("aria-describedby", "search-help");
+  label.append(input);
+
+  const submit = el("button", "search-submit", "Search");
+  submit.type = "submit";
+
+  form.append(label, submit);
+  replaceChildren(host, form);
+
+  const help = el("p", "picker-note");
+  help.id = "search-help";
+  help.textContent =
+    "Every word you type must appear in the question's subject line — this is not a " +
+    "phrase search and not a ranked one. The index covers subject lines only, not " +
+    "question or answer text, which this project never opens. It is fetched on your " +
+    "first search and not before, so a visitor who never searches never downloads it.";
+  host.append(help);
+
+  // Politely announced: a reader who submits the form is told the result
+  // without focus being moved out from under them.
+  result.setAttribute("role", "status");
+  result.setAttribute("aria-live", "polite");
+  result.setAttribute("aria-atomic", "false");
+
+  replaceChildren(result, searchStatusLine("Type a word or two above and press Search."));
+  result.dataset.state = "empty";
+}
+
+/* ====================================================================== */
+/* T088 — the state and constituency entry point. User Story 3.           */
+/* ====================================================================== */
+
+/* SC-008: "A person who knows only their constituency or state can reach
+ * their members' questions without knowing a member's name."
+ *
+ * The walk, and nothing else (owner decision 2026-10-10):
+ *
+ *   first use of the view -> reference/constituencies.jsonl   252,226 B
+ *                         -> aggregates/state-subjects.jsonl  181,347 B
+ *   opening one member    -> by-member/<id>.jsonl             <= 442,053 B
+ *
+ * NOT `reference/members.jsonl` (3,447,794 B): T086 put the member's name,
+ * party and sitting status onto the representation so this view would not need
+ * it. NOT every member of a state up front: Maharashtra's 85 members come to
+ * 10,489,198 B, which is why the state subject summary is a published
+ * aggregate instead. NOT a per-state question partition, which the dataset
+ * deliberately does not publish.
+ *
+ * STATE FIRST, THEN CONSTITUENCY. Three names in this window name a different
+ * seat in each of two states, so a typed name always shows its state and this
+ * view never resolves one to a single seat on its own.
+ */
+
+/** Everything the view holds between interactions. */
+const seatView = {
+  seats: null,
+  stateRows: null,
+  loaded: false,
+  busy: false,
+  state: "",
+  seat: null,
+  openMemberId: null,
+};
+
+/** The published basis for one unit, rendered through the shared block so this
+ * view, the ministry profile and the comparison all print it the same way. */
+function basisBlockForUnit(unit, options) {
+  return basisBlock([{ row: { counting_basis_unit: unit } }], options);
+}
+
+function seatStatusLine(text) {
+  return el("p", "search-status", text);
+}
+
+/** A member's sitting status, with the "as of" the record actually supports.
+ *
+ * `sitting_status` is a MEMBER-level fact as of the last refresh, not a fact
+ * about the term — a former member's 17th-term representation still reads
+ * `former`. Saying so is the difference between a date the record has and one
+ * the page implied.
+ */
+function sittingStatusText(value) {
+  if (isMissing(value)) return NOT_STATED;
+  return `${String(value)} (as of the last refresh)`;
+}
+
+/* ---------------------------------------------------------------------- */
+/* One seat                                                               */
+/* ---------------------------------------------------------------------- */
+
+function representativeCard(entry, { onOpen }) {
+  const li = el("li", "rep");
+
+  const head = el("div", "rep-top");
+  const name = el("h4", "rep-name");
+  if (entry.nameMissing) {
+    // The record names the member but not who they are. The id is shown with a
+    // flag rather than an empty row -- dropping them would make a seat look
+    // as though it had fewer representatives than it had.
+    name.textContent = entry.memberId;
+    name.classList.add("rep-name-missing");
+  } else {
+    name.textContent = entry.name;
+  }
+  head.append(name);
+  if (entry.nameMissing) {
+    head.append(el("span", "flag-word", "flagged"));
+    head.append(
+      el("span", "result-flag-why", "this member's name is not in the published seat record"),
+    );
+  }
+  li.append(head);
+
+  const meta = el("dl", "rep-meta");
+  const pair = (label, value, className) => {
+    meta.append(el("dt", null, label));
+    meta.append(el("dd", className, value));
+  };
+  pair("Party", stated(entry.party));
+  pair("Represented", termsPhrase(entry.terms));
+  pair("Sitting status", sittingStatusText(entry.sittingStatus));
+  pair("Member id", entry.memberId, "rep-id");
+  li.append(meta);
+
+  const open = el("button", "rep-open", "Show their questions");
+  open.type = "button";
+  open.addEventListener("click", () => onOpen(entry));
+  li.append(open);
+
+  const host = el("div", "rep-questions");
+  host.id = `rep-questions-${entry.memberId}`;
+  host.dataset.state = "empty";
+  li.append(host);
+
+  return li;
+}
+
+function renderSeat(container, seat, { onOpen }) {
+  const history = seatHistory(seat);
+  const frag = document.createDocumentFragment();
+
+  const head = el("div", "seat-head");
+  head.append(el("h3", "seat-name", stated(seat.name)));
+  /* The state is ALWAYS beside the name. Three names in this window are
+   * ambiguous without it, and a reader cannot tell which three.
+   *
+   * No House is named here. A constituency only ever belongs to one of them,
+   * but which Houses this RECORD covers is the coverage statement's claim and
+   * it derives it from the published rows -- a second copy here would be the
+   * typed claim that `housesClaim` exists to have removed. */
+  head.append(el("p", "seat-state", stated(seat.state)));
+  head.append(el("p", "seat-id", `Seat id: ${stated(seat.constituency_id)}`));
+  frag.append(head);
+
+  /* Whether the seat changed hands, in words. US3 scenario 3's whole point is
+   * that two holders are not merged, so the page says which case this is
+   * rather than leaving the reader to count the rows. */
+  const note = el("p", "seat-history");
+  if (history.people.length === 0) {
+    note.textContent = "The published record lists no representation for this seat in the covered window.";
+  } else if (history.changedHands) {
+    note.textContent =
+      `${count(history.people.length)} different members represented this seat across the ` +
+      `covered window (${termsPhrase(history.terms)}). They are listed separately, with ` +
+      "their own terms — not merged into one entry.";
+  } else {
+    note.textContent =
+      `One member represented this seat across the covered window ` +
+      `(${termsPhrase(history.terms)}).`;
+  }
+  frag.append(note);
+
+  if (history.people.length > 0) {
+    const ul = el("ul", "rep-list");
+    for (const entry of history.people) ul.append(representativeCard(entry, { onOpen }));
+    frag.append(ul);
+  }
+
+  frag.append(
+    el(
+      "p",
+      "picker-note",
+      "Dates are not shown because the published record does not carry them: every " +
+        "representation's start and end date is “not stated”, so the term is the " +
+        "period this record has. Only the member's name, party, state, constituency, " +
+        "House, term and sitting status are published.",
+    ),
+  );
+
+  replaceChildren(container, frag);
+  container.dataset.state = "ready";
+}
+
+/* ---------------------------------------------------------------------- */
+/* One member's questions                                                 */
+/* ---------------------------------------------------------------------- */
+
+function renderMemberQuestions(host, entry, records) {
+  const summary = memberQuestions(records);
+  const frag = document.createDocumentFragment();
+
+  const totals = el("div", "member-totals");
+  totals.append(
+    fact(
+      "Questions published",
+      count(summary.total),
+      "Counted once each. A question this member asked jointly with others is " +
+        "one question here, and appears in every asker's file.",
+    ),
+  );
+  frag.append(totals);
+
+  /* Link status, in the SAME WORDS as the ministry profile and the search
+   * results: the labels come from `statusField`, which reads that view's own
+   * list. Flagged rows carry the WORD "flagged", never colour alone. */
+  const status = el("div", "status-strip");
+  status.append(el("p", "strip-head", "How these questions are linked to this member"));
+  const statusList = el("ul", "status-list");
+  for (const row of summary.statusRows) {
+    const li = el("li", row.flagged ? "status-item flagged" : "status-item");
+    if (row.flagged) {
+      // A WORD, never colour alone, and in the same position the ministry
+      // profile puts it.
+      li.append(el("span", "flag-word", "flagged"));
+    }
+    li.append(el("span", "status-label", row.label));
+    li.append(el("span", "status-value", count(row.questions)));
+    statusList.append(li);
+  }
+  status.append(statusList);
+  if (summary.unknownStatus > 0) {
+    status.append(
+      el(
+        "p",
+        "strip-note",
+        `${count(summary.unknownStatus)} question(s) carry no link status at all and are ` +
+          "counted in the total above but in none of the rows.",
+      ),
+    );
+  }
+  status.append(
+    el(
+      "p",
+      "strip-note",
+      "Unresolved and ambiguous questions are included in the total, not filtered out. " +
+        "A partly linked question is in this member's file and is still counted as " +
+        "unresolved in the published record.",
+    ),
+  );
+  frag.append(status);
+
+  // The member's own subject lines. From data already loaded -- this file.
+  const tally = subjectTally(records, { limit: 10 });
+  if (tally.rows.length > 0) {
+    const box = el("div", "subject-tally");
+    box.append(
+      el(
+        "p",
+        "strip-head",
+        `Their most-asked subject lines (${count(tally.shown)} of ` +
+          `${count(tally.distinct)} distinct lines)`,
+      ),
+    );
+    box.append(
+      list("subject-list", tally.rows, (li, row) => {
+        li.append(el("span", "subject-text", row.subject));
+        li.append(el("span", "subject-count", count(row.questions)));
+      }),
+    );
+    box.append(
+      el(
+        "p",
+        "strip-note",
+        "Exact subject lines as the source records them, not topics: two lines " +
+          "differing by a word or by capitalisation are counted separately.",
+      ),
+    );
+    frag.append(box);
+  }
+
+  // The questions themselves -- "individual questions are reachable".
+  const shown = summary.questions.slice(0, SEAT_QUESTION_PAGE);
+  const listBox = el("div", "member-questions");
+  listBox.append(
+    el(
+      "p",
+      "strip-head",
+      `Questions, newest first (${count(shown.length)} of ${count(summary.total)} shown)`,
+    ),
+  );
+  listBox.append(
+    list("question-list", shown, (li, question) => {
+      const subject = el("p", "question-subject");
+      if (isMissing(question.subject)) {
+        subject.textContent = NOT_STATED;
+        subject.classList.add("result-subject-missing");
+      } else {
+        subject.textContent = question.subject;
+      }
+      li.append(subject);
+      const meta = el("dl", "question-meta");
+      meta.append(el("dt", null, "Question"));
+      meta.append(el("dd", "result-id", stated(question.question_id)));
+      meta.append(el("dt", null, "Date"));
+      meta.append(el("dd", null, isoDate(question.date)));
+      meta.append(el("dt", null, "Ministry"));
+      const ministry = ministryNameFor(question.ministry_id);
+      const ministryDd = el("dd", ministry.flagged ? "flagged" : null, ministry.text);
+      if (ministry.flagged) ministryDd.append(el("span", "flag-word", "flagged"));
+      meta.append(ministryDd);
+      const field = statusField(questionBucket(question));
+      meta.append(el("dt", null, "Link status"));
+      const statusDd = el("dd", field && field.flagged ? "flagged" : null);
+      statusDd.append(el("span", "result-status", field ? field.label : NOT_STATED));
+      if (field && field.flagged) statusDd.append(el("span", "flag-word", "flagged"));
+      meta.append(statusDd);
+      const askers = (question.asking_members ?? []).length;
+      if (askers > 1) {
+        meta.append(el("dt", null, "Asked jointly"));
+        meta.append(
+          el("dd", null, `with ${count(askers - 1)} other member(s); counted once`),
+        );
+      }
+      li.append(meta);
+    }),
+  );
+  if (summary.total > shown.length) {
+    listBox.append(
+      el(
+        "p",
+        "strip-note",
+        `The remaining ${count(summary.total - shown.length)} are in the published file ` +
+          `by-member/${entry.memberId}.jsonl, which this page has already downloaded in ` +
+          "full — they are not shown here to keep the page readable, not withheld.",
+      ),
+    );
+  }
+  frag.append(listBox);
+
+  frag.append(basisBlockForUnit("question", { head: "How these figures were counted" }));
+
+  replaceChildren(host, frag);
+  host.dataset.state = "ready";
+}
+
+/** How many of a member's questions the page lists. The whole file is already
+ * downloaded; this is a readability bound, and the page says so. */
+const SEAT_QUESTION_PAGE = 25;
+
+async function openMemberQuestions(entry) {
+  const host = document.getElementById(`rep-questions-${entry.memberId}`);
+  if (!host) return;
+  if (seatView.openMemberId === entry.memberId && host.dataset.state === "ready") {
+    // A second click closes it, so one member's questions are not left open
+    // underneath another's.
+    replaceChildren(host);
+    host.dataset.state = "empty";
+    seatView.openMemberId = null;
+    return;
+  }
+  seatView.openMemberId = entry.memberId;
+  host.dataset.state = "loading";
+  replaceChildren(
+    host,
+    seatStatusLine(
+      "Reading this member's published questions — one file, fetched only because you " +
+        "opened them.",
+    ),
+  );
+  try {
+    const records = await loadMemberQuestions(entry.memberId);
+    renderMemberQuestions(host, entry, records);
+  } catch (error) {
+    renderUnavailable(
+      host,
+      `This member's published question file could not be read, so none of their ` +
+        "questions could be listed. This is a failed download, not a member with no " +
+        "questions.",
+      describe(error),
+    );
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* One state                                                              */
+/* ---------------------------------------------------------------------- */
+
+function renderStateSummary(container, state) {
+  const summary = stateSubjects(seatView.stateRows, state);
+  const frag = document.createDocumentFragment();
+  frag.append(el("h3", "seat-name", `${stated(state)} — what its members have raised`));
+
+  if (!summary) {
+    frag.append(
+      el(
+        "p",
+        "seat-history",
+        "The published state subject summary carries no row for this state. That means no " +
+          "question in the covered window could be attributed to a member holding a seat " +
+          "here — not that its members asked none.",
+      ),
+    );
+    frag.append(basisBlockForUnit(STATE_BASIS_UNIT, { head: "How this would have been counted" }));
+    replaceChildren(container, frag);
+    container.dataset.state = "ready";
+    return;
+  }
+
+  const totals = el("div", "member-totals");
+  totals.append(
+    fact(
+      "Questions attributed to this state",
+      count(summary.stateQuestions),
+      "A question counts once here if at least one of its identified asking members " +
+        "holds a seat in this state.",
+    ),
+  );
+  totals.append(
+    fact(
+      "Distinct subject lines",
+      count(summary.stateSubjects),
+      `The ${count(summary.subjectsShown)} most-asked are listed below; the rest are in ` +
+        "the published question records.",
+    ),
+  );
+  frag.append(totals);
+
+  const box = el("div", "subject-tally");
+  box.append(
+    el(
+      "p",
+      "strip-head",
+      `Most-asked subject lines (${count(summary.rows.length)} of ` +
+        `${count(summary.stateSubjects)} distinct lines)`,
+    ),
+  );
+  box.append(
+    list("subject-list", summary.rows, (li, row) => {
+      li.append(el("span", "subject-text", row.subject));
+      li.append(el("span", "subject-count", count(row.questions)));
+    }),
+  );
+  frag.append(box);
+
+  // The published basis, read from the file. It carries the attribution rule.
+  frag.append(basisBlockForUnit(summary.basisUnit, { head: "How these figures were counted" }));
+  frag.append(
+    el(
+      "p",
+      "picker-note",
+      "These figures are read from the published aggregate, not recomputed by this page. " +
+        "They can be reproduced by hand from the published by-member files — take every " +
+        "member holding a seat in this state, de-duplicate their questions on question_id, " +
+        "and count the subject lines.",
+    ),
+  );
+
+  replaceChildren(container, frag);
+  container.dataset.state = "ready";
+}
+
+/* ---------------------------------------------------------------------- */
+/* The pickers                                                            */
+/* ---------------------------------------------------------------------- */
+
+function seatOptionsFor(state) {
+  const seats = seatsInState(seatView.seats, state);
+  return [["", `Choose one of ${seats.length} constituencies…`], ...seats.map((s) => [s.constituency_id, s.name])];
+}
+
+function showSeat(seatResult, seat) {
+  seatView.seat = seat;
+  seatView.openMemberId = null;
+  renderSeat(seatResult, seat, { onOpen: (entry) => void openMemberQuestions(entry) });
+}
+
+function renderNameMatches(host, seatResult, text) {
+  const exact = seatsNamed(seatView.seats, text);
+  const near = exact.length > 0 ? exact : seatsMatching(seatView.seats, text);
+  replaceChildren(host);
+  if (near.length === 0) {
+    host.append(
+      seatStatusLine(
+        text.trim().length < 2
+          ? "Type at least two letters of a constituency name."
+          : "No constituency in the published record has that name. Try picking a state above.",
+      ),
+    );
+    return;
+  }
+  host.append(
+    el(
+      "p",
+      "strip-head",
+      exact.length > 1
+        ? `${count(exact.length)} constituencies are named “${text.trim()}” — in different states. ` +
+            "Pick the one you mean."
+        : `${count(near.length)} match(es)`,
+    ),
+  );
+  const ul = el("ul", "match-list");
+  for (const seat of near) {
+    const li = el("li");
+    const button = el("button", "match-button");
+    button.type = "button";
+    // The STATE is always in the label. A name on its own is ambiguous for
+    // three seats in this window and the reader cannot know which.
+    button.append(el("span", "match-name", stated(seat.name)));
+    button.append(el("span", "match-state", stated(seat.state)));
+    button.addEventListener("click", () => {
+      const states = statesIn(seatView.seats).map((s) => s.state);
+      const stateSelect = document.getElementById("seat-state");
+      if (stateSelect && states.includes(seat.state)) {
+        stateSelect.value = seat.state;
+        seatView.state = seat.state;
+        refreshSeatSelect();
+        renderStateSummary(document.getElementById("state-summary"), seat.state);
+      }
+      const seatSelect = document.getElementById("seat-constituency");
+      if (seatSelect) seatSelect.value = seat.constituency_id;
+      showSeat(seatResult, seat);
+    });
+    li.append(button);
+    ul.append(li);
+  }
+  host.append(ul);
+}
+
+function refreshSeatSelect() {
+  const wrap = document.getElementById("seat-constituency-host");
+  if (!wrap) return;
+  const seatResult = document.getElementById("seat-result");
+  replaceChildren(wrap);
+  if (!seatView.state) return;
+  const { wrap: field, select } = labelledSelect(
+    "seat-constituency",
+    "Then pick your constituency",
+    seatOptionsFor(seatView.state),
+    "",
+  );
+  select.addEventListener("change", () => {
+    const seat = seatById(seatView.seats, select.value);
+    if (seat) showSeat(seatResult, seat);
+    else {
+      replaceChildren(seatResult, seatStatusLine("Pick a constituency to see its members."));
+      seatResult.dataset.state = "empty";
+    }
+  });
+  wrap.append(field);
+}
+
+function renderSeatPickers(host) {
+  const seatResult = document.getElementById("seat-result");
+  const stateSummary = document.getElementById("state-summary");
+  const frag = document.createDocumentFragment();
+
+  const states = statesIn(seatView.seats);
+  const withSubjects = statesWithSubjects(seatView.stateRows);
+  const { wrap, select } = labelledSelect(
+    "seat-state",
+    "Pick your state or union territory",
+    [
+      ["", `Choose one of ${states.length}…`],
+      ...states.map((s) => [s.state, `${s.state} — ${s.seats} seat(s), ${s.members} member(s)`]),
+    ],
+    "",
+  );
+  select.addEventListener("change", () => {
+    seatView.state = select.value;
+    refreshSeatSelect();
+    replaceChildren(seatResult, seatStatusLine("Pick a constituency to see its members."));
+    seatResult.dataset.state = "empty";
+    if (seatView.state) {
+      renderStateSummary(stateSummary, seatView.state);
+      if (!withSubjects.has(nameKey(seatView.state))) stateSummary.dataset.state = "ready";
+    } else {
+      replaceChildren(stateSummary);
+      stateSummary.dataset.state = "empty";
+    }
+  });
+  frag.append(wrap);
+
+  const seatHost = el("div");
+  seatHost.id = "seat-constituency-host";
+  frag.append(seatHost);
+
+  // The by-name box, which ALWAYS shows the state of every match.
+  const form = el("form", "search-form");
+  form.setAttribute("role", "search");
+  const label = el("label", "field");
+  label.htmlFor = "seat-name";
+  label.append(el("span", "field-label", "Or type a constituency name"));
+  const input = el("input");
+  input.type = "search";
+  input.id = "seat-name";
+  input.name = "seat-name";
+  input.autocomplete = "off";
+  input.spellcheck = false;
+  input.setAttribute("aria-describedby", "seat-name-help");
+  label.append(input);
+  const submit = el("button", "search-submit", "Find");
+  submit.type = "submit";
+  form.append(label, submit);
+  const matches = el("div", "match-host");
+  matches.id = "seat-matches";
+  matches.setAttribute("role", "status");
+  matches.setAttribute("aria-live", "polite");
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    renderNameMatches(matches, seatResult, input.value);
+  });
+  frag.append(form);
+  const help = el("p", "picker-note");
+  help.id = "seat-name-help";
+  help.textContent =
+    "Every match is listed with its state, always. Three constituency names in the " +
+    "covered window name a different seat in each of two states, so a name on its own " +
+    "does not identify a seat and this page never picks one for you.";
+  frag.append(help);
+  frag.append(matches);
+
+  replaceChildren(host, frag);
+}
+
+/** Load the two files this view needs. FIRST USE ONLY. */
+async function ensureSeatData() {
+  if (seatView.seats && seatView.stateRows) return;
+  const [seats, stateRows] = await Promise.all([loadSeats(), loadStateSubjects()]);
+  seatView.seats = seats;
+  seatView.stateRows = stateRows;
+  seatView.loaded = true;
+}
+
+async function openSeatView(host) {
+  if (seatView.busy) return;
+  seatView.busy = true;
+  replaceChildren(
+    host,
+    seatStatusLine(
+      "Reading the published seat list and the state subject summary — the two files " +
+        "this view fetches only when you open it.",
+    ),
+  );
+  try {
+    await ensureSeatData();
+  } catch (error) {
+    renderUnavailable(
+      host,
+      "The published seat list could not be read, so no state or constituency could be " +
+        "listed. This is a failed download, not a record with no constituencies.",
+      describe(error),
+    );
+    seatView.busy = false;
+    return;
+  }
+  try {
+    renderSeatPickers(host);
+  } catch (error) {
+    renderUnavailable(host, "The seat list was read but could not be displayed.", describe(error));
+  }
+  seatView.busy = false;
+}
+
+function buildConstituencyView(doc) {
+  const host = doc.getElementById("seat-picker");
+  const seatResult = doc.getElementById("seat-result");
+  const stateSummary = doc.getElementById("state-summary");
+  if (!host || !seatResult || !stateSummary) return;
+
+  seatResult.setAttribute("role", "status");
+  seatResult.setAttribute("aria-live", "polite");
+  seatResult.setAttribute("aria-atomic", "false");
+
+  const open = el("button", "search-submit", "Show states and constituencies");
+  open.type = "button";
+  open.id = "seat-open";
+  open.addEventListener("click", () => void openSeatView(host));
+  const note = el("p", "picker-note");
+  note.textContent =
+    "This view fetches nothing until you open it: the seat list and the state subject " +
+    "summary are read on your first use and not before, so a visitor who never looks " +
+    "one up never downloads them.";
+  replaceChildren(host, open, note);
+
+  replaceChildren(seatResult, seatStatusLine("Pick a state, then a constituency."));
+  seatResult.dataset.state = "empty";
+  replaceChildren(stateSummary);
+  stateSummary.dataset.state = "empty";
+}
