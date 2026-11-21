@@ -1,0 +1,1710 @@
+/* Indian Sansad — question explorer. T075.
+ *
+ * Hand-written. No framework, no build step, no preprocessor. And no
+ * reference of any kind to another file or another host: no @import, no
+ * url(), no web font. The font stacks below name faces the operating system
+ * already has, which is why there is no network request for type.
+ *
+ * Designed at 390 px FIRST (owner decision 2026-10-10). Every rule outside a
+ * media query is the narrow layout; the one `min-width` block widens it. The
+ * page must never scroll horizontally, so anything that cannot shrink -- the
+ * session table -- scrolls inside its own container instead.
+ *
+ * Contrast, against the --surface and --ground grounds, computed with the
+ * WCAG relative-luminance formula. RECOMPUTED 2026-10-10 -- three of the
+ * figures previously recorded here were wrong, all of them understated:
+ * --ink on white was given as 14.07:1 and is 15.97:1, --ink on the ground as
+ * 12.98:1 and is 14.51:1, --accent as 7.33:1 and is 8.03:1. They were
+ * conservative rather than dangerous, but a recorded measurement that nobody
+ * can reproduce is not a measurement.
+ *
+ *   TEXT, floor 4.5:1
+ *   --ink    #14213D on #FFFFFF = 15.97:1   body text
+ *   --ink    #14213D on #F3F4F6 = 14.51:1
+ *   --ink    #14213D on #FFF9EE = 15.24:1   text on a flagged row
+ *   --muted  #4B5563 on #FFFFFF =  7.56:1   notes and captions
+ *   --muted  #4B5563 on #F3F4F6 =  6.87:1
+ *   --accent #8C3325 on #FFFFFF =  8.03:1   links and focus ring
+ *   --flag-text #7A3B06 on #FFF4E0 = 7.85:1 flagged text, flagged ground
+ *   --flag-text #7A3B06 on #FFF9EE = 8.16:1
+ *
+ *   NON-TEXT marks that carry meaning, floor 3:1
+ *   --accent        #8C3325 on #FFFFFF = 8.03:1  focus ring, starred bars
+ *   --bar-unstarred #6F88BD on #FFFFFF = 3.54:1  unstarred bars
+ *   --control-border #767F8F on #FFFFFF = 4.04:1 select boundary
+ *   --control-border #767F8F on #F3F4F6 = 3.67:1
+ *
+ *   The two bar fills are only 2.27:1 against EACH OTHER, which is below the
+ *   3:1 adjacent-mark floor. They are never adjacent: every segment is
+ *   stroked with --surface, and at 1280 px that separator is about 3.8 px of
+ *   white between them. The numbers are also in the table beside the chart,
+ *   which is the authoritative form.
+ *
+ *   --flag-border #D9A441 on #FFF4E0 = 1.63:1  <-- decorative only; the flag
+ *     is also carried by a word ("flagged", "Not built yet", "not stated")
+ *     and never by colour alone, so the border is not the signal.
+ *
+ * Nothing on this page carries meaning by colour alone. "not stated" is a
+ * word. A gap is a list item. A region that is not built says so in text.
+ */
+
+:root {
+  --ground: #f3f4f6;
+  --surface: #ffffff;
+  --ink: #14213d;
+  --muted: #4b5563;
+  --rule: #d5d9e0;
+  --accent: #8c3325;
+  --flag-bg: #fff4e0;
+  --flag-border: #d9a441;
+  --flag-text: #7a3b06;
+  /* A flagged TABLE ROW: lighter than --flag-bg so a flagged cell inside a
+     flagged row is still distinguishable. */
+  --flag-row: #fff9ee;
+  /* The second chart series. Previously named by chart.js and DEFINED
+     NOWHERE, so every unstarred bar rendered black and the legend swatch
+     rendered blank -- an undefined var() falls back to the property's initial
+     value and reports nothing. */
+  --bar-unstarred: #6f88bd;
+  /* The boundary of a <select>. #8A93A3 was the fallback hiding in a var()
+     default; it is 3.10:1 on white but only 2.81:1 on --ground, i.e. below
+     the 3:1 non-text floor exactly where a control sits on the page ground.
+     #767F8F clears it on both. */
+  --control-border: #767f8f;
+
+  --font-head: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --container: 1120px;
+  --gutter: 16px;
+  --radius: 6px;
+  --tap: 44px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  /* The page itself never scrolls sideways. Wide content scrolls inside its
+     own container; see .table-wrap. */
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  /* Belt and braces with html{} above: a single over-wide child cannot drag
+     the viewport. */
+  overflow-wrap: break-word;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-head);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.6rem;
+}
+
+h2 {
+  font-size: 1.35rem;
+}
+
+h3 {
+  font-size: 1.1rem;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* Keyboard operability: a visible ring everywhere, never removed. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Every figure reads as a figure. */
+.fact-value,
+table,
+.num-col {
+  font-variant-numeric: tabular-nums;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--ground);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.container {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+}
+
+.skip-link:focus {
+  left: 8px;
+  top: 8px;
+  z-index: 10;
+  background: var(--surface);
+  padding: 10px 14px;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  min-height: var(--tap);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Header                                                                 */
+/* ---------------------------------------------------------------------- */
+
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+  padding: 18px 0;
+}
+
+.site-name {
+  font-family: var(--font-head);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.tagline {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Sections and cards                                                     */
+/* ---------------------------------------------------------------------- */
+
+main {
+  padding-top: 20px;
+  padding-bottom: 36px;
+}
+
+.section,
+.card {
+  margin-top: 24px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+}
+
+.section-head {
+  margin-bottom: 12px;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.lede {
+  color: var(--muted);
+  font-size: 0.94rem;
+  margin-top: 4px;
+}
+
+.status {
+  color: var(--muted);
+  font-size: 0.94rem;
+  padding: 6px 0;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Coverage                                                               */
+/* ---------------------------------------------------------------------- */
+
+.houses {
+  border-left: 4px solid var(--accent);
+  padding: 2px 0 2px 12px;
+  margin-bottom: 18px;
+}
+
+.houses-value {
+  font-family: var(--font-head);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.houses-note,
+.houses-why {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-top: 3px;
+}
+
+.fact-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.fact {
+  background: var(--surface);
+  padding: 12px 14px;
+}
+
+.fact-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.fact-value {
+  font-family: var(--font-head);
+  font-size: 1.45rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.fact-note {
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin-top: 4px;
+}
+
+/* The counting basis. Read at runtime; never retyped in the page. */
+.basis {
+  margin-top: 18px;
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.basis-head {
+  font-weight: 700;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.basis-text {
+  margin-top: 6px;
+  font-size: 0.9rem;
+}
+
+.basis-src {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Sessions, gaps, merges                                                 */
+/* ---------------------------------------------------------------------- */
+
+.sessions,
+.gaps,
+.merges {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+
+.gaps-lede {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
+
+.gap-list,
+.merge-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.9rem;
+}
+
+.gap-list li,
+.merge-list li {
+  margin-bottom: 8px;
+}
+
+.merge-list li {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+/* Wide content scrolls HERE, not the page. */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+thead th {
+  background: var(--ground);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+}
+
+tbody tr:last-child th,
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.num-col {
+  text-align: right;
+}
+
+/* An absent value is a WORD, never an empty cell and never a dash whose
+   meaning a reader has to guess. */
+.not-stated {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* The session table is collapsed by default: 21 rows is a wall in front of
+   the figures that matter. <details> needs no script, is keyboard-operable
+   and is announced by screen readers without any ARIA. */
+details.sessions > summary {
+  cursor: pointer;
+  list-style-position: outside;
+  padding: 8px 0;
+  min-height: var(--tap);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+details.sessions > summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.summary-label {
+  font-family: var(--font-head);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.summary-note {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+/* Zero sitting days. A WORD, not a colour -- the flag below is the signal
+   and the amber ground is decoration that carries nothing on its own. */
+.zero-days-note {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  background: var(--flag-bg);
+  border-left: 4px solid var(--flag-text);
+  border-radius: var(--radius);
+  color: var(--flag-text);
+  font-size: 0.84rem;
+}
+
+.zero-days-value {
+  font-weight: 700;
+}
+
+.zero-days-flag {
+  display: block;
+  color: var(--flag-text);
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: normal;
+  max-width: 22ch;
+  margin-left: auto;
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Regions that are not built yet (T078, T079, T080)                      */
+/* ---------------------------------------------------------------------- */
+
+.not-built {
+  background: var(--flag-bg);
+  border-color: var(--flag-border);
+  /* A second, non-colour signal: the heavy left rule plus the text tag. */
+  border-left: 5px solid var(--flag-text);
+  color: var(--flag-text);
+}
+
+.not-built-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.not-built p {
+  font-size: 0.9rem;
+}
+
+.not-built p + p {
+  margin-top: 8px;
+}
+
+.not-built-note {
+  border-top: 1px solid var(--flag-border);
+  padding-top: 8px;
+}
+
+.not-built code {
+  background: rgb(255 255 255 / 60%);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Failure                                                                */
+/* ---------------------------------------------------------------------- */
+
+.unavailable {
+  background: var(--flag-bg);
+  border: 1px solid var(--flag-border);
+  border-left: 5px solid var(--flag-text);
+  border-radius: var(--radius);
+  color: var(--flag-text);
+  padding: 14px;
+  font-size: 0.9rem;
+}
+
+.unavailable-head {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.unavailable-detail {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.unavailable-note {
+  margin-top: 8px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Footer                                                                 */
+/* ---------------------------------------------------------------------- */
+
+.site-footer {
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+  padding: 22px 0 36px;
+}
+
+.origin-note {
+  color: var(--muted);
+  font-size: 0.86rem;
+  max-width: 62ch;
+}
+
+.licence {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  max-width: 72ch;
+}
+
+.licence-head {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-top: 14px;
+}
+
+.licence-head:first-child {
+  margin-top: 0;
+}
+
+.licence-id {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  margin-top: 2px;
+}
+
+.licence-scope {
+  font-size: 0.86rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.attribution {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  background: var(--ground);
+  border-left: 4px solid var(--rule);
+  border-radius: var(--radius);
+  font-size: 0.86rem;
+}
+
+.licence-links {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  font-size: 0.86rem;
+}
+
+.licence-links li {
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+
+.licence-links-note {
+  color: var(--muted);
+}
+
+.licence-src {
+  margin-top: 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Wider than 390 px. This is the ONLY widening block.                    */
+/* ---------------------------------------------------------------------- */
+
+@media (min-width: 40rem) {
+  :root {
+    --gutter: 24px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h2 {
+    font-size: 1.55rem;
+  }
+
+  .site-name {
+    font-size: 1.5rem;
+  }
+
+  main {
+    padding-top: 28px;
+  }
+
+  .card {
+    padding: 22px 24px;
+  }
+
+  .fact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  th,
+  td {
+    padding: 9px 14px;
+  }
+}
+
+@media (min-width: 64rem) {
+  .fact-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Respect a reader who asks for less motion. There is no animation on this
+   page today; this keeps that true if one is ever added. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Pickers (T078, T080)                                                   */
+/* ---------------------------------------------------------------------- */
+
+.picker {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+/* (b) The table caption used the class `visually-hidden`, which style.css
+   never defined -- so it rendered visibly and, inside a nowrap table, clipped
+   at "Questions per session for the selecte". It is useful text, so it is
+   shown properly rather than hidden properly: left-aligned, wrapping, outside
+   the cells' white-space rule. */
+caption.table-caption {
+  caption-side: top;
+  text-align: left;
+  white-space: normal;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: var(--ground);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Named by the comparison table so it can be addressed; the shared table
+   rules above already carry its layout. */
+table.table-compare th[scope="row"] {
+  white-space: normal;
+  min-width: 14ch;
+}
+
+select {
+  font: inherit;
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  min-height: var(--tap);
+  width: 100%;
+  max-width: 100%;
+}
+
+select:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Results                                                                */
+/* ---------------------------------------------------------------------- */
+
+.result-head {
+  margin-top: 22px;
+}
+
+.result-head h3 {
+  font-size: 1.3rem;
+}
+
+.result-span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-top: 3px;
+}
+
+.former-names {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--ground);
+  border-left: 4px solid var(--rule);
+  border-radius: var(--radius);
+  font-size: 0.84rem;
+}
+
+#profile-result > *,
+#compare-result > * {
+  margin-top: 18px;
+}
+
+.helper {
+  color: var(--muted);
+  font-size: 0.86rem;
+  margin-top: 4px;
+}
+
+.footnote {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 10px;
+}
+
+.change-block,
+.chart-block,
+.mix-block,
+.status-strip {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.change-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.change-list li {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  padding: 9px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.change-label {
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.change-value {
+  font-family: var(--font-head);
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.change-from {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------- */
+/* The four-way status split                                              */
+/* ---------------------------------------------------------------------- */
+
+.strip-head {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.status-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.status-item {
+  background: var(--surface);
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: baseline;
+}
+
+/* The amber ground is decoration. The WORD "flagged" is the signal, and it is
+   present whether or not colour renders. */
+.status-item.flagged {
+  background: var(--flag-bg);
+  color: var(--flag-text);
+}
+
+.flag-word {
+  grid-column: 1 / -1;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--flag-text);
+}
+
+.status-label {
+  font-weight: 600;
+}
+
+.status-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.status-share {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.status-item.flagged .status-share {
+  color: var(--flag-text);
+}
+
+.strip-note {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Chart                                                                  */
+/* ---------------------------------------------------------------------- */
+
+.legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 0.84rem;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  border: 1px solid var(--ink);
+  flex: 0 0 auto;
+}
+
+figure.chart {
+  margin: 12px 0 0;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 180px;
+  display: block;
+  background: var(--surface);
+}
+
+.chart-labels {
+  list-style: none;
+  display: flex;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+/* Hidden below 40rem. With 21 sessions at 390 px each column gets ~17 px,
+   and a four-digit total shrunk into that is not text anyone can read -- it
+   is noise that LOOKS like information. The table below carries every number
+   and is the authoritative form, so nothing is lost by hiding these. */
+.chart-labels {
+  display: none;
+}
+
+.chart-labels li {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--muted);
+  overflow: hidden;
+}
+
+.chart-labels b {
+  display: block;
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+figure.chart figcaption {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Flagged table cells and absent rows                                    */
+/* ---------------------------------------------------------------------- */
+
+.td-flag {
+  background: var(--flag-row);
+}
+
+tr.row-absent th {
+  color: var(--muted);
+}
+
+.row-absent-note {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: normal;
+  max-width: 20ch;
+}
+
+tr.tr-flag {
+  background: var(--flag-row);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Comparison                                                             */
+/* ---------------------------------------------------------------------- */
+
+/* Phone: cards. Wide: the table. Both render from ONE list of rows, so the
+   totals are equal in the two forms by construction rather than by care. */
+.compare-cards {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.cc-name {
+  font-family: var(--font-head);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.cc-list {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  font-size: 0.88rem;
+}
+
+.cc-list dt {
+  color: var(--muted);
+  padding: 5px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.cc-list dd {
+  margin: 0;
+  padding: 5px 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  border-top: 1px solid var(--rule);
+}
+
+.cc-list dt.flagged {
+  color: var(--flag-text);
+}
+
+.cc-list dt .flag-word {
+  display: block;
+}
+
+#compare-result .table-wrap {
+  display: none;
+}
+
+@media (min-width: 40rem) {
+  .picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .change-list li {
+    grid-template-columns: 1fr auto auto;
+    gap: 14px;
+    align-items: baseline;
+  }
+
+  .status-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Wide enough for a column label to be legible. */
+  .chart-labels {
+    display: flex;
+  }
+
+  /* Wide enough for the table: show it and hide the cards, so one set of
+     figures is on screen rather than two. */
+  #compare-result .table-wrap {
+    display: block;
+  }
+
+  .compare-cards {
+    display: none;
+  }
+}
+
+@media (min-width: 64rem) {
+  .picker {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .status-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* A pre-selection, or the lack of one, explained in words. */
+.picker-note {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+/* ====================================================================== */
+/* T079 — subject search                                                  */
+/* ====================================================================== */
+
+/* 390 px first, like everything above: the result list is a stack of cards
+ * and the definition list runs label-over-value. The one `min-width` block at
+ * the bottom turns each result's metadata into two columns. Nothing here is
+ * wider than its container, so the page still never scrolls sideways.
+ *
+ * Contrast, same method as the head of this file (WCAG relative luminance):
+ *   --ink    #14213D on #FFFFFF = 15.97:1   subject, names, status words
+ *   --muted  #4B5563 on #FFFFFF =  7.56:1   labels, notes, the order sentence
+ *   --muted  #4B5563 on #F3F4F6 =  6.87:1
+ *   --accent #8C3325 on #FFFFFF =  8.03:1   the focus ring and the button
+ *   --surface #FFFFFF on #8C3325 =  8.03:1  the button's own label
+ *   --flag-text #7A3B06 on #FFF4E0 = 7.85:1 every flag word and reason
+ *   --control-border #767F8F on #FFFFFF = 4.04:1  the input boundary
+ *
+ * No meaning is carried by colour: every flag is also the word "flagged" plus
+ * a sentence saying what was flagged, and a missing value is the words "not
+ * stated".
+ */
+
+.search-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+input[type="search"] {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 10px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  /* The platform clear button is a second control with no label; the field is
+     cleared by selecting and deleting, like any other text input. */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="search"]:focus-visible,
+.search-submit:focus-visible,
+.show-more:focus-visible,
+.result-subject:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.search-submit {
+  min-height: var(--tap);
+  padding: 8px 18px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--surface);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.search-status {
+  margin: 0;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  color: var(--muted);
+}
+
+#search-result > * {
+  margin-top: 16px;
+}
+
+.search-summary {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.search-count {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.search-count-note {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* The order statement. Rendered from lib/search.js, never typed into the
+   page, so this styles a sentence the code owns. */
+.order-note {
+  padding: 12px 16px;
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.order-head {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.order-text {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+/* Words the tokenise rule dropped. A flag ground, because it is a change the
+   page made to the reader's query. */
+.ignored {
+  padding: 12px 16px;
+  background: var(--flag-bg);
+  border: 1px solid var(--flag-border);
+  border-radius: var(--radius);
+  color: var(--flag-text);
+}
+
+.ignored-head {
+  margin: 0;
+  font-weight: 600;
+}
+
+.ignored-note {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+
+.ignored-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.ignored-word {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.ignored-why {
+  margin-left: 8px;
+}
+
+/* The results. An ordered list, so a screen reader announces the position and
+   the count -- but the numbers are NOT shown, because a visible 1, 2, 3 reads
+   as a ranking and nothing here is ranked. */
+.result-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.result-top {
+  margin-bottom: 8px;
+}
+
+.result-subject {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.result-subject-missing {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.result-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px 12px;
+  font-size: 0.9rem;
+}
+
+.result-meta dt {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.result-meta dd {
+  margin: 0;
+  color: var(--ink);
+}
+
+.result-meta dd.flagged {
+  color: var(--flag-text);
+}
+
+.result-id {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  /* A question id is long and has no spaces; it wraps on the slashes rather
+     than dragging the card wider than the viewport. */
+  overflow-wrap: anywhere;
+}
+
+.result-status {
+  font-weight: 600;
+}
+
+/* The flag word sits INLINE after a status or a name here, not on its own
+   grid row as it does in the ministry profile's status strip -- `.flag-word`
+   there carries `grid-column: 1 / -1`, which is meaningless outside a grid and
+   leaves the word butted straight against the label. Measured on screen
+   before this rule existed: "Not linkedFLAGGED". */
+.result-meta .flag-word,
+.asker-list .flag-word {
+  margin-left: 8px;
+}
+
+.result-flag-why {
+  display: block;
+  color: var(--flag-text);
+  font-size: 0.8rem;
+}
+
+.result-askers {
+  color: var(--ink);
+}
+
+.result-no-asker {
+  color: var(--flag-text);
+  font-style: italic;
+}
+
+.asker-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.asker-name {
+  font-weight: 600;
+}
+
+.asker-party {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.asker-unknown .asker-name {
+  font-family: var(--font-mono);
+  color: var(--flag-text);
+}
+
+.result-flag {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  background: var(--flag-bg);
+  border: 1px solid var(--flag-border);
+  border-radius: var(--radius);
+  color: var(--flag-text);
+  font-size: 0.82rem;
+}
+
+.show-more {
+  min-height: var(--tap);
+  width: 100%;
+  padding: 8px 18px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--accent);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.show-more-note {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+@media (min-width: 40rem) {
+  .search-form {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .search-form .field {
+    flex: 1 1 auto;
+  }
+
+  .search-submit {
+    flex: 0 0 auto;
+  }
+
+  /* Label beside value, once there is room for both. */
+  .result-meta {
+    grid-template-columns: max-content 1fr;
+    align-items: baseline;
+  }
+
+  .result-meta dt {
+    margin: 0;
+  }
+
+  .show-more {
+    width: auto;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* T088 — the state and constituency entry point                          */
+/*                                                                        */
+/* Reuses the existing vocabulary wherever one exists: `.status-list` and  */
+/* its items come straight from the ministry profile's four-way split, so  */
+/* the three views look the same because they ARE the same rule, and       */
+/* `.basis`, `.fact`, `.flag-word` and `.picker-note` are untouched.       */
+/*                                                                        */
+/* 390 px first: every grid below is one column until it has room, and no  */
+/* rule here depends on a viewport wider than that to be readable.         */
+/* ---------------------------------------------------------------------- */
+
+.seat-head {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.seat-name {
+  font-family: var(--font-head);
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+/* The state, always beside the name. Three names in the window are ambiguous
+   without it, so this is not a subtitle -- it is part of the identity. */
+.seat-state {
+  margin: 2px 0 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.seat-id {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.seat-history {
+  margin: 0 0 14px;
+  color: var(--ink);
+}
+
+.rep-list,
+.question-list,
+.subject-list,
+.match-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rep {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px;
+  margin: 0 0 12px;
+}
+
+.rep-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.rep-name {
+  font-family: var(--font-head);
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+/* A member the seat record names but does not name. The id is shown instead,
+   in the monospace the page uses for every id, and the `.flag-word` beside it
+   carries the meaning without colour. */
+.rep-name-missing {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+.rep-meta,
+.question-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px 12px;
+  margin: 10px 0 0;
+}
+
+.rep-meta dt,
+.question-meta dt {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.rep-meta dd,
+.question-meta dd {
+  margin: 0;
+}
+
+.rep-id {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.rep-open {
+  margin: 12px 0 0;
+  min-height: var(--tap);
+  padding: 0 16px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.rep-open:hover {
+  border-color: var(--accent);
+}
+
+.rep-questions[data-state="empty"] {
+  display: none;
+}
+
+.rep-questions {
+  margin-top: 14px;
+  border-top: 1px solid var(--rule);
+  padding-top: 14px;
+}
+
+.member-totals {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.member-questions {
+  margin-top: 14px;
+}
+
+.question-list li {
+  border-top: 1px solid var(--rule);
+  padding: 12px 0;
+}
+
+.question-subject {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 1rem;
+}
+
+.subject-tally {
+  margin-top: 14px;
+}
+
+.subject-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  border-top: 1px solid var(--rule);
+  padding: 8px 0;
+}
+
+.subject-text {
+  flex: 1 1 auto;
+}
+
+.subject-count {
+  flex: 0 0 auto;
+  font-family: var(--font-head);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.match-host:empty {
+  display: none;
+}
+
+.match-host {
+  margin-top: 12px;
+}
+
+.match-list li {
+  border-top: 1px solid var(--rule);
+}
+
+/* One button per match, and the state is inside the button's label rather
+   than beside it: a reader choosing between two seats called Aurangabad is
+   choosing a state, so the state has to be part of what they click. */
+.match-button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 4px;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.match-button:hover .match-name {
+  text-decoration: underline;
+}
+
+.match-name {
+  font-weight: 700;
+}
+
+.match-state {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+@media (min-width: 40rem) {
+  .rep-meta,
+  .question-meta {
+    grid-template-columns: 9rem 1fr;
+  }
+
+  .rep-meta dt,
+  .question-meta dt {
+    margin: 0;
+  }
+
+  .member-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The same vertical rhythm the other three result regions use. */
+#state-summary > *,
+#seat-result > * {
+  margin-top: 16px;
+}
